@@ -18,6 +18,9 @@
                     <x-nav-link :href="route('messages.index')" :active="request()->routeIs('messages.*')">
                         {{ __('الرسائل') }}
                     </x-nav-link>
+                    <x-nav-link :href="route('contacts.index')" :active="request()->routeIs('contacts.*')">
+                        {{ __('جهات الاتصال') }}
+                    </x-nav-link>
                     <x-nav-link :href="route('users.index')" :active="request()->routeIs('users.*')">
                         {{ __('المستخدمين') }}
                     </x-nav-link>
@@ -96,6 +99,9 @@
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('messages.index')" :active="request()->routeIs('messages.*')">
                 {{ __('الرسائل') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('contacts.index')" :active="request()->routeIs('contacts.*')">
+                {{ __('جهات الاتصال') }}
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('users.index')" :active="request()->routeIs('users.*')">
                 {{ __('المستخدمين') }}

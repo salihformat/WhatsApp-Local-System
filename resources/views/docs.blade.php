@@ -88,8 +88,8 @@ php artisan serve --port=8001</pre>
                             <div class="space-y-4">
                                 <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border-r-4 border-blue-500">
                                     <h3 class="text-lg font-bold mb-2">أولاً: معالج الطوابير (Queue Worker)</h3>
-                                    <p class="text-sm mb-2">هذا الأمر مسؤول عن إرسال الرسائل فعلياً:</p>
-                                    <pre class="bg-gray-900 text-gray-100 p-3 rounded dir-ltr">php artisan queue:work</pre>
+                                    <p class="text-sm mb-2">هذا الأمر مسؤول عن إرسال الرسائل، ومزامنة جهات الاتصال، ومعالجة أحداث الـ Webhooks:</p>
+                                    <pre class="bg-gray-900 text-gray-100 p-3 rounded dir-ltr">php artisan queue:work --queue=contacts-sync,webhooks,default</pre>
                                 </div>
 
                                 <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border-r-4 border-green-500">
@@ -134,7 +134,7 @@ goto loop</pre>
                             <pre class="bg-gray-900 text-gray-100 p-3 rounded dir-ltr text-xs">
 [program:whatsapp-worker]
 process_name=%(program_name)s_%(process_num)02d
-command=php /path-to-your-project/artisan queue:work --sleep=3 --tries=3 --max-time=3600
+command=php /path-to-your-project/artisan queue:work --queue=contacts-sync,webhooks,default --sleep=3 --tries=3 --max-time=3600
 autostart=true
 autorestart=true
 user=www-data
@@ -144,7 +144,26 @@ stdout_logfile=/path-to-your-project/storage/logs/worker.log</pre>
                         </section>
 
                         <section class="mb-10">
-                            <h2 class="text-2xl font-semibold mb-4 border-b pb-2">6. ملاحظات هامة</h2>
+                            <h2 class="text-2xl font-semibold mb-4 border-b pb-2">6. مزامنة جهات الاتصال يدوياً (Contacts Sync)</h2>
+                            <p class="mb-4">تتم مزامنة جهات الاتصال تلقائياً عبر المهام المجدولة، ولكن يمكنك إجراؤها يدوياً في أي وقت:</p>
+                            
+                            <div class="space-y-4">
+                                <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border-r-4 border-purple-500">
+                                    <h3 class="text-lg font-bold mb-2">1. المزامنة عبر الطابور (ينصح به):</h3>
+                                    <p class="text-sm mb-2">هذا الأمر يضع مهمة المزامنة في الطابور لمعالجتها في الخلفية (يتطلب تشغيل Queue Worker):</p>
+                                    <pre class="bg-gray-900 text-gray-100 p-3 rounded dir-ltr">php artisan contacts:sync</pre>
+                                </div>
+
+                                <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border-r-4 border-red-500">
+                                    <h3 class="text-lg font-bold mb-2">2. المزامنة الفورية (بدون طابور):</h3>
+                                    <p class="text-sm mb-2">لتنفيذ المزامنة فوراً ورؤية النتائج مباشرة في الشاشة (مفيد لمعرفة سبب المشكلة أو الخطأ إن وجد):</p>
+                                    <pre class="bg-gray-900 text-gray-100 p-3 rounded dir-ltr">php artisan contacts:sync --now</pre>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="mb-10">
+                            <h2 class="text-2xl font-semibold mb-4 border-b pb-2">7. ملاحظات هامة</h2>
                             <ul class="list-disc list-inside space-y-2 mr-4 text-gray-700 dark:text-gray-300">
                                 <li>النظام يعتمد على ملفات يتم وضعها في مجلد محدد ليقوم بمعالجتها وإرسالها عبر الواتساب.</li>
                                 <li>تأكد من أن خدمة "الجدولة" (Scheduler) تعمل في الخلفية لضمان استمرارية الإرسال.</li>

@@ -204,6 +204,17 @@
                     <p class="text-sm mt-1 max-w-2xl leading-relaxed" style="color: rgba(255,255,255,0.9); margin: 0;">إدارة متكاملة لعمليات الإرسال، مراقبة المجلد النشط، معالجة الطوابير وإعادة إرسال الرسائل المتعثرة بضغطة زر.</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-3">
+                    <form action="{{ route('dashboard.start-services') }}" method="POST" class="inline" style="margin: 0;">
+                        @csrf
+                        <button type="submit" class="btn-header-white" style="background-color: #fef08a !important; color: #854d0e !important; box-shadow: 0 4px 12px rgba(202, 138, 4, 0.3);">
+                            <svg style="width: 18px; height: 18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            تشغيل الخدمات (مخفية)
+                        </button>
+                    </form>
+
                     <form action="{{ route('dashboard.scan') }}" method="POST" class="inline" style="margin: 0;">
                         @csrf
                         <button type="submit" class="btn-header-white">
@@ -233,6 +244,16 @@
                             تشغيل الطابور
                         </button>
                     </form>
+
+                    <form action="{{ route('dashboard.restart-queue') }}" method="POST" class="inline" style="margin: 0;">
+                        @csrf
+                        <button type="submit" class="btn-header-white" style="background-color: #fee2e2 !important; color: #991b1b !important; box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2);">
+                            <svg style="width: 18px; height: 18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 4.89M9 11l3 3L22 4"></path>
+                            </svg>
+                            إعادة تشغيل الطابور
+                        </button>
+                    </form>
                 </div>
             </div>
 
@@ -259,6 +280,12 @@
                 <a href="{{ route('messages.index', ['status' => 'sent']) }}" class="mini-square-card">
                     <div class="mini-card-title" style="color: #16a34a;">مرسل</div>
                     <div class="mini-card-value" style="color: #16a34a;">{{ $stats['sent'] }}</div>
+                </a>
+
+                <!-- Stat Card: Received -->
+                <a href="{{ route('messages.index', ['status' => 'received']) }}" class="mini-square-card">
+                    <div class="mini-card-title" style="color: #4f46e5;">واردة</div>
+                    <div class="mini-card-value" style="color: #4f46e5;">{{ $stats['received'] ?? 0 }}</div>
                 </a>
 
                 <!-- Stat Card: Delivered -->
@@ -311,6 +338,22 @@
                             <div style="font-size: 13px; color: #334155; background-color: #f8fafc; padding: 16px; border-radius: 16px; border: 1px solid #e2e8f0; font-family: monospace; text-align: left; direction: ltr;">
                                 <strong style="font-weight: 700; display: block; text-align: right; color: #0f172a; margin-bottom: 6px; font-family: 'Cairo', sans-serif;" dir="rtl">المسار النشط:</strong>
                                 {{ $folderStats['path'] }}
+                            </div>
+
+                            <!-- Server Connection Status -->
+                            <div style="padding: 16px; border-radius: 16px; display: flex; align-items: center; justify-content: space-between; background-color: {{ $serverStatus['connected'] ? '#dcfce7' : '#fee2e2' }}; border: 1px solid {{ $serverStatus['connected'] ? '#bbf7d0' : '#fecaca' }};">
+                                <div class="flex items-center gap-3">
+                                    <div class="{{ $serverStatus['connected'] ? 'pulse-dot-green' : 'pulse-dot-red' }}"></div>
+                                    <div>
+                                        <div style="font-weight: 700; font-size: 14px; color: {{ $serverStatus['connected'] ? '#15803d' : '#b91c1c' }};">
+                                            {{ $serverStatus['connected'] ? 'متصل بالسيرفر' : 'غير متصل بالسيرفر' }}
+                                        </div>
+                                        <div style="font-size: 11px; color: {{ $serverStatus['connected'] ? '#166534' : '#991b1b' }}; opacity: 0.9; margin-top: 2px;">
+                                            {{ $serverStatus['message'] }}
+                                        </div>
+                                    </div>
+                                </div>
+                                <span style="color: #64748b; font-size: 12px; font-family: monospace;">Server</span>
                             </div>
 
                             @if(auth()->user()->isAdmin())
@@ -387,6 +430,7 @@
                             <tr style="background-color: #f8fafc; color: #64748b; font-weight: 700; font-size: 13px;">
                                 <th style="padding: 16px; border-top-right-radius: 14px; border-bottom-right-radius: 14px;">رقم الرسالة</th>
                                 <th style="padding: 16px;">المستلم</th>
+                                <th style="padding: 16px; width: 160px;">محتوى الرسالة</th>
                                 <th style="padding: 16px;">نوع الرسالة</th>
                                 <th style="padding: 16px;">الملف المرفق</th>
                                 <th style="padding: 16px;">الحالة</th>
@@ -399,6 +443,21 @@
                                 <tr style="background-color: #ffffff; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
                                     <td style="padding: 16px; font-weight: 800; color: #0f172a; border-top-right-radius: 12px; border-bottom-right-radius: 12px; border: 1px solid #f1f5f9; border-left: none;">#{{ $msg->id }}</td>
                                     <td style="padding: 16px; font-weight: 700; color: #0f172a; border-top: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9;" dir="ltr">{{ $msg->phone_number }}</td>
+                                    <td style="padding: 16px; border-top: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9; max-width: 160px; min-width: 160px; width: 160px; text-align: right;">
+                                        @if(mb_strlen($msg->message_text ?? '') > 50)
+                                            <div id="dash-msg-text-{{ $msg->id }}" class="text-gray-900 font-medium whitespace-normal leading-relaxed text-xs overflow-hidden transition-all duration-300" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word;">
+                                                {{ $msg->message_text }}
+                                            </div>
+                                            <button onclick="toggleDashboardMessage(this, 'dash-msg-text-{{ $msg->id }}')" class="text-[#128C7E] hover:text-[#075E54] text-[10px] font-bold mt-1.5 focus:outline-none inline-flex items-center gap-1 transition-colors bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-full border border-emerald-100/50">
+                                                <span class="toggle-text">{{ __('عرض المزيد') }}</span>
+                                                <svg class="w-3 h-3 transform transition-transform duration-300 toggle-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                            </button>
+                                        @else
+                                            <div class="text-gray-900 font-medium whitespace-normal leading-relaxed text-xs" style="word-break: break-word;">
+                                                {{ $msg->message_text ?? '--' }}
+                                            </div>
+                                        @endif
+                                    </td>
                                     <td style="padding: 16px; border-top: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9;">
                                         @if($msg->message_type === 'media')
                                             <span style="background-color: #e0e7ff; color: #4338ca; padding: 4px 10px; border-radius: 8px; font-size: 12px; font-weight: 700;">وسائط وملف</span>
@@ -419,10 +478,25 @@
                                         @endif
                                     </td>
                                     <td style="padding: 16px; border-top: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9;">
-                                        @if($msg->status === 'sent' || $msg->status === 'delivered' || $msg->status === 'read')
+                                        @if($msg->status === 'read')
+                                            <span class="status-badge status-sent" style="color: #1d4ed8; background-color: #dbeafe; border: 1px solid rgba(29, 78, 216, 0.1);">
+                                                <span style="width: 8px; height: 8px; border-radius: 50%; background-color: #3b82f6;"></span>
+                                                تم القراءة
+                                            </span>
+                                        @elseif($msg->status === 'delivered')
+                                            <span class="status-badge status-sent" style="color: #0369a1; background-color: #e0f2fe; border: 1px solid rgba(3, 105, 161, 0.1);">
+                                                <span style="width: 8px; height: 8px; border-radius: 50%; background-color: #0ea5e9;"></span>
+                                                تم التسليم
+                                            </span>
+                                        @elseif($msg->status === 'sent' || $msg->status === 'queued')
                                             <span class="status-badge status-sent">
                                                 <span style="width: 8px; height: 8px; border-radius: 50%; background-color: #22c55e;"></span>
                                                 تم الإرسال
+                                            </span>
+                                        @elseif($msg->status === 'received')
+                                            <span class="status-badge status-processing" style="color: #4338ca; background-color: #e0e7ff; border: 1px solid rgba(67, 56, 202, 0.1);">
+                                                <span style="width: 8px; height: 8px; border-radius: 50%; background-color: #4338ca;"></span>
+                                                مستلمة
                                             </span>
                                         @elseif($msg->status === 'processing')
                                             <span class="status-badge status-processing">
@@ -434,13 +508,22 @@
                                                 <span style="width: 8px; height: 8px; border-radius: 50%; background-color: #eab308;"></span>
                                                 في الانتظار
                                             </span>
+                                        @elseif($msg->status === 'cancelled')
+                                            <span class="status-badge status-failed" title="ملغاة" style="color: #be123c; background-color: #ffe4e6; border: 1px solid rgba(190, 18, 60, 0.1);">
+                                                <span style="width: 8px; height: 8px; border-radius: 50%; background-color: #be123c;"></span>
+                                                ملغاة
+                                            </span>
                                         @else
                                             <span class="status-badge status-failed" title="{{ $msg->error_message }}">
                                                 <span style="width: 8px; height: 8px; border-radius: 50%; background-color: #ef4444;"></span>
                                                 فشلت
                                             </span>
                                             @if($msg->error_message)
-                                                <span style="font-size: 11px; color: #ef4444; display: block; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 4px; font-weight: 700;" title="{{ $msg->error_message }}">{{ $msg->error_message }}</span>
+                                                <div class="error-msg-wrapper" style="margin-top: 4px; max-width: 200px; text-align: right;">
+                                                    <div class="error-short" style="font-size: 11px; color: #ef4444; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700;" title="{{ $msg->error_message }}">{{ $msg->error_message }}</div>
+                                                    <div class="error-full" style="font-size: 11px; color: #ef4444; display: none; white-space: normal; word-break: break-word; font-weight: 700;">{{ $msg->error_message }}</div>
+                                                    <button type="button" onclick="const wrapper = this.parentElement; const shortText = wrapper.querySelector('.error-short'); const fullText = wrapper.querySelector('.error-full'); if(fullText.style.display === 'none') { fullText.style.display = 'block'; shortText.style.display = 'none'; this.innerText = 'إخفاء'; } else { fullText.style.display = 'none'; shortText.style.display = 'block'; this.innerText = 'قراءة المزيد'; }" style="font-size: 10px; color: #b91c1c; text-decoration: underline; background: transparent; border: none; cursor: pointer; padding: 0; margin-top: 4px; font-family: inherit; font-weight: 800;">قراءة المزيد</button>
+                                                </div>
                                             @endif
                                         @endif
                                     </td>
@@ -468,7 +551,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" style="padding: 48px; text-align: center; color: #64748b; font-weight: 700; background-color: #ffffff; border-radius: 16px; border: 1px solid #f1f5f9;">لا توجد رسائل نشطة حالياً. قم بإدخال ملفات في مجلد المراقبة للبدء تلقائياً!</td>
+                                    <td colspan="8" style="padding: 48px; text-align: center; color: #64748b; font-weight: 700; background-color: #ffffff; border-radius: 16px; border: 1px solid #f1f5f9;">لا توجد رسائل نشطة حالياً. قم بإدخال ملفات في مجلد المراقبة للبدء تلقائياً!</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -481,6 +564,23 @@
 
     <!-- Chart Configuration Script -->
     <script>
+        // Toggle message text function for dashboard
+        window.toggleDashboardMessage = function(button, textId) {
+            const textDiv = document.getElementById(textId);
+            const icon = button.querySelector('.toggle-icon');
+            const textSpan = button.querySelector('.toggle-text');
+            
+            if (textDiv.style.webkitLineClamp === '2') {
+                textDiv.style.webkitLineClamp = 'unset';
+                textSpan.innerText = '{{ __("عرض أقل") }}';
+                icon.classList.add('rotate-180');
+            } else {
+                textDiv.style.webkitLineClamp = '2';
+                textSpan.innerText = '{{ __("عرض المزيد") }}';
+                icon.classList.remove('rotate-180');
+            }
+        };
+
         document.addEventListener('DOMContentLoaded', function () {
             const ctx = document.getElementById('deliveryTrendChart').getContext('2d');
             

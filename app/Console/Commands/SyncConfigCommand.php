@@ -40,13 +40,18 @@ class SyncConfigCommand extends Command
         }
 
         try {
-            $response = Http::timeout(15)
+            $http = Http::timeout(15)
                 ->withHeaders([
                     'Authorization' => 'Bearer ' . $token,
                     'X-Company-ID' => $companyId,
                     'Accept' => 'application/json',
-                ])
-                ->get($apiUrl . '/local-system/config');
+                ]);
+
+            if (env('API_VERIFY_SSL', true) === false || env('API_VERIFY_SSL') === 'false') {
+                $http->withoutVerifying();
+            }
+
+            $response = $http->get($apiUrl . '/local-system/config');
 
             if ($response->successful()) {
                 $data = $response->json();

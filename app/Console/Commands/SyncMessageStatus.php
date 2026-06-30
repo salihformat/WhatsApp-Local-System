@@ -16,7 +16,7 @@ class SyncMessageStatus extends Command
     {
         $limit = $this->option('limit');
 
-        $pendingMessages = Message::whereIn('status', ['pending', 'sent'])
+        $pendingMessages = Message::whereIn('status', ['pending', 'sent', 'delivered', 'queued'])
             ->whereNotNull('central_message_id')
             ->where('created_at', '>=', now()->subHours(48))
             ->orderBy('updated_at', 'asc')
@@ -49,22 +49,31 @@ class SyncMessageStatus extends Command
                             $statusData = $result['statuses'][$centralId];
                             $newStatus = $statusData['status'];
 
+                            $hasChanges = false;
+                            $updateData = [];
+
                             if ($newStatus !== $message->status) {
-                                $updateData = [];
+                                $hasChanges = true;
+                            }
 
-                                if ($statusData['sent_at']) {
-                                    $updateData['sent_at'] = $statusData['sent_at'];
-                                }
-                                if ($statusData['delivered_at']) {
-                                    $updateData['delivered_at'] = $statusData['delivered_at'];
-                                }
-                                if ($statusData['read_at']) {
-                                    $updateData['read_at'] = $statusData['read_at'];
-                                }
-                                if ($statusData['error_message']) {
-                                    $updateData['error_message'] = $statusData['error_message'];
-                                }
+                            if ($statusData['sent_at'] && !$message->sent_at) {
+                                $updateData['sent_at'] = $statusData['sent_at'];
+                                $hasChanges = true;
+                            }
+                            if ($statusData['delivered_at'] && !$message->delivered_at) {
+                                $updateData['delivered_at'] = $statusData['delivered_at'];
+                                $hasChanges = true;
+                            }
+                            if ($statusData['read_at'] && !$message->read_at) {
+                                $updateData['read_at'] = $statusData['read_at'];
+                                $hasChanges = true;
+                            }
+                            if ($statusData['error_message'] && $statusData['error_message'] !== $message->error_message) {
+                                $updateData['error_message'] = $statusData['error_message'];
+                                $hasChanges = true;
+                            }
 
+                            if ($hasChanges) {
                                 $message->updateStatus($newStatus, $updateData);
                                 $syncCount++;
 

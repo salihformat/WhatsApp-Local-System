@@ -11,8 +11,10 @@ class Message extends Model
     use HasFactory;
 
     protected $fillable = [
+        'is_incoming',
         'user_id',
         'phone_number',
+        'sender_name',
         'message_text',
         'file_name',
         'file_type',
@@ -124,6 +126,10 @@ class Message extends Model
 
         if (isset($metadata['error_message'])) {
             $updateData['error_message'] = $metadata['error_message'];
+        }
+
+        if (isset($metadata['file_url'])) {
+            $updateData['file_path'] = $metadata['file_url'];
         }
 
         $this->update($updateData);

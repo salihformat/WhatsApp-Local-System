@@ -23,7 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // API middleware group
         $middleware->group('api', [
             // \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
-            \Illuminate\Routing\Middleware\ThrottleRequests::class.':api',
+            // \Illuminate\Routing\Middleware\ThrottleRequests::class.':api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ]);
     })

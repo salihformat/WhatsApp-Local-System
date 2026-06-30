@@ -100,6 +100,7 @@ class MessageController extends Controller
                     'read' => 'تم القراءة',
                     'delivered' => 'تم التسليم',
                     'sent' => 'مرسلة بنجاح',
+                    'received' => 'مستلمة',
                     'pending' => 'قيد الانتظار',
                     'processing' => 'جاري المعالجة',
                     'failed' => 'فشلت',
@@ -129,12 +130,13 @@ class MessageController extends Controller
         return response()->stream($callback, 200, $headers);
     }
 
-    /**
-     * Show the form for creating a new message.
-     */
-    public function create()
+    public function create(Request $request)
     {
-        return view('messages.create');
+        $preselectedContact = null;
+        if ($request->has('contact_id')) {
+            $preselectedContact = \App\Models\Contact::find($request->contact_id);
+        }
+        return view('messages.create', compact('preselectedContact'));
     }
 
     /**
@@ -427,9 +429,32 @@ class MessageController extends Controller
             return response()->json(['error' => 'Unauthorized'], 401);
         }
 
-        $localId = $request->input('local_message_id') ?? $request->input('message_id');
-        $validator = Validator::make(['local_message_id' => $localId] + $request->all(), [
-            'local_message_id' => 'required|integer',
+        if ($request->input('event') === 'ping' || $request->header('X-Webhook-Event') === 'ping') {
+            Log::info('Webhook ping received successfully.', [
+                'ip' => $request->ip(),
+            ]);
+            return response()->json(['success' => true, 'message' => 'Ping received successfully.']);
+        }
+
+        // The central system sends data nested inside a "data" object, but also support root level for compatibility
+        $data = $request->input('data') ?? $request->all();
+        
+        $localId = $data['local_message_id'] ?? $data['message_id'] ?? null;
+        
+        // إذا كان المعرف غير رقمي (مثل UUID قادم من رسالة نظام مركزي ولم تخرج من النظام المحلي)، نتجاهلها بسلام.
+        if (!is_numeric($localId)) {
+            return response()->json(['success' => true, 'message' => 'Ignored non-local message']);
+        }
+
+        $status = $data['status'] ?? null;
+        $errorMessage = $data['error_message'] ?? null;
+
+        $validator = Validator::make([
+            'local_message_id' => $localId,
+            'status' => $status,
+            'error_message' => $errorMessage
+        ], [
+            'local_message_id' => 'required|numeric',
             'status' => 'required|string|in:pending,processing,sent,delivered,read,failed,no_whatsapp',
             'error_message' => 'nullable|string|max:1000'
         ]);
@@ -444,19 +469,76 @@ class MessageController extends Controller
         }
 
         $updateData = [];
-        if ($request->input('sent_at')) $updateData['sent_at'] = $request->input('sent_at');
-        if ($request->input('delivered_at')) $updateData['delivered_at'] = $request->input('delivered_at');
-        if ($request->input('read_at')) $updateData['read_at'] = $request->input('read_at');
-        if ($request->input('error_message')) $updateData['error_message'] = $request->input('error_message');
+        if (isset($data['sent_at'])) $updateData['sent_at'] = $data['sent_at'];
+        if (isset($data['delivered_at'])) $updateData['delivered_at'] = $data['delivered_at'];
+        if (isset($data['read_at'])) $updateData['read_at'] = $data['read_at'];
+        if ($errorMessage) $updateData['error_message'] = $errorMessage;
+        if (!empty($data['file_url'])) $updateData['file_url'] = $data['file_url'];
 
-        $message->updateStatus($request->input('status'), $updateData);
+        $message->updateStatus($status, $updateData);
 
         Log::info("Webhook status updated for message ID: {$message->id}", [
-            'new_status' => $request->input('status'),
+            'new_status' => $status,
             'ip' => $request->ip(),
         ]);
 
         return response()->json(['success' => true]);
+    }
+
+    /**
+     * استلام رسالة واردة من النظام المركزي
+     */
+    public function incomingMessage(Request $request)
+    {
+        $token = $request->header('Authorization');
+        $expectedToken = 'Bearer ' . config('app.central_api_token');
+
+        if (empty($token) || $token !== $expectedToken) {
+            Log::warning('Unauthorized incoming_message webhook attempt', [
+                'ip' => $request->ip()
+            ]);
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $data = $request->input('data') ?? $request->all();
+
+        Log::info("Received incoming webhook payload:", ['data' => $data]);
+
+        $validator = Validator::make($data, [
+            'sender_phone' => 'required|string',
+            'message_body' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            Log::error('Validation failed for incoming webhook', ['errors' => $validator->errors()]);
+            return response()->json(['error' => 'Invalid data', 'details' => $validator->errors()], 400);
+        }
+
+        $messageType = isset($data['message_type']) && in_array($data['message_type'], ['text', 'chat']) ? 'text' : 'media';
+
+        $message = Message::create([
+            'is_incoming' => true,
+            'phone_number' => $data['sender_phone'],
+            'sender_name' => $data['sender_name'] ?? null,
+            'message_text' => $data['message_body'] ?? '',
+            'message_type' => $messageType,
+            'file_path' => $data['media_url'] ?? null,
+            'file_name' => $data['file_name'] ?? null,
+            'file_type' => $data['mime_type'] ?? null,
+            'central_message_id' => $data['message_id'] ?? null,
+            'status' => 'received',
+            'metadata' => [
+                'session' => $data['session'] ?? null,
+                'channel' => $data['channel'] ?? 'whatsapp',
+                'is_group' => $data['is_group'] ?? false,
+            ]
+        ]);
+
+        Log::info("Incoming message received from: {$data['sender_phone']}", [
+            'local_message_id' => $message->id
+        ]);
+
+        return response()->json(['success' => true, 'message_id' => $message->id]);
     }
 
     // ===== مسارات API المحمية =====

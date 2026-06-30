@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <title>Laravel</title>
+    <title>{{ config('app.name', 'Laravel') }}</title>
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.bunny.net">
@@ -1582,6 +1582,7 @@
                             </span>
                         </li>
                     </ul>
+                    @guest
                     <ul class="flex gap-3 text-sm leading-normal">
                         <li>
                             <a href="{{ route('login') }}" class="inline-block dark:bg-[#eeeeec] dark:border-[#eeeeec] dark:text-[#1C1C1A] dark:hover:bg-white dark:hover:border-white hover:bg-black hover:border-black px-8 py-2 bg-[#1b1b18] rounded-sm border border-black text-white text-sm font-medium transition-all">
@@ -1589,6 +1590,7 @@
                             </a>
                         </li>
                     </ul>
+                    @endguest
                 </div>
                 <div class="bg-[#fff2f2] dark:bg-[#1D0002] relative lg:-ml-px -mb-px lg:mb-0 rounded-t-lg lg:rounded-t-none lg:rounded-r-lg aspect-[335/376] lg:aspect-auto w-full lg:w-[438px] shrink-0 overflow-hidden flex items-center justify-center p-8">
                     <img src="{{ asset('image/main.png') }}" alt="Main Illustration" class="w-full max-w-[280px] h-auto object-contain transition-all translate-y-0 opacity-100 duration-750 starting:opacity-0 starting:translate-y-6 hover:scale-105 drop-shadow-2xl filter" />

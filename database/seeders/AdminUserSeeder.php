@@ -10,12 +10,23 @@ class AdminUserSeeder extends Seeder
 {
     public function run()
     {
+        // إنشاء مستخدم أدمن
         User::updateOrCreate(
             ['email' => 'admin@rasayily.com'],
             [
-                'name' => 'Admin',
+                'name' => 'Admin User',
                 'password' => Hash::make('admin123'),
                 'is_admin' => true,
+            ]
+        );
+
+        // إنشاء مستخدم عادي
+        User::updateOrCreate(
+            ['email' => 'user@rasayily.com'],
+            [
+                'name' => 'Normal User',
+                'password' => Hash::make('user123'),
+                'is_admin' => false,
             ]
         );
     }

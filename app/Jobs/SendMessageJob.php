@@ -169,6 +169,10 @@ class SendMessageJob implements ShouldQueue
                     'Accept' => 'application/json'
                 ]);
 
+            if (env('API_VERIFY_SSL', true) === false || env('API_VERIFY_SSL') === 'false') {
+                $request->withoutVerifying();
+            }
+
             $hasAttachedFile = false;
             if ($message->message_type === 'media' && $message->file_path) {
                 $localPath = null;
@@ -189,21 +193,48 @@ class SendMessageJob implements ShouldQueue
                 }
 
                 if ($localPath && file_exists($localPath)) {
+                    // Check if filename contains non-ASCII characters (like Arabic)
+                    $isAscii = preg_match('/^[\x20-\x7E]*$/', $message->file_name);
+                    
+                    if ($isAscii) {
+                        $uploadName = $message->file_name;
+                    } else {
+                        $extension = pathinfo($message->file_name, PATHINFO_EXTENSION);
+                        $uploadName = 'document_' . $message->id . ($extension ? '.' . $extension : '');
+                    }
+
                     $request = $request->attach(
                         'file',
                         fopen($localPath, 'r'),
-                        $message->file_name
+                        $uploadName
                     );
                     $hasAttachedFile = true;
-                    Log::info("Attached physical file for multipart upload: {$localPath}");
+                    Log::info("Attached physical file for multipart upload: {$localPath} as {$uploadName}");
+                    $requestData['file_url'] = null; // Ensure file_url is not set initially
                 }
             }
 
             if ($hasAttachedFile) {
-                // If we are attaching the file physically, we do not need to send file_url,
-                // which avoids any central validation errors on non-public/invalid local URLs.
+                // Try multipart upload first
                 unset($requestData['file_url']);
                 $response = $request->post(config('app.central_api_url') . '/messages/send', $requestData);
+
+                // If multipart failed AND we have public temp storage enabled, try fallback
+                if (!$response->successful() && env('USE_PUBLIC_TEMP_STORAGE', false) && isset($localPath) && file_exists($localPath)) {
+                    Log::warning("Multipart upload failed with status " . $response->status() . ", attempting tmpfiles.org fallback...");
+                    $publicUrl = $this->uploadToTemporaryPublicStorage($localPath);
+                    
+                    if ($publicUrl) {
+                        $requestData['file_url'] = $publicUrl;
+                        Log::info("Fallback successful: Uploaded file to public temp storage: {$publicUrl}");
+                        
+                        // Send as JSON with file_url
+                        $request = Http::timeout(config('app.central_api_timeout', 60))
+                            ->withToken(config('app.central_api_token'));
+                        $response = $request->withHeaders(['Content-Type' => 'application/json'])
+                            ->post(config('app.central_api_url') . '/messages/send', $requestData);
+                    }
+                }
             } else {
                 $response = $request->withHeaders(['Content-Type' => 'application/json'])
                     ->post(config('app.central_api_url') . '/messages/send', $requestData);
@@ -303,9 +334,16 @@ class SendMessageJob implements ShouldQueue
             'attempt' => $this->attempts()
         ]);
 
+        $errorMessage = $exception->getMessage();
+        if ($exception instanceof \Illuminate\Http\Client\ConnectionException || str_contains($errorMessage, 'cURL error') || str_contains($errorMessage, 'Timeout')) {
+            $friendlyError = 'تعذر الاتصال بالسيرفر المركزي (انتهت مهلة الاتصال). يرجى التحقق من اتصال الإنترنت أو حالة السيرفر.';
+        } else {
+            $friendlyError = 'خطأ في الاتصال: ' . $errorMessage;
+        }
+
         $message->update([
             'status' => 'failed',
-            'error_message' => 'خطأ في الاتصال: ' . $exception->getMessage(),
+            'error_message' => $friendlyError,
         ]);
 
         if ($this->attempts() < $this->tries) {
@@ -322,9 +360,16 @@ class SendMessageJob implements ShouldQueue
 
         $message = Message::find($this->messageId);
         if ($message) {
+            $errorMessage = $exception->getMessage();
+            if ($exception instanceof \Illuminate\Http\Client\ConnectionException || str_contains($errorMessage, 'cURL error') || str_contains($errorMessage, 'Timeout')) {
+                $friendlyError = 'فشل نهائي بعد ' . $this->tries . ' محاولات: تعذر الاتصال بالسيرفر المركزي.';
+            } else {
+                $friendlyError = 'فشل نهائي بعد ' . $this->tries . ' محاولات: ' . $errorMessage;
+            }
+
             $message->update([
                 'status' => 'failed',
-                'error_message' => 'فشل نهائي بعد ' . $this->tries . ' محاولات: ' . $exception->getMessage(),
+                'error_message' => $friendlyError,
             ]);
             $this->moveFolderFile($message, false);
         }
@@ -395,5 +440,37 @@ class SendMessageJob implements ShouldQueue
         } catch (\Exception $e) {
             Log::error("Failed to move file {$message->file_name} to {$targetFolder}: " . $e->getMessage());
         }
+    }
+
+    /**
+     * رفع الملف إلى خدمة استضافة عامة مؤقتة (لحل مشكلة سيرفرات الواتساب الخارجية التي تتطلب روابط عامة)
+     */
+    private function uploadToTemporaryPublicStorage(string $filePath): ?string
+    {
+        try {
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, 'https://tmpfiles.org/api/v1/upload');
+            curl_setopt($ch, CURLOPT_POST, 1);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, ['file' => new \CURLFile($filePath)]);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($httpCode === 200 && $response) {
+                $data = json_decode($response, true);
+                if (isset($data['status']) && $data['status'] === 'success' && isset($data['data']['url'])) {
+                    $originalUrl = $data['data']['url'];
+                    // Convert tmpfiles.org/XXXX to tmpfiles.org/dl/XXXX to get the direct download link
+                    $directUrl = str_replace('tmpfiles.org/', 'tmpfiles.org/dl/', $originalUrl);
+                    return $directUrl;
+                }
+            }
+        } catch (\Exception $e) {
+            Log::error('Temporary public upload failed: ' . $e->getMessage());
+        }
+        return null;
     }
 }

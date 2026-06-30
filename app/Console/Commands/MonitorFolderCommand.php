@@ -193,14 +193,8 @@ class MonitorFolderCommand extends Command
                 
                 Storage::disk('public')->put($publicPath, File::get($fullPath));
                 
-                // Construct file URL safely without duplication
-                $relativeUrl = Storage::disk('public')->url($publicPath);
-                if (preg_match('/^https?:\/\//i', $relativeUrl)) {
-                    $fileUrl = $relativeUrl;
-                } else {
-                    $baseUrl = config('filemanager.public_url', url('/'));
-                    $fileUrl = rtrim($baseUrl, '/') . '/' . ltrim($relativeUrl, '/');
-                }
+                // Construct file URL safely as a relative path so it works from any host/domain
+                $fileUrl = '/storage/' . $publicPath;
 
                 $defaultText = env('MONITOR_MESSAGE_TEXT');
                 if ($defaultText === null) {

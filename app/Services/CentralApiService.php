@@ -169,7 +169,7 @@ class CentralApiService
     /**
      * تنفيذ طلب API إلى النظام المركزي
      */
-    private function makeApiRequest(string $method, string $endpoint, array $data = [], ?int $companyId = null): array
+    public function makeApiRequest(string $method, string $endpoint, array $data = [], ?int $companyId = null): array
     {
         $attempt = 0;
         $lastError = null;
@@ -210,7 +210,7 @@ class CentralApiService
                     'timeout' => "{$this->timeout} seconds"
 
                 ]);
-                $response = Http::withHeaders([
+                $http = Http::withHeaders([
                     'Authorization' => 'Bearer ' . $this->apiToken,
                     'X-Company-ID' => $currentCompanyId,  // Use the current config value
                     'Content-Type' => 'application/json',
@@ -218,11 +218,23 @@ class CentralApiService
 //                    'X-Request-ID' => uniqid('req_'),
                     'X-Request-ID' => $requestId,
                 ])->timeout($this->timeout);
+
+                if (env('API_VERIFY_SSL', true) === false || env('API_VERIFY_SSL') === 'false') {
+                    $http->withoutVerifying();
+                }
+                $response = $http;
+                $url = rtrim($this->baseUrl, '/') . '/' . ltrim($endpoint, '/');
                 $startTime = microtime(true);
-                if ($method === 'POST') {
-                    $httpResponse = $response->post($this->baseUrl . $endpoint, $data);
+                if (strtoupper($method) === 'POST') {
+                    $httpResponse = $response->post($url, $data);
+                } elseif (strtoupper($method) === 'PUT') {
+                    $httpResponse = $response->put($url, $data);
+                } elseif (strtoupper($method) === 'PATCH') {
+                    $httpResponse = $response->patch($url, $data);
+                } elseif (strtoupper($method) === 'DELETE') {
+                    $httpResponse = $response->delete($url, $data);
                 } else {
-                    $httpResponse = $response->get($this->baseUrl . $endpoint, $data);
+                    $httpResponse = $response->get($url, $data);
                 }
 
                 $responseTime = round((microtime(true) - $startTime) * 1000, 2); // in milliseconds
@@ -259,7 +271,11 @@ class CentralApiService
                     ]);
                 } else {
                     $errorData = $httpResponse->json();
-                    $lastError = "HTTP {$httpResponse->status()}: " . ($errorData['message'] ?? 'Unknown error');
+                    if ($httpResponse->status() === 404) {
+                        $lastError = "HTTP 404: لم يتم العثور على الرابط المطلوب في النظام المركزي (تأكد من وجود المسار {$endpoint})";
+                    } else {
+                        $lastError = "HTTP {$httpResponse->status()}: " . ($errorData['message'] ?? 'Unknown error');
+                    }
 
                     Log::warning("API Request failed", [
                         'attempt' => $attempt,

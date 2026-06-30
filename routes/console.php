@@ -41,3 +41,5 @@ Schedule::command('monitor:folder')->everyMinute()->withoutOverlapping();
 // إنشاء تقرير يومي (مرة واحدة فقط)
 // Schedule::command('reports:daily')->dailyAt('23:59');
 
+// مزامنة جهات الاتصال مع النظام المركزي كل 15 دقيقة
+Schedule::command('contacts:sync')->everyFifteenMinutes()->withoutOverlapping();

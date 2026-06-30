@@ -10,23 +10,29 @@
             .btn-whatsapp-primary {
                 background-color: #128C7E !important;
                 color: #ffffff !important;
-                border: 1px solid #075E54 !important;
-                transition: all 0.3s ease;
+                border: none !important;
+                border-radius: 8px !important;
+                font-weight: 600 !important;
+                transition: all 0.2s ease-in-out !important;
             }
             .btn-whatsapp-primary:hover {
-                background-color: #075E54 !important;
-                color: #ffffff !important;
-                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+                background-color: #0d6b60 !important;
+                box-shadow: 0 4px 6px -1px rgba(18, 140, 126, 0.3) !important;
+                transform: translateY(-1px);
             }
             .btn-whatsapp-secondary {
-                background-color: #DCF8C6 !important;
-                color: #075E54 !important;
-                border: 1px solid #128C7E !important;
-                transition: all 0.3s ease;
+                background-color: #fee2e2 !important; /* Tailwind red-100 */
+                color: #dc2626 !important; /* Tailwind red-600 */
+                border: none !important;
+                border-radius: 8px !important;
+                font-weight: 600 !important;
+                transition: all 0.2s ease-in-out !important;
             }
             .btn-whatsapp-secondary:hover {
-                background-color: #c7ebae !important;
-                color: #075E54 !important;
+                background-color: #fecaca !important; /* Tailwind red-200 */
+                color: #b91c1c !important; /* Tailwind red-700 */
+                transform: translateY(-1px);
+                box-shadow: 0 4px 6px -1px rgba(220, 38, 38, 0.1) !important;
             }
         </style>
     </head>
@@ -45,20 +51,45 @@
                 <div class="mb-6 flex items-center gap-4">
                     <label for="phone_number" class="w-1/4 text-sm font-medium text-gray-700">رقم الجوال (دولي)</label>
                     <div class="flex-grow w-3/4">
-                        <div class="relative rounded-md shadow-sm">
-                            <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                        <div class="relative rounded-md shadow-sm" id="phone-autocomplete-wrapper">
+                            <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none z-10">
                                 <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                                 </svg>
                             </div>
                             <input type="tel" name="phone_number" id="phone_number"
-                                   class="focus:ring-blue-500 focus:border-blue-500 block w-full pr-10 sm:text-sm border-gray-300 rounded-md p-3 border"
-                                   placeholder="مثال: 966501234567"
+                                   class="focus:ring-[#128C7E] focus:border-[#128C7E] block w-full pr-10 sm:text-sm border-gray-300 rounded-md p-3 border"
+                                   placeholder="ابحث بالاسم أو الرقم... أو أدخل رقم جديد"
                                    pattern="[0-9]{10,15}"
                                    required
+                                   autocomplete="off"
                                    dir="ltr">
+                            <!-- قائمة الاقتراحات -->
+                            <div id="contact-suggestions" class="hidden absolute z-50 w-full mt-1 bg-white rounded-xl shadow-2xl border border-gray-200 max-h-64 overflow-y-auto" style="direction:rtl">
+                                <div id="suggestions-list"></div>
+                                <div id="suggestions-loading" class="hidden p-3 text-center text-xs text-gray-400">
+                                    <svg class="animate-spin h-4 w-4 mx-auto mb-1 text-[#128C7E]" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                    جاري البحث...
+                                </div>
+                                <div id="suggestions-empty" class="hidden p-3 text-center text-xs text-gray-400">
+                                    لا توجد نتائج مطابقة
+                                </div>
+                            </div>
                         </div>
-                        <p class="mt-1 text-sm text-gray-500">أدخل الرمز الدولي متبوعاً برقم الجوال (بدون + أو 00)</p>
+                        <!-- بطاقة جهة الاتصال المختارة -->
+                        <div id="selected-contact-card" class="hidden mt-2 bg-gradient-to-l from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-3 flex items-center justify-between animate-fade-in">
+                            <div class="flex items-center gap-3">
+                                <div class="w-9 h-9 rounded-full bg-[#128C7E] text-white flex items-center justify-center font-black text-sm" id="selected-avatar"></div>
+                                <div>
+                                    <p class="font-bold text-sm text-gray-800" id="selected-name"></p>
+                                    <p class="text-[10px] text-gray-500" id="selected-info"></p>
+                                </div>
+                            </div>
+                            <button type="button" onclick="clearSelectedContact()" class="text-gray-400 hover:text-red-500 p-1 cursor-pointer" title="إزالة">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                        </div>
+                        <p class="mt-1 text-sm text-gray-500">أدخل الرمز الدولي متبوعاً برقم الجوال (بدون + أو 00) أو ابحث باسم العميل</p>
                     </div>
                 </div>
 
@@ -120,7 +151,7 @@
                     </div>
                 </div>
 
-                <div class="flex items-center justify-between pt-4 border-t border-gray-100">
+                <div class="flex items-center justify-center gap-4 pt-4 border-t border-gray-100">
                     <button type="submit" class="btn-whatsapp-primary inline-flex items-center px-8 py-3 rounded-xl shadow-md text-sm font-bold text-center">
                         <svg class="ml-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
@@ -215,9 +246,162 @@
             // Format phone number as user types
             const phoneInput = document.getElementById('phone_number');
             phoneInput.addEventListener('input', function(e) {
-                let value = this.value.replace(/\D/g, '');
+                let value = this.value.replace(/[^\d\u0600-\u06FFa-zA-Z\s]/g, '');
+                // إذا أدخل أرقاماً فقط، تنظيفها
+                if (/^\d+$/.test(value)) {
+                    value = value.replace(/\D/g, '');
+                }
                 this.value = value;
             });
+
+            // ===== Contact Autocomplete =====
+            const suggestionsBox = document.getElementById('contact-suggestions');
+            const suggestionsList = document.getElementById('suggestions-list');
+            const suggestionsLoading = document.getElementById('suggestions-loading');
+            const suggestionsEmpty = document.getElementById('suggestions-empty');
+            const selectedCard = document.getElementById('selected-contact-card');
+            let searchTimeout = null;
+            let currentHighlight = -1;
+
+            // البحث عند الكتابة (Debounced)
+            phoneInput.addEventListener('input', function() {
+                const query = this.value.trim();
+                clearTimeout(searchTimeout);
+
+                if (query.length < 2) {
+                    hideSuggestions();
+                    return;
+                }
+
+                searchTimeout = setTimeout(() => searchContacts(query), 300);
+            });
+
+            // إغلاق عند الضغط خارج المنطقة
+            document.addEventListener('click', function(e) {
+                if (!document.getElementById('phone-autocomplete-wrapper').contains(e.target)) {
+                    hideSuggestions();
+                }
+            });
+
+            // التنقل بالأسهم والاختيار بـ Enter
+            phoneInput.addEventListener('keydown', function(e) {
+                const items = suggestionsList.querySelectorAll('.suggestion-item');
+                if (!items.length) return;
+
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    currentHighlight = Math.min(currentHighlight + 1, items.length - 1);
+                    updateHighlight(items);
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    currentHighlight = Math.max(currentHighlight - 1, 0);
+                    updateHighlight(items);
+                } else if (e.key === 'Enter' && currentHighlight >= 0) {
+                    e.preventDefault();
+                    items[currentHighlight].click();
+                } else if (e.key === 'Escape') {
+                    hideSuggestions();
+                }
+            });
+
+            async function searchContacts(query) {
+                suggestionsBox.classList.remove('hidden');
+                suggestionsLoading.classList.remove('hidden');
+                suggestionsEmpty.classList.add('hidden');
+                suggestionsList.innerHTML = '';
+                currentHighlight = -1;
+
+                try {
+                    const response = await fetch(`{{ route('contacts.search') }}?q=${encodeURIComponent(query)}`, {
+                        headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
+                    });
+                    const contacts = await response.json();
+
+                    suggestionsLoading.classList.add('hidden');
+
+                    if (contacts.length === 0) {
+                        suggestionsEmpty.classList.remove('hidden');
+                        return;
+                    }
+
+                    contacts.forEach((contact, index) => {
+                        const item = document.createElement('div');
+                        item.className = 'suggestion-item flex items-center gap-3 px-4 py-3 hover:bg-emerald-50 cursor-pointer transition-all border-b border-gray-50 last:border-0';
+                        item.dataset.phone = contact.phone_number;
+                        item.dataset.name = contact.name;
+                        item.dataset.fileNumber = contact.file_number || '';
+                        item.dataset.company = contact.company_name || '';
+
+                        const initial = contact.name ? contact.name.charAt(0) : '?';
+                        const subInfo = [contact.file_number, contact.company_name].filter(Boolean).join(' • ');
+
+                        item.innerHTML = `
+                            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-[#25D366] to-[#128C7E] text-white flex items-center justify-center font-bold text-xs flex-shrink-0">${initial}</div>
+                            <div class="flex-1 min-w-0">
+                                <p class="font-bold text-sm text-gray-800 truncate">${contact.name}</p>
+                                <p class="text-[11px] text-gray-500">${subInfo ? subInfo + ' • ' : ''}<span dir="ltr">${contact.phone_number}</span></p>
+                            </div>
+                            <svg class="w-4 h-4 text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                        `;
+
+                        item.addEventListener('click', () => selectContact(contact));
+                        suggestionsList.appendChild(item);
+                    });
+
+                } catch (err) {
+                    suggestionsLoading.classList.add('hidden');
+                    console.error('Search error:', err);
+                }
+            }
+
+            function selectContact(contact) {
+                phoneInput.value = contact.phone_number;
+                // إزالة pattern مؤقتاً لأن البحث بالاسم لن يطابقه
+                phoneInput.setAttribute('pattern', '[0-9]{10,15}');
+                hideSuggestions();
+
+                // إظهار بطاقة جهة الاتصال المختارة
+                const initial = contact.name ? contact.name.charAt(0) : '?';
+                document.getElementById('selected-avatar').textContent = initial;
+                document.getElementById('selected-name').textContent = contact.name;
+                const info = [contact.file_number, contact.company_name].filter(Boolean).join(' • ');
+                document.getElementById('selected-info').textContent = info || contact.phone_number;
+                selectedCard.classList.remove('hidden');
+            }
+
+            function clearSelectedContact() {
+                phoneInput.value = '';
+                selectedCard.classList.add('hidden');
+                phoneInput.focus();
+            }
+
+            function hideSuggestions() {
+                suggestionsBox.classList.add('hidden');
+                suggestionsList.innerHTML = '';
+                suggestionsLoading.classList.add('hidden');
+                suggestionsEmpty.classList.add('hidden');
+                currentHighlight = -1;
+            }
+
+            function updateHighlight(items) {
+                items.forEach((item, i) => {
+                    item.classList.toggle('bg-emerald-50', i === currentHighlight);
+                    item.classList.toggle('ring-1', i === currentHighlight);
+                    item.classList.toggle('ring-[#128C7E]', i === currentHighlight);
+                });
+            }
+
+            @if(isset($preselectedContact) && $preselectedContact)
+            document.addEventListener('DOMContentLoaded', function() {
+                const initialContact = {
+                    name: "{{ $preselectedContact->name }}",
+                    phone_number: "{{ $preselectedContact->phone_number }}",
+                    file_number: "{{ $preselectedContact->file_number ?? '' }}",
+                    company_name: "{{ $preselectedContact->company_name ?? '' }}"
+                };
+                selectContact(initialContact);
+            });
+            @endif
         </script>
     @endpush
 </x-app-layout>

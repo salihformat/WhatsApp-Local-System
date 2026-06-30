@@ -33,6 +33,7 @@ class DashboardController extends Controller
             'delivered' => (clone $statsQuery)->where('status', 'delivered')->count(),
             'read' => (clone $statsQuery)->where('status', 'read')->count(),
             'failed' => (clone $statsQuery)->where('status', 'failed')->count(),
+            'received' => (clone $statsQuery)->where('status', 'received')->count(),
         ];
 
         // 2. Fetch Print Monitor Folder Statistics (Admin only feature usually, or restricted)
@@ -98,7 +99,7 @@ class DashboardController extends Controller
             $chartData['labels'][] = now()->subDays($i)->translatedFormat('l');
             
             $sentQuery = Message::whereDate('created_at', $date)
-                ->whereIn('status', ['sent', 'delivered', 'read']);
+                ->whereIn('status', ['sent', 'delivered', 'read', 'received']);
             
             $failedQuery = Message::whereDate('created_at', $date)
                 ->where('status', 'failed');
@@ -112,7 +113,38 @@ class DashboardController extends Controller
             $chartData['failed'][] = $failedQuery->count();
         }
 
-        return view('dashboard', compact('stats', 'folderStats', 'recentMessages', 'chartData'));
+        // 5. Check Server Connection Status
+        $serverStatus = [
+            'connected' => false,
+            'message' => 'جاري الفحص...',
+            'url' => config('app.central_api_url')
+        ];
+        
+        try {
+            if (!empty($serverStatus['url'])) {
+                // We send a lightweight request. Even if 404, it means the server is reachable.
+                $http = \Illuminate\Support\Facades\Http::timeout(5);
+                
+                if (env('API_VERIFY_SSL', true) === false || env('API_VERIFY_SSL') === 'false') {
+                    $http->withoutVerifying();
+                }
+                
+                $response = $http->get($serverStatus['url']);
+                $serverStatus['connected'] = true;
+                $serverStatus['message'] = 'متصل بالسيرفر بنجاح';
+            } else {
+                $serverStatus['message'] = 'لم يتم تعيين رابط السيرفر (CENTRAL_API_URL)';
+            }
+        } catch (\Exception $e) {
+            $serverStatus['connected'] = false;
+            if ($e instanceof \Illuminate\Http\Client\ConnectionException || str_contains($e->getMessage(), 'cURL error')) {
+                $serverStatus['message'] = 'لا يمكن الوصول للسيرفر (تأكد من العنوان أو أن السيرفر يعمل)';
+            } else {
+                $serverStatus['message'] = 'خطأ في الاتصال: ' . $e->getMessage();
+            }
+        }
+
+        return view('dashboard', compact('stats', 'folderStats', 'recentMessages', 'chartData', 'serverStatus'));
     }
 
     /**
@@ -177,6 +209,82 @@ class DashboardController extends Controller
             return redirect()->route('dashboard')->with('success', 'تم معالجة قائمة الانتظار بنجاح.');
         } catch (\Exception $e) {
             return redirect()->route('dashboard')->with('error', 'فشل معالجة قائمة الانتظار: ' . $e->getMessage());
+        }
+    }
+    /**
+     * Start background services (queue & schedule).
+     */
+    public function startServices()
+    {
+        try {
+            // التحقق مما إذا كانت الخدمات تعمل مسبقاً
+            exec('wmic process where "name=\'php.exe\' and commandline like \'%artisan queue:work%\'" get processid 2>NUL', $outputQueue);
+            exec('wmic process where "name=\'php.exe\' and commandline like \'%artisan schedule:work%\'" get processid 2>NUL', $outputSchedule);
+            
+            $queueRunning = false;
+            foreach($outputQueue as $line) {
+                if (is_numeric(trim($line))) $queueRunning = true;
+            }
+            
+            $scheduleRunning = false;
+            foreach($outputSchedule as $line) {
+                if (is_numeric(trim($line))) $scheduleRunning = true;
+            }
+
+            $basePath = base_path();
+            $phpPath = 'c:\xampp\php\php.exe';
+            
+            $messages = [];
+
+            if (!$queueRunning) {
+                $cmdQueue = "powershell -windowstyle hidden -command \"Start-Process '$phpPath' -ArgumentList 'artisan queue:work' -WorkingDirectory '$basePath' -WindowStyle Hidden\"";
+                pclose(popen("start /B " . $cmdQueue, "r"));
+                $messages[] = 'تم تشغيل عامل الطابور (Queue Worker).';
+            } else {
+                $messages[] = 'عامل الطابور يعمل مسبقاً.';
+            }
+
+            if (!$scheduleRunning) {
+                $cmdSchedule = "powershell -windowstyle hidden -command \"Start-Process '$phpPath' -ArgumentList 'artisan schedule:work' -WorkingDirectory '$basePath' -WindowStyle Hidden\"";
+                pclose(popen("start /B " . $cmdSchedule, "r"));
+                $messages[] = 'تم تشغيل المجدول (Scheduler).';
+            } else {
+                $messages[] = 'المجدول يعمل مسبقاً.';
+            }
+
+            return redirect()->route('dashboard')->with('success', implode(' ', $messages));
+        } catch (\Exception $e) {
+            Log::error('Dashboard Start Services failed', ['error' => $e->getMessage()]);
+            return redirect()->route('dashboard')->with('error', 'فشل تشغيل الخدمات: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Restart Queue workers.
+     */
+    public function restartQueue()
+    {
+        try {
+            // Tell existing workers to stop gracefully (they will stop after finishing current job)
+            Artisan::call('queue:restart');
+            
+            // Also forcefully kill the queue worker process to restart it immediately since we run it in a hidden window without a daemon manager
+            exec('wmic process where "name=\'php.exe\' and commandline like \'%artisan queue:work%\'" call terminate 2>NUL');
+            
+            // Wait a moment for processes to terminate
+            sleep(1);
+            
+            // Start the queue worker again
+            $basePath = base_path();
+            $phpPath = 'c:\xampp\php\php.exe';
+            
+            $cmdQueue = "powershell -windowstyle hidden -command \"Start-Process '$phpPath' -ArgumentList 'artisan queue:work' -WorkingDirectory '$basePath' -WindowStyle Hidden\"";
+            pclose(popen("start /B " . $cmdQueue, "r"));
+            
+            return redirect()->route('dashboard')->with('success', 'تم إعادة تشغيل الطابور بنجاح.');
+        } catch (\Exception $e) {
+            Log::error('Dashboard Restart Queue failed', ['error' => $e->getMessage()]);
+            return redirect()->route('dashboard')->with('error', 'فشل إعادة تشغيل الطابور: ' . $e->getMessage());
         }
     }
 }

@@ -278,7 +278,7 @@
                                 @if(auth()->user()->isAdmin())
                                     <th class="px-3 py-3.5" style="width: 120px;">{{ __('المرسل') }}</th>
                                 @endif
-                                <th class="px-3 py-3.5" style="width: 120px;">{{ __('محتوى الرسالة') }}</th>
+                                <th class="px-3 py-3.5" style="width: 160px;">{{ __('محتوى الرسالة') }}</th>
                                 <th class="px-3 py-3.5" style="width: 180px;">{{ __('نوع الرسالة والملف') }}</th>
                                 <th class="px-3 py-3.5" style="width: 120px;">{{ __('الحالة') }}</th>
                                 <th class="px-3 py-3.5" style="width: 120px;">{{ __('التاريخ والوقت') }}</th>
@@ -301,15 +301,28 @@
                                     @endif
                                     
                                     <!-- Message text bounded beautifully with explicit responsive styling -->
-                                    <td class="px-6 py-4 text-right" style="max-width: 120px; min-width: 120px; width: 120px;">
-                                        <div class="text-gray-900 font-medium break-all whitespace-normal leading-relaxed text-xs" style="word-break: break-all; overflow-wrap: break-word;">
-                                            {{ $message->message_text ?? '--' }}
-                                        </div>
+                                    <td class="px-6 py-4 text-right" style="max-width: 160px; min-width: 160px; width: 160px;">
+                                        @if(mb_strlen($message->message_text ?? '') > 50)
+                                            <div id="msg-text-{{ $message->id }}" class="text-gray-900 font-medium whitespace-normal leading-relaxed text-xs overflow-hidden transition-all duration-300" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word;">
+                                                {{ $message->message_text }}
+                                            </div>
+                                            <button onclick="toggleMessage(this, 'msg-text-{{ $message->id }}')" class="text-[#128C7E] hover:text-[#075E54] text-[10px] font-bold mt-1.5 focus:outline-none inline-flex items-center gap-1 transition-colors bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-full border border-emerald-100/50">
+                                                <span class="toggle-text">{{ __('عرض المزيد') }}</span>
+                                                <svg class="w-3 h-3 transform transition-transform duration-300 toggle-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                            </button>
+                                        @else
+                                            <div class="text-gray-900 font-medium whitespace-normal leading-relaxed text-xs" style="word-break: break-word;">
+                                                {{ $message->message_text ?? '--' }}
+                                            </div>
+                                        @endif
                                     </td>
                                     
                                     <td class="px-4 py-4 whitespace-normal" style="max-width: 180px; width: 180px;">
                                         @if($message->message_type === 'media')
                                             <span class="px-2 py-0.5 bg-blue-50 text-blue-700 rounded font-semibold text-[10px] inline-block mb-1">وسائط</span>
+                                            @if($message->file_path)
+                                                <a href="{{ $message->file_path }}" target="_blank" class="px-2 py-0.5 bg-green-50 text-green-700 rounded font-semibold text-[10px] inline-block mb-1 ml-1 hover:bg-green-100 transition-colors">عرض المرفق <i class="fas fa-external-link-alt ml-1"></i></a>
+                                            @endif
                                             @if($message->file_name)
                                                 <div class="text-[10px] text-gray-500 break-all whitespace-normal leading-normal" style="word-break: break-all; overflow-wrap: break-word;">{{ $message->file_name }}</div>
                                             @endif
@@ -329,7 +342,7 @@
                                                 <span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
                                                 {{ __('تم التسليم') }}
                                             </span>
-                                        @elseif($message->status === 'sent')
+                                        @elseif($message->status === 'sent' || $message->status === 'queued')
                                             <span class="px-2.5 py-1 inline-flex items-center gap-1 font-bold rounded-lg bg-emerald-50 text-emerald-700">
                                                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                                                 {{ __('مرسلة') }}
@@ -338,6 +351,11 @@
                                             <span class="px-2.5 py-1 inline-flex items-center gap-1 font-bold rounded-lg bg-amber-50 text-amber-700">
                                                 <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
                                                 {{ $message->status === 'processing' ? __('جاري المعالجة') : __('قيد الانتظار') }}
+                                            </span>
+                                        @elseif($message->status === 'received')
+                                            <span class="px-2.5 py-1 inline-flex items-center gap-1 font-bold rounded-lg bg-indigo-50 text-indigo-700">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                                                {{ __('مستلمة') }}
                                             </span>
                                         @else
                                             <span class="px-2.5 py-1 inline-flex items-center gap-1 font-bold rounded-lg bg-rose-50 text-rose-700" title="{{ $message->error_message }}">
@@ -522,53 +540,131 @@
                 fetch(`/api/messages/${messageId}/status`)
                     .then(response => response.json())
                     .then(data => {
-                        let statusBadge = '';
-                        if (data.status === 'read') {
-                            statusBadge = `
-                                <span class="px-2.5 py-1 inline-flex items-center gap-1 font-bold rounded-lg bg-blue-50 text-blue-700">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                                    تم القراءة
-                                </span>
-                            `;
-                        } else if (data.status === 'delivered') {
-                            statusBadge = `
-                                <span class="px-2.5 py-1 inline-flex items-center gap-1 font-bold rounded-lg bg-sky-50 text-sky-700">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
-                                    تم التسليم
-                                </span>
-                            `;
-                        } else if (data.status === 'sent') {
-                            statusBadge = `
-                                <span class="px-2.5 py-1 inline-flex items-center gap-1 font-bold rounded-lg bg-emerald-50 text-emerald-700">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                    مرسلة
-                                </span>
-                            `;
-                        } else if (data.status === 'failed') {
-                            const errorMsg = data.error_message || '';
-                            statusBadge = `
-                                <span class="px-2.5 py-1 inline-flex items-center gap-1 font-bold rounded-lg bg-rose-50 text-rose-700" title="${errorMsg}">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                                    فشلت
-                                </span>
-                            `;
-                            if (errorMsg) {
-                                statusBadge += `<span class="text-[10px] text-rose-500 block max-w-[150px] truncate mt-1 text-right font-medium" title="${errorMsg}">${errorMsg}</span>`;
-                            }
-                        } else {
-                            statusBadge = `
-                                <span class="px-2.5 py-1 inline-flex items-center gap-1 font-bold rounded-lg bg-amber-50 text-amber-700">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-                                    قيد الانتظار
-                                </span>
-                            `;
-                        }
-                        statusCell.innerHTML = statusBadge;
+                        updateStatusCell(statusCell, data);
                     })
                     .catch(error => {
                         console.error('Error:', error);
                         statusCell.innerHTML = originalContent;
                     });
+            }
+
+            function updateStatusCell(statusCell, data) {
+                let statusBadge = '';
+                if (data.status === 'read') {
+                    statusBadge = `
+                        <span class="px-2.5 py-1 inline-flex items-center gap-1 font-bold rounded-lg bg-blue-50 text-blue-700" data-status="read">
+                            <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                            تم القراءة
+                        </span>
+                    `;
+                } else if (data.status === 'delivered') {
+                    statusBadge = `
+                        <span class="px-2.5 py-1 inline-flex items-center gap-1 font-bold rounded-lg bg-sky-50 text-sky-700" data-status="delivered">
+                            <span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
+                            تم التسليم
+                        </span>
+                    `;
+                } else if (data.status === 'sent' || data.status === 'queued') {
+                    statusBadge = `
+                        <span class="px-2.5 py-1 inline-flex items-center gap-1 font-bold rounded-lg bg-emerald-50 text-emerald-700" data-status="sent">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            مرسلة
+                        </span>
+                    `;
+                } else if (data.status === 'failed') {
+                    const errorMsg = data.error_message || '';
+                    statusBadge = `
+                        <span class="px-2.5 py-1 inline-flex items-center gap-1 font-bold rounded-lg bg-rose-50 text-rose-700" title="${errorMsg}" data-status="failed">
+                            <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                            فشلت
+                        </span>
+                    `;
+                    if (errorMsg) {
+                        statusBadge += `<span class="text-[10px] text-rose-500 block max-w-[150px] truncate mt-1 text-right font-medium" title="${errorMsg}">${errorMsg}</span>`;
+                    }
+                } else if (data.status === 'received') {
+                    statusBadge = `
+                        <span class="px-2.5 py-1 inline-flex items-center gap-1 font-bold rounded-lg bg-indigo-50 text-indigo-700" data-status="received">
+                            <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                            مستلمة
+                        </span>
+                    `;
+                } else {
+                    statusBadge = `
+                        <span class="px-2.5 py-1 inline-flex items-center gap-1 font-bold rounded-lg bg-amber-50 text-amber-700" data-status="pending">
+                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                            قيد الانتظار
+                        </span>
+                    `;
+                }
+                statusCell.innerHTML = statusBadge;
+            }
+
+            function pollLocalStatuses() {
+                // Get all messages that are still pending, sent, or delivered
+                const pendingCells = document.querySelectorAll('td[id^="status-"]');
+                const messageIds = [];
+                
+                pendingCells.forEach(cell => {
+                    const idParts = cell.id.split('-');
+                    if (idParts.length === 2) {
+                        // Check if it's NOT read or failed or received (those are final states mostly)
+                        const badge = cell.querySelector('span[data-status]');
+                        if (badge) {
+                            const status = badge.getAttribute('data-status');
+                            if (['pending', 'sent', 'delivered'].includes(status)) {
+                                messageIds.push(idParts[1]);
+                            }
+                        } else {
+                            // If no data-status yet (initial load), we can still poll it
+                            const text = cell.innerText.trim();
+                            if (text.includes('قيد الانتظار') || text.includes('مرسلة') || text.includes('تم التسليم')) {
+                                messageIds.push(idParts[1]);
+                            }
+                        }
+                    }
+                });
+
+                if (messageIds.length === 0) return;
+
+                fetch('/api/messages/local-statuses', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({ ids: messageIds })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    for (const [id, msgData] of Object.entries(data)) {
+                        const cell = document.getElementById(`status-${id}`);
+                        if (cell) {
+                            updateStatusCell(cell, msgData);
+                        }
+                    }
+                })
+                .catch(err => console.error('Error polling statuses:', err));
+            }
+
+            // Start polling every 10 seconds
+            setInterval(pollLocalStatuses, 10000);
+
+            // Toggle message text function
+            function toggleMessage(button, textId) {
+                const textDiv = document.getElementById(textId);
+                const icon = button.querySelector('.toggle-icon');
+                const textSpan = button.querySelector('.toggle-text');
+                
+                if (textDiv.style.webkitLineClamp === '2') {
+                    textDiv.style.webkitLineClamp = 'unset';
+                    textSpan.innerText = '{{ __("عرض أقل") }}';
+                    icon.classList.add('rotate-180');
+                } else {
+                    textDiv.style.webkitLineClamp = '2';
+                    textSpan.innerText = '{{ __("عرض المزيد") }}';
+                    icon.classList.remove('rotate-180');
+                }
             }
         </script>
     @endpush

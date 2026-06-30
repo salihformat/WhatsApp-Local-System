@@ -18,6 +18,9 @@ Route::get('/health', function () {
 
 // Webhook من النظام المركزي (محمي بتحقق التوكن داخل الـ Controller)
 Route::post('/webhook/status', [MessageController::class, 'updateStatus']);
+Route::post('/webhook/status_update', [MessageController::class, 'updateStatus']); // لدعم المسار التلقائي
+Route::post('/webhook/ping', [MessageController::class, 'updateStatus']); // مسار اختبار الاتصال القديم
+Route::post('/webhook/incoming_message', [MessageController::class, 'incomingMessage']);
 
 // مسارات محمية بتوكن API + Rate Limiting
 Route::middleware(['api.token', 'api.ratelimit:30,1'])->group(function () {
@@ -35,6 +38,30 @@ Route::middleware(['api.token'])->group(function () {
     // التقارير
     Route::get('/reports', [ReportController::class, 'index']);
     Route::get('/reports/export', [ReportController::class, 'export']);
+
+    // مسارات وهمية (Mock) لجهات الاتصال لمحاكاة النظام المركزي وتجنب الخطأ 404
+    Route::get('/contacts', function (Request $request) {
+        return response()->json([
+            'success' => true,
+            'contacts' => [], // يمكن إضافة جهات اتصال وهمية هنا لاختبار السحب
+            'message' => 'Mock GET contacts successful'
+        ]);
+    });
+
+    Route::post('/contacts', function (Request $request) {
+        return response()->json([
+            'success' => true,
+            'contact_id' => 'central_' . uniqid(), // توليد معرّف وهمي
+            'message' => 'Mock POST contacts successful'
+        ]);
+    });
+
+    Route::put('/contacts/{id}', function (Request $request, $id) {
+        return response()->json([
+            'success' => true,
+            'message' => 'Mock PUT contacts successful'
+        ]);
+    });
 });
 
 // مسار المستخدم (محمي بـ Sanctum)
