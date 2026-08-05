@@ -45,12 +45,15 @@
                             <x-input-error :messages="$errors->get('password_confirmation')" class="mt-2" />
                         </div>
 
-                        <!-- Admin Checkbox -->
-                        <div class="block mt-4">
-                            <label for="is_admin" class="inline-flex items-center">
-                                <input id="is_admin" type="checkbox" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" name="is_admin">
-                                <span class="mr-2 text-sm text-gray-600">{{ __('مدير النظام') }}</span>
-                            </label>
+                        <!-- Role Select -->
+                        <div class="mb-4">
+                            <x-input-label for="role" :value="__('الرتبة / الصلاحيات')" />
+                            <select id="role" name="role" class="block mt-1 w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" required>
+                                <option value="agent" {{ old('role') === 'agent' ? 'selected' : '' }}>{{ __('موظف خدمة عملاء (يرى محادثاته فقط)') }}</option>
+                                <option value="supervisor" {{ old('role') === 'supervisor' ? 'selected' : '' }}>{{ __('مشرف (يرى كافة المحادثات ويمكنه تعيين الموظفين)') }}</option>
+                                <option value="admin" {{ old('role') === 'admin' ? 'selected' : '' }}>{{ __('مدير نظام (صلاحيات كاملة)') }}</option>
+                            </select>
+                            <x-input-error :messages="$errors->get('role')" class="mt-2" />
                         </div>
 
                         <div class="flex items-center justify-end mt-4">

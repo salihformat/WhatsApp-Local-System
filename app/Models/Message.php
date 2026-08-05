@@ -5,18 +5,34 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class Message extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsActivity;
+
+    // نُسجّل الحذف فقط في سجل التدقيق — تسجيل كل رسالة تُنشأ/تُحدَّث سيُغرق السجل بآلاف الإدخالات
+    // الروتينية (كل رسالة واردة/صادرة تمر بعدة تحديثات حالة تلقائية)، بينما الحذف عملية حساسة
+    // يدوية نادرة تستحق التدقيق فعلياً (من حذف رسالة عميل ومتى؟).
+    protected static $recordEvents = ['deleted'];
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['phone_number', 'message_text', 'message_type', 'status', 'user_id'])
+            ->useLogName('messages');
+    }
 
     protected $fillable = [
+        'conversation_id',
         'is_incoming',
         'user_id',
         'phone_number',
         'sender_name',
         'message_text',
         'file_name',
+        'source_filename',
         'file_type',
         'file_size',
         'file_path',
@@ -31,6 +47,11 @@ class Message extends Model
         'metadata',
         'last_retry_at',
     ];
+
+    public function conversation()
+    {
+        return $this->belongsTo(Conversation::class);
+    }
 
     /**
      * Get the user that owns the message.

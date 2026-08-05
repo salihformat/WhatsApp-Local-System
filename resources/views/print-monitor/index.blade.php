@@ -1,0 +1,188 @@
+<x-app-layout>
+    <x-slot name="header">
+        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+            {{ __('متابعة مجلد المراقبة (PrintMonitor)') }}
+        </h2>
+    </x-slot>
+
+    <div class="py-12">
+        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
+
+            @if(session('success'))
+                <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative">
+                    {{ session('success') }}
+                </div>
+            @endif
+
+            @if(session('error'))
+                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+                    {{ session('error') }}
+                </div>
+            @endif
+
+            @unless($folderExists)
+                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+                    المجلد <code>{{ $folderPath }}</code> غير موجود حالياً — سيُنشأ تلقائياً عند أول تشغيل لأمر <code>monitor:folder</code>.
+                </div>
+            @endunless
+
+            <!-- بطاقات ملخّص -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                @php
+                    $cardColors = [
+                        'pending' => 'border-gray-400',
+                        'review' => 'border-yellow-500',
+                        'processing' => 'border-blue-500',
+                        'archive' => 'border-green-500',
+                        'failed' => 'border-red-500',
+                    ];
+                @endphp
+                @foreach($folders as $key => $folder)
+                    <div class="bg-white rounded-lg shadow-sm p-5 border-r-4 {{ $cardColors[$key] }}">
+                        <div class="text-xs text-gray-500 mb-1">{{ $folder['label'] }}</div>
+                        <div class="text-2xl font-bold text-gray-800">{{ count($folder['files']) }}</div>
+                    </div>
+                @endforeach
+            </div>
+
+            <!-- تفاصيل كل مجلد -->
+            @foreach($folders as $key => $folder)
+                <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                    <div class="px-6 py-3 bg-gray-50 border-b border-gray-200 font-bold text-gray-700">
+                        {{ $folder['label'] }} ({{ count($folder['files']) }})
+                        @if(count($folder['files']) === 100)
+                            <span class="text-xs text-gray-400 font-normal">— آخر 100 فقط</span>
+                        @endif
+                    </div>
+                    @php
+                        $colCount = 5; // اسم الملف، الحجم، آخر تعديل، رقم الجوال، تفاصيل البحث
+                        if ($key === 'failed' || $key === 'processing') $colCount++;
+                        if ($key === 'review') $colCount++;
+                    @endphp
+                    @if($key === 'review' && count($folder['files']) > 0)
+                        <div class="px-6 py-2 bg-yellow-50 border-b border-yellow-200 text-xs text-yellow-800">
+                            هذه الملفات استُخرج رقم الجوال لها من مصدر منخفض الثقة (بلا تسمية صريحة) — راجع "تفاصيل البحث" ثم وافق أو ارفض قبل الإرسال.
+                        </div>
+                    @endif
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-2 text-right text-xs font-medium text-gray-500 uppercase">اسم الملف</th>
+                                <th class="px-6 py-2 text-right text-xs font-medium text-gray-500 uppercase">الحجم</th>
+                                <th class="px-6 py-2 text-right text-xs font-medium text-gray-500 uppercase">آخر تعديل</th>
+                                <th class="px-6 py-2 text-right text-xs font-medium text-gray-500 uppercase">رقم الجوال</th>
+                                @if($key === 'failed' || $key === 'processing')
+                                    <th class="px-6 py-2 text-right text-xs font-medium text-gray-500 uppercase">سبب الفشل</th>
+                                @endif
+                                <th class="px-6 py-2 text-right text-xs font-medium text-gray-500 uppercase">تفاصيل البحث</th>
+                                @if($key === 'review')
+                                    <th class="px-6 py-2 text-right text-xs font-medium text-gray-500 uppercase">الإجراء</th>
+                                @endif
+                            </tr>
+                        </thead>
+                        @forelse($folder['files'] as $file)
+                            <tbody x-data="{ open: false }" class="bg-white divide-y divide-gray-100">
+                                <tr>
+                                    <td class="px-6 py-3 text-sm text-gray-800 break-all">{{ $file['name'] }}</td>
+                                    <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-500">{{ $file['size'] }}</td>
+                                    <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-500">{{ \Carbon\Carbon::createFromTimestamp($file['modified_at'])->diffForHumans() }}</td>
+                                    <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-500" dir="ltr">
+                                        {{ $file['phone_number'] ?? '—' }}
+                                    </td>
+                                    @if($key === 'failed' || $key === 'processing')
+                                        <td class="px-6 py-3 text-sm text-red-600 break-all">
+                                            @if($file['error_message'])
+                                                {{ $file['error_message'] }}
+                                            @elseif($key === 'failed' && empty($file['phone_number']))
+                                                لم يتم العثور على رقم جوال في اسم الملف أو محتواه
+                                            @elseif($file['status'] === 'pending' || $file['status'] === 'processing')
+                                                <span class="text-gray-400">قيد الإرسال…</span>
+                                            @else
+                                                <span class="text-gray-400">—</span>
+                                            @endif
+                                        </td>
+                                    @endif
+                                    <td class="px-6 py-3 whitespace-nowrap text-sm">
+                                        @if($file['trace'])
+                                            <button type="button" @click="open = !open" class="text-indigo-600 hover:text-indigo-800 text-xs font-medium underline">
+                                                <span x-show="!open">عرض التفاصيل</span>
+                                                <span x-show="open" style="display:none">إخفاء</span>
+                                            </button>
+                                        @else
+                                            <span class="text-gray-300 text-xs">—</span>
+                                        @endif
+                                    </td>
+                                    @if($key === 'review')
+                                        <td class="px-6 py-3 whitespace-nowrap text-sm">
+                                            @if($file['message_id'])
+                                                <div class="flex gap-2">
+                                                    <form action="{{ route('print-monitor.approve', $file['message_id']) }}" method="POST" onsubmit="return confirm('سيتم إرسال الملف فعلياً إلى {{ $file['phone_number'] }}. متابعة؟');">
+                                                        @csrf
+                                                        <button type="submit" class="px-3 py-1 rounded-md bg-green-600 text-white text-xs font-medium hover:bg-green-700">موافقة وإرسال</button>
+                                                    </form>
+                                                    <form action="{{ route('print-monitor.reject', $file['message_id']) }}" method="POST" onsubmit="return confirm('سيتم رفض هذا الملف ونقله لمجلد فشلت بدون إرسال. متابعة؟');">
+                                                        @csrf
+                                                        <button type="submit" class="px-3 py-1 rounded-md bg-red-600 text-white text-xs font-medium hover:bg-red-700">رفض</button>
+                                                    </form>
+                                                </div>
+                                            @else
+                                                <span class="text-gray-300 text-xs">لم يُعثر على سجل الرسالة</span>
+                                            @endif
+                                        </td>
+                                    @endif
+                                </tr>
+                                @if($file['trace'])
+                                    <tr x-show="open" style="display:none">
+                                        <td colspan="{{ $colCount }}" class="px-6 py-3 bg-indigo-50/50 text-xs text-gray-700">
+                                            <div class="space-y-1">
+                                                <div><span class="font-semibold">آلية الاستخراج:</span> {{ $file['trace']['source_label'] }}</div>
+                                                @if($file['trace']['rtl_corrected'])
+                                                    <div class="text-amber-700">⚠ تم تصحيح انعكاس ترتيب الأحرف العربية في النص قبل المطابقة (مشكلة معروفة في استخراج بعض ملفات PDF).</div>
+                                                @endif
+                                                @if($file['trace']['pdf_ocr_used'])
+                                                    <div class="text-purple-700">🖼️ طبقة نص الملف كانت تالفة/غير موجودة — تم تحويل الصفحة الأولى لصورة وقراءتها عبر OCR للحصول على النتيجة.</div>
+                                                @endif
+                                                @if($file['trace']['matched_label'])
+                                                    <div><span class="font-semibold">الكلمة المطابقة:</span> <code dir="ltr">{{ $file['trace']['matched_label'] }}</code></div>
+                                                @endif
+                                                @if($file['trace']['file_number'])
+                                                    <div>
+                                                        <span class="font-semibold">رقم الملف المستخرج:</span> {{ $file['trace']['file_number'] }}
+                                                        —
+                                                        @if($file['trace']['contact_found'])
+                                                            <span class="text-green-700">تم العثور على جهة اتصال مطابقة ✓</span>
+                                                        @else
+                                                            <span class="text-red-600">لا توجد جهة اتصال بهذا الرقم ✗</span>
+                                                        @endif
+                                                    </div>
+                                                @endif
+                                                @if(!empty($file['trace']['excluded']))
+                                                    <div>
+                                                        <span class="font-semibold">أرقام تم تجاهلها أثناء البحث:</span>
+                                                        <ul class="list-disc pr-5 mt-1 space-y-0.5">
+                                                            @foreach($file['trace']['excluded'] as $ex)
+                                                                <li dir="ltr" class="text-right" dir="rtl">
+                                                                    <span dir="ltr">{{ $ex['value'] }}</span>
+                                                                    — طابق كلمة "<span dir="ltr">{{ $ex['matched_label'] }}</span>"
+                                                                    لكن استُبعد بسبب وجود كلمة "<span dir="ltr">{{ $ex['excluded_by'] }}</span>" قريباً منه
+                                                                </li>
+                                                            @endforeach
+                                                        </ul>
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @endif
+                            </tbody>
+                        @empty
+                            <tbody>
+                                <tr><td colspan="{{ $colCount }}" class="px-6 py-4 text-center text-gray-400 text-sm">لا توجد ملفات</td></tr>
+                            </tbody>
+                        @endforelse
+                    </table>
+                </div>
+            @endforeach
+        </div>
+    </div>
+</x-app-layout>

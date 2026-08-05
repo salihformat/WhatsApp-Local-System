@@ -20,7 +20,8 @@ class SendMessageJob implements ShouldQueue
 
     // تحديد عدد المحاولات والوقت المسموح
     public $tries = 3;
-    public $timeout = 120;
+    // يجب أن تتجاوز مهلة HTTP (180 ثانية أدناه) بهامش أمان، وإلا يقتل Laravel المهمة قبل انتهاء رفع الملف
+    public $timeout = 200;
     public $backoff = [60, 120, 300]; // إعادة المحاولة بعد 1، 2، 5 دقائق
 
     public function __construct($messageId)
@@ -61,7 +62,10 @@ class SendMessageJob implements ShouldQueue
             $requestData = [
                 'phone_number' => $message->phone_number,
                 'local_message_id' => $message->id,
-                'message_source' => 'local_system'
+                'message_source' => 'local_system',
+                'device_name' => config('app.device_name'),
+                'location' => config('app.location'),
+                'plan_type' => config('app.plan_type')
             ];
 
             // Attach dynamic provider details if specified in metadata
@@ -162,7 +166,7 @@ class SendMessageJob implements ShouldQueue
                 'has_text' => isset($requestData['message'])
             ]);
 
-            $request = Http::timeout(60)
+            $request = Http::timeout(180) // تم زيادة مهلة الاتصال للسماح برفع الملفات بأحجام أكبر دون انقطاع
                 ->withHeaders([
                     'Authorization' => 'Bearer ' . config('app.central_api_token'),
                     'X-Company-ID' => config('app.company_id'),
@@ -205,7 +209,7 @@ class SendMessageJob implements ShouldQueue
 
                     $request = $request->attach(
                         'file',
-                        fopen($localPath, 'r'),
+                        fopen($localPath, 'rb'), // استخدام 'rb' ضروري جداً في نظام ويندوز لقراءة الملفات الثنائية بشكل صحيح دون تلف
                         $uploadName
                     );
                     $hasAttachedFile = true;
@@ -453,7 +457,7 @@ class SendMessageJob implements ShouldQueue
             curl_setopt($ch, CURLOPT_POST, 1);
             curl_setopt($ch, CURLOPT_POSTFIELDS, ['file' => new \CURLFile($filePath)]);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 180);
             
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);

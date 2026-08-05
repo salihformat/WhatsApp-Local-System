@@ -5,7 +5,10 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Message;
+use App\Models\PrintJob;
 use App\Jobs\SendMessageJob;
+use App\Jobs\ProcessPrintJob;
+use App\Services\PrintRuleEngine;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
@@ -187,6 +190,19 @@ class MessageController extends Controller
             $phoneNumber = $this->formatPhoneNumber($request->input('phone_number'));
             $messageText = trim($request->input('message_text', ''));
             
+            // Find associated contact
+            $contact = \App\Models\Contact::where('phone_number', $phoneNumber)->first();
+            
+            // Find or create an active conversation
+            $conversation = \App\Models\Conversation::firstOrCreate(
+                ['phone_number' => $phoneNumber, 'status' => 'open'],
+                [
+                    'user_id' => auth()->id(),
+                    'contact_id' => $contact ? $contact->id : null,
+                    'last_message_at' => now(),
+                ]
+            );
+
             $currentDelay = 0;
             $hasAttachment = $request->hasFile('files') && !empty($request->file('files'));
             $hasText = !empty($messageText);
@@ -195,6 +211,7 @@ class MessageController extends Controller
             // If there's text and it should be sent as a separate message
             if ($hasText && (!$hasAttachment || !$useAsCaption)) {
                 $message = Message::create([
+                    'conversation_id' => $conversation->id,
                     'user_id' => auth()->id(),
                     'phone_number' => $phoneNumber,
                     'message_text' => $messageText,
@@ -214,6 +231,12 @@ class MessageController extends Controller
             }
             
             // If there are attachments
+            // كل ملف يُعالَج بمعزل عن البقية: فشل ملف واحد (حجم/تخزين) لا يجب أن يُظهر للمستخدم
+            // "حدث خطأ" عاماً بينما رسالة النص (أو ملفات أخرى) نجحت فعلاً وأُرسلت للطابور بالفعل —
+            // نُبلغه بدقة بما نجح وما فشل تحديداً.
+            $attachmentErrors = [];
+            $attachmentsSucceeded = 0;
+
             if ($hasAttachment) {
                 $files = $request->file('files');
                 $isFirst = true;
@@ -223,58 +246,86 @@ class MessageController extends Controller
                         $currentDelay += rand(1, 10);
                     }
 
-                    $fileName = $file->getClientOriginalName();
-                    $fileType = $file->getClientMimeType();
-                    
-                    // Store the file in the public disk
-                    $filePath = $file->store('attachments', 'public');
-                    
-                    // Generate a public URL that will be accessible from the internet
-                    $publicUrl = Storage::url($filePath);
-                    
-                    // Use the configured public URL if available, otherwise use the local URL
-                    $baseUrl = config('filemanager.public_url');
-                    if ($baseUrl) {
-                        $publicUrl = rtrim($baseUrl, '/') . $publicUrl;
-                    } else {
-                        $publicUrl = url($publicUrl);
+                    try {
+                        $fileName = $file->getClientOriginalName();
+                        $fileType = $file->getClientMimeType();
+
+                        // Store the file in the public disk
+                        $filePath = $file->store('attachments', 'public');
+
+                        // Generate a public URL that will be accessible from the internet
+                        $publicUrl = Storage::url($filePath);
+
+                        // Use the configured public URL if available, otherwise use the local URL
+                        $baseUrl = config('filemanager.public_url');
+                        if ($baseUrl) {
+                            $publicUrl = rtrim($baseUrl, '/') . $publicUrl;
+                        } else {
+                            $publicUrl = url($publicUrl);
+                        }
+
+                        Log::info('File uploaded successfully', [
+                            'file_name' => $fileName,
+                            'file_type' => $fileType,
+                            'file_path' => $filePath,
+                            'public_url' => $publicUrl
+                        ]);
+
+                        $caption = ($isFirst && $hasText && $useAsCaption) ? $messageText : null;
+
+                        $message = Message::create([
+                            'conversation_id' => $conversation->id,
+                            'user_id' => auth()->id(),
+                            'file_name' => $fileName,
+                            'file_path' => $publicUrl,
+                            'file_type' => $fileType,
+                            'phone_number' => $phoneNumber,
+                            'message_text' => $caption,
+                            'message_type' => 'media',
+                            'status' => 'pending',
+                            'created_at' => now()->addSeconds($currentDelay)
+                        ]);
+
+                        // Dispatch job for processing with delay
+                        dispatch((new SendMessageJob($message->id))->delay(now()->addSeconds($currentDelay)));
+                        Log::info('Media message created', [
+                            'message_id' => $message->id,
+                            'file_path' => $publicUrl,
+                            'delay' => $currentDelay
+                        ]);
+
+                        $attachmentsSucceeded++;
+                    } catch (\Exception $e) {
+                        Log::error('Failed to process one attachment (others continue)', [
+                            'file_name' => $file->getClientOriginalName(),
+                            'error' => $e->getMessage(),
+                        ]);
+                        $attachmentErrors[] = $file->getClientOriginalName() . ': ' . $e->getMessage();
                     }
-                    
-                    Log::info('File uploaded successfully', [
-                        'file_name' => $fileName,
-                        'file_type' => $fileType,
-                        'file_path' => $filePath,
-                        'public_url' => $publicUrl
-                    ]);
-                    
-                    $caption = ($isFirst && $hasText && $useAsCaption) ? $messageText : null;
-                    
-                    $message = Message::create([
-                        'user_id' => auth()->id(),
-                        'file_name' => $fileName,
-                        'file_path' => $publicUrl,
-                        'file_type' => $fileType,
-                        'phone_number' => $phoneNumber,
-                        'message_text' => $caption,
-                        'message_type' => 'media',
-                        'status' => 'pending',
-                        'created_at' => now()->addSeconds($currentDelay)
-                    ]);
-                    
-                    // Dispatch job for processing with delay
-                    dispatch((new SendMessageJob($message->id))->delay(now()->addSeconds($currentDelay)));
-                    Log::info('Media message created', [
-                        'message_id' => $message->id,
-                        'file_path' => $publicUrl,
-                        'delay' => $currentDelay
-                    ]);
 
                     $isFirst = false;
                 }
             }
 
+            $conversation->update(['last_message_at' => now()]);
+
+            // لا شيء نجح إطلاقاً (لا نص أُرسل ولا أي مرفق) → خطأ حقيقي
+            if (!$hasText && $hasAttachment && $attachmentsSucceeded === 0) {
+                return redirect()
+                    ->back()
+                    ->with('error', 'فشل رفع كل المرفقات: ' . implode(' | ', $attachmentErrors))
+                    ->withInput();
+            }
+
+            if (!empty($attachmentErrors)) {
+                $successMsg = 'تم إضافة الرسالة إلى قائمة الانتظار، لكن فشل رفع ' . count($attachmentErrors) . ' من المرفقات: ' . implode(' | ', $attachmentErrors);
+                return redirect()
+                    ->route('conversations.show', $conversation->id)
+                    ->with('warning', $successMsg);
+            }
+
             return redirect()
-                ->route('messages.index')
+                ->route('conversations.show', $conversation->id)
                 ->with('success', 'تم إضافة الرسالة إلى قائمة الانتظار بنجاح');
 
         } catch (\Exception $e) {
@@ -297,7 +348,19 @@ class MessageController extends Controller
     public function show($id)
     {
         $message = Message::findOrFail($id);
+        $this->authorizeMessageOwner($message);
         return view('messages.show', compact('message'));
+    }
+
+    /**
+     * التحقق من أن المستخدم الحالي هو مالك الرسالة أو مدير، لمنع الوصول لرسائل مستخدمين آخرين (IDOR)
+     */
+    private function authorizeMessageOwner(Message $message): void
+    {
+        $user = auth()->user();
+        if (!$user->isAdmin() && $message->user_id !== $user->id) {
+            abort(403, 'غير مصرح لك بالوصول لهذه الرسالة.');
+        }
     }
 
     /**
@@ -306,7 +369,8 @@ class MessageController extends Controller
     public function retry($id)
     {
         $message = Message::findOrFail($id);
-        
+        $this->authorizeMessageOwner($message);
+
         // Update message status to pending
         $message->update([
             'status' => 'pending',
@@ -351,6 +415,66 @@ class MessageController extends Controller
     }
 
     /**
+     * فحص القواعد وإرسال الرسالة الواردة للطباعة الآلية إن طابقت طابعة (نظام Smart Printing)
+     */
+    private function dispatchPrintJobIfMatched(Message $message): void
+    {
+        if (!config('printing.enabled')) {
+            return;
+        }
+
+        $printer = app(PrintRuleEngine::class)->resolvePrinter($message);
+        if (!$printer) {
+            return;
+        }
+
+        $printJob = PrintJob::create([
+            'message_id' => $message->id,
+            'printer_id' => $printer->id,
+            'file_name' => $message->file_name,
+            'file_path' => $message->file_path,
+            'status' => 'pending',
+            'source' => 'whatsapp_incoming',
+        ]);
+
+        dispatch(new ProcessPrintJob($printJob->id));
+
+        Log::info("Print job dispatched for incoming message {$message->id}", [
+            'printer' => $printer->name,
+            'print_job_id' => $printJob->id,
+        ]);
+
+        $this->sendPrintReceivedAck($message, $printJob);
+    }
+
+    /**
+     * رد فوري "تم استلام طلب الطباعة" لحظة تسجيل المهمة، منفصل عن رد النتيجة النهائية (نجاح/فشل)
+     * الذي يصل لاحقاً من ProcessPrintJob — حتى يطمئن العميل أن الملف وصل وجاري تنفيذه فوراً، بدل
+     * انتظار صامت قد يستمر عدة ثوانٍ لا يعرف خلالها هل تم استلام طلبه أصلاً أم لا.
+     */
+    private function sendPrintReceivedAck(Message $sourceMessage, PrintJob $printJob): void
+    {
+        if (!config('printing.reply_ack_on_receipt')) {
+            return;
+        }
+
+        try {
+            $ack = Message::create([
+                'conversation_id' => $sourceMessage->conversation_id,
+                'phone_number' => $sourceMessage->phone_number,
+                'message_text' => "📥 تم استلام طلب طباعة ملفك \"{$sourceMessage->file_name}\" وجاري تنفيذه الآن...",
+                'message_type' => 'text',
+                'status' => 'pending',
+                'metadata' => ['source' => 'print_status_reply', 'print_job_id' => $printJob->id],
+            ]);
+
+            dispatch(new SendMessageJob($ack->id));
+        } catch (\Exception $e) {
+            Log::error("PrintJob {$printJob->id}: failed to dispatch receipt ack", ['error' => $e->getMessage()]);
+        }
+    }
+
+    /**
      * Handle bulk actions
      */
     public function bulkActions(Request $request)
@@ -363,14 +487,28 @@ class MessageController extends Controller
                 ->back()
                 ->with('error', 'لم يتم تحديد أي رسائل');
         }
-        
+
+        // تقييد العملية بالرسائل التي يملكها المستخدم فقط، ما لم يكن مديراً (منع IDOR)
+        $user = auth()->user();
+        $selectedQuery = Message::whereIn('id', $selected);
+        if (!$user->isAdmin()) {
+            $selectedQuery->where('user_id', $user->id);
+        }
+        $selected = $selectedQuery->pluck('id')->all();
+
+        if (empty($selected)) {
+            return redirect()
+                ->back()
+                ->with('error', 'لم يتم تحديد أي رسائل');
+        }
+
         switch ($action) {
             case 'delete':
                 Message::whereIn('id', $selected)->delete();
                 return redirect()
                     ->back()
                     ->with('success', 'تم حذف الرسائل المحددة بنجاح');
-                
+
             case 'retry':
                 $messages = Message::whereIn('id', $selected)
                     ->whereIn('status', ['failed', 'pending'])
@@ -402,8 +540,9 @@ class MessageController extends Controller
      */
     public function destroy(Message $message)
     {
+        $this->authorizeMessageOwner($message);
         $message->delete();
-        
+
         return redirect()
             ->route('messages.index')
             ->with('success', 'تم حذف الرسالة بنجاح');
@@ -415,19 +554,7 @@ class MessageController extends Controller
      */
     public function updateStatus(Request $request)
     {
-        $token = $request->header('Authorization');
-        $expectedToken = 'Bearer ' . config('app.central_api_token');
-
-        // يجب أن يكون Token موجوداً ومطابقاً (إصلاح الثغرة)
-        if (empty($token) || $token !== $expectedToken) {
-            Log::warning('Unauthorized webhook attempt', [
-                'ip' => $request->ip(),
-                'user_agent' => $request->userAgent(),
-                'path' => $request->path(),
-                'timestamp' => now()->toDateTimeString(),
-            ]);
-            return response()->json(['error' => 'Unauthorized'], 401);
-        }
+        // تم نقل التحقق من التوكن إلى VerifyWebhookToken Middleware
 
         if ($request->input('event') === 'ping' || $request->header('X-Webhook-Event') === 'ping') {
             Log::info('Webhook ping received successfully.', [
@@ -490,15 +617,7 @@ class MessageController extends Controller
      */
     public function incomingMessage(Request $request)
     {
-        $token = $request->header('Authorization');
-        $expectedToken = 'Bearer ' . config('app.central_api_token');
-
-        if (empty($token) || $token !== $expectedToken) {
-            Log::warning('Unauthorized incoming_message webhook attempt', [
-                'ip' => $request->ip()
-            ]);
-            return response()->json(['error' => 'Unauthorized'], 401);
-        }
+        // تم نقل التحقق من التوكن إلى VerifyWebhookToken Middleware
 
         $data = $request->input('data') ?? $request->all();
 
@@ -514,11 +633,44 @@ class MessageController extends Controller
             return response()->json(['error' => 'Invalid data', 'details' => $validator->errors()], 400);
         }
 
+        // منع تكرار الرسالة الواردة إن أعاد النظام المركزي إرسال نفس الـ webhook (شائع عند عدم
+        // استلامه 200 في الوقت المناسب) — بدون هذا الفحص، كل إعادة إرسال تُنشئ رسالة مكررة جديدة.
+        $providerMessageId = $data['message_id'] ?? null;
+        if (!empty($providerMessageId)) {
+            $existing = Message::where('central_message_id', $providerMessageId)
+                ->where('is_incoming', true)
+                ->first();
+            if ($existing) {
+                Log::info('Duplicate incoming webhook skipped (idempotency)', [
+                    'message_id' => $providerMessageId,
+                    'existing_local_id' => $existing->id,
+                ]);
+                return response()->json(['success' => true, 'message_id' => $existing->id]);
+            }
+        }
+
+        $senderPhone = $data['sender_phone'];
         $messageType = isset($data['message_type']) && in_array($data['message_type'], ['text', 'chat']) ? 'text' : 'media';
 
+        // Find associated contact and user
+        $contact = \App\Models\Contact::where('phone_number', $senderPhone)->first();
+        $userId = $contact ? $contact->user_id : \App\Models\User::first()->id;
+
+        // Find or create an active conversation
+        $conversation = \App\Models\Conversation::firstOrCreate(
+            ['phone_number' => $senderPhone, 'status' => 'open'],
+            [
+                'user_id' => $userId,
+                'contact_id' => $contact ? $contact->id : null,
+                'last_message_at' => now(),
+            ]
+        );
+
         $message = Message::create([
+            'conversation_id' => $conversation->id,
+            'user_id' => $userId,
             'is_incoming' => true,
-            'phone_number' => $data['sender_phone'],
+            'phone_number' => $senderPhone,
             'sender_name' => $data['sender_name'] ?? null,
             'message_text' => $data['message_body'] ?? '',
             'message_type' => $messageType,
@@ -534,9 +686,24 @@ class MessageController extends Controller
             ]
         ]);
 
-        Log::info("Incoming message received from: {$data['sender_phone']}", [
-            'local_message_id' => $message->id
+        // Update conversation unread count and last_message_at
+        $conversation->increment('unread_count');
+        $conversation->update(['last_message_at' => now()]);
+
+        $this->dispatchPrintJobIfMatched($message);
+
+        try {
+            app(\App\Services\AutomationRuleEngine::class)->evaluate($message, $conversation);
+        } catch (\Exception $e) {
+            Log::error('AutomationRuleEngine dispatch failed', ['error' => $e->getMessage()]);
+        }
+
+        Log::info("Incoming message received from: {$senderPhone}", [
+            'local_message_id' => $message->id,
+            'conversation_id' => $conversation->id
         ]);
+
+        event(new \App\Events\MessageReceived($message));
 
         return response()->json(['success' => true, 'message_id' => $message->id]);
     }
@@ -578,7 +745,22 @@ class MessageController extends Controller
             $phoneNumber = $this->formatPhoneNumber($request->input('phone_number'));
             $messageType = !empty($request->input('file_url')) ? 'media' : 'text';
 
+            // Find associated contact
+            $contact = \App\Models\Contact::where('phone_number', $phoneNumber)->first();
+            
+            // Find or create an active conversation
+            $conversation = \App\Models\Conversation::firstOrCreate(
+                ['phone_number' => $phoneNumber, 'status' => 'open'],
+                [
+                    'user_id' => auth()->id() ?? \App\Models\User::first()->id,
+                    'contact_id' => $contact ? $contact->id : null,
+                    'last_message_at' => now(),
+                ]
+            );
+
             $message = Message::create([
+                'conversation_id' => $conversation->id,
+                'user_id' => auth()->id() ?? \App\Models\User::first()->id,
                 'phone_number' => $phoneNumber,
                 'message_text' => $request->input('message_text'),
                 'file_name' => $request->input('file_name'),
@@ -587,6 +769,8 @@ class MessageController extends Controller
                 'message_type' => $messageType,
                 'status' => 'pending',
             ]);
+            
+            $conversation->update(['last_message_at' => now()]);
 
             dispatch(new SendMessageJob($message->id));
 

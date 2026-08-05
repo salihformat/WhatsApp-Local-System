@@ -1,0 +1,203 @@
+{
+    "info": {
+        "name": "WhatsApp Local System",
+        "description": "مجموعة اختبار لواجهات النظام المحلي: Webhooks (من المركزي)، API الإرسال والاستعلام، والصحة العامة. استورد ملف البيئة WhatsApp-Local-System.postman_environment.json معها وفعّله.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "Health Check",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/api/health",
+                    "host": ["{{base_url}}"],
+                    "path": ["api", "health"]
+                }
+            }
+        },
+        {
+            "name": "Webhooks (من النظام المركزي)",
+            "item": [
+                {
+                    "name": "Webhook Ping (اختبار الاتصال)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{central_api_token}}" },
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"event\": \"ping\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/webhook/ping",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "webhook", "ping"]
+                        }
+                    }
+                },
+                {
+                    "name": "Incoming Message - نصية",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{central_api_token}}" },
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"sender_phone\": \"966500000001\",\n  \"sender_name\": \"عميل تجريبي\",\n  \"message_body\": \"مرحباً، هذه رسالة اختبار\",\n  \"message_type\": \"text\",\n  \"message_id\": \"test_{{$timestamp}}\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/webhook/incoming_message",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "webhook", "incoming_message"]
+                        }
+                    }
+                },
+                {
+                    "name": "Incoming Message - PDF (لاختبار الطباعة الذكية)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{central_api_token}}" },
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"sender_phone\": \"966500000001\",\n  \"sender_name\": \"عميل تجريبي\",\n  \"message_body\": \"فاتورة هذا الشهر\",\n  \"message_type\": \"media\",\n  \"media_url\": \"https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf\",\n  \"file_name\": \"invoice_test.pdf\",\n  \"mime_type\": \"application/pdf\",\n  \"message_id\": \"test_{{$timestamp}}\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/webhook/incoming_message",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "webhook", "incoming_message"]
+                        }
+                    }
+                },
+                {
+                    "name": "Status Update - تحديث حالة رسالة صادرة",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{central_api_token}}" },
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"data\": {\n    \"local_message_id\": 1,\n    \"status\": \"delivered\",\n    \"delivered_at\": \"{{$isoTimestamp}}\"\n  }\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/webhook/status",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "webhook", "status"]
+                        },
+                        "description": "غيّر local_message_id لمعرّف رسالة حقيقي موجود عندك في جدول messages قبل الاختبار."
+                    }
+                }
+            ]
+        },
+        {
+            "name": "API (محمي بتوكن + Rate Limit)",
+            "item": [
+                {
+                    "name": "إرسال رسالة - نصية",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{central_api_token}}" },
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"phone_number\": \"966500000002\",\n  \"message_text\": \"رسالة اختبار من Postman\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/send-message",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "send-message"]
+                        }
+                    }
+                },
+                {
+                    "name": "إرسال رسالة - مع ملف",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{central_api_token}}" },
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"phone_number\": \"966500000002\",\n  \"message_text\": \"مرفق الملف المطلوب\",\n  \"file_url\": \"https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf\",\n  \"file_name\": \"document.pdf\",\n  \"file_type\": \"application/pdf\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/send-message",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "send-message"]
+                        }
+                    }
+                },
+                {
+                    "name": "قائمة الرسائل",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{central_api_token}}" }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/messages?per_page=15",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "messages"],
+                            "query": [{ "key": "per_page", "value": "15" }]
+                        }
+                    }
+                },
+                {
+                    "name": "عرض رسالة محددة",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{central_api_token}}" }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/messages/1",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "messages", "1"]
+                        }
+                    }
+                },
+                {
+                    "name": "إعادة إرسال رسالة فاشلة",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{central_api_token}}" }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/messages/1/retry",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "messages", "1", "retry"]
+                        }
+                    }
+                },
+                {
+                    "name": "تقارير",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{central_api_token}}" }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/reports",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "reports"]
+                        }
+                    }
+                }
+            ]
+        }
+    ]
+}

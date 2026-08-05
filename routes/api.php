@@ -16,11 +16,13 @@ Route::get('/health', function () {
     ]);
 });
 
-// Webhook من النظام المركزي (محمي بتحقق التوكن داخل الـ Controller)
-Route::post('/webhook/status', [MessageController::class, 'updateStatus']);
-Route::post('/webhook/status_update', [MessageController::class, 'updateStatus']); // لدعم المسار التلقائي
-Route::post('/webhook/ping', [MessageController::class, 'updateStatus']); // مسار اختبار الاتصال القديم
-Route::post('/webhook/incoming_message', [MessageController::class, 'incomingMessage']);
+// Webhook من النظام المركزي (محمي عبر VerifyWebhookToken Middleware)
+Route::middleware([\App\Http\Middleware\VerifyWebhookToken::class])->group(function () {
+    Route::post('/webhook/status', [MessageController::class, 'updateStatus']);
+    Route::post('/webhook/status_update', [MessageController::class, 'updateStatus']); // لدعم المسار التلقائي
+    Route::post('/webhook/ping', [MessageController::class, 'updateStatus']); // مسار اختبار الاتصال القديم
+    Route::post('/webhook/incoming_message', [MessageController::class, 'incomingMessage']);
+});
 
 // مسارات محمية بتوكن API + Rate Limiting
 Route::middleware(['api.token', 'api.ratelimit:30,1'])->group(function () {

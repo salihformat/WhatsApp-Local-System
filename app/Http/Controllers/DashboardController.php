@@ -74,14 +74,41 @@ class DashboardController extends Controller
 
             // Count archived files
             $archivePath = $folderPath . '/archive';
+            $folderStats['archived_files_list'] = [];
             if (File::exists($archivePath)) {
-                $folderStats['archived_files'] = count(File::files($archivePath));
+                $archivedFiles = File::files($archivePath);
+                $folderStats['archived_files'] = count($archivedFiles);
+                $recentArchived = array_slice($archivedFiles, -50); // Get last 50 for performance
+                foreach ($recentArchived as $file) {
+                    if (!str_starts_with($file->getFilename(), '.')) {
+                        $trace = \App\Models\ExtractionTrace::where('filename', $file->getFilename())->latest()->first();
+                        $folderStats['archived_files_list'][] = [
+                            'name' => $file->getFilename(),
+                            'size' => round($file->getSize() / 1024, 2) . ' KB',
+                            'time' => date('Y-m-d H:i:s', $file->getMTime()),
+                            'trace' => $trace
+                        ];
+                    }
+                }
             }
 
             // Count failed files
             $failedPath = $folderPath . '/failed';
+            $folderStats['failed_files_list'] = [];
             if (File::exists($failedPath)) {
-                $folderStats['failed_files'] = count(File::files($failedPath));
+                $failedFiles = File::files($failedPath);
+                $folderStats['failed_files'] = count($failedFiles);
+                foreach ($failedFiles as $file) {
+                    if (!str_starts_with($file->getFilename(), '.')) {
+                        $trace = \App\Models\ExtractionTrace::where('filename', $file->getFilename())->latest()->first();
+                        $folderStats['failed_files_list'][] = [
+                            'name' => $file->getFilename(),
+                            'size' => round($file->getSize() / 1024, 2) . ' KB',
+                            'time' => date('Y-m-d H:i:s', $file->getMTime()),
+                            'trace' => $trace
+                        ];
+                    }
+                }
             }
         }
 
@@ -144,7 +171,17 @@ class DashboardController extends Controller
             }
         }
 
-        return view('dashboard', compact('stats', 'folderStats', 'recentMessages', 'chartData', 'serverStatus'));
+        // 6. Check Background Services Status (via PID files owned by this application only)
+        $queueRunning = $this->isTrackedProcessRunning('queue');
+        $scheduleRunning = $this->isTrackedProcessRunning('schedule');
+
+        $servicesStatus = [
+            'queue' => $queueRunning,
+            'schedule' => $scheduleRunning,
+            'all_running' => $queueRunning && $scheduleRunning
+        ];
+
+        return view('dashboard', compact('stats', 'folderStats', 'recentMessages', 'chartData', 'serverStatus', 'servicesStatus'));
     }
 
     /**
@@ -161,7 +198,7 @@ class DashboardController extends Controller
                 'output' => $output
             ]);
 
-            return redirect()->route('dashboard')->with('success', 'تم فحص المجلد بنجاح: ' . nl2br($output));
+            return redirect()->route('dashboard')->with('success', 'تم فحص المجلد بنجاح: ' . $output);
         } catch (\Exception $e) {
             Log::error('Dashboard Manual Folder Scan failed', ['error' => $e->getMessage()]);
             return redirect()->route('dashboard')->with('error', 'فشل فحص المجلد: ' . $e->getMessage());
@@ -216,37 +253,23 @@ class DashboardController extends Controller
      */
     public function startServices()
     {
-        try {
-            // التحقق مما إذا كانت الخدمات تعمل مسبقاً
-            exec('wmic process where "name=\'php.exe\' and commandline like \'%artisan queue:work%\'" get processid 2>NUL', $outputQueue);
-            exec('wmic process where "name=\'php.exe\' and commandline like \'%artisan schedule:work%\'" get processid 2>NUL', $outputSchedule);
-            
-            $queueRunning = false;
-            foreach($outputQueue as $line) {
-                if (is_numeric(trim($line))) $queueRunning = true;
-            }
-            
-            $scheduleRunning = false;
-            foreach($outputSchedule as $line) {
-                if (is_numeric(trim($line))) $scheduleRunning = true;
-            }
+        activity('services')->causedBy(auth()->user())->log('تشغيل الخدمات (Queue/Scheduler)');
 
+        try {
             $basePath = base_path();
             $phpPath = 'c:\xampp\php\php.exe';
-            
+
             $messages = [];
 
-            if (!$queueRunning) {
-                $cmdQueue = "powershell -windowstyle hidden -command \"Start-Process '$phpPath' -ArgumentList 'artisan queue:work' -WorkingDirectory '$basePath' -WindowStyle Hidden\"";
-                pclose(popen("start /B " . $cmdQueue, "r"));
+            if (!$this->isTrackedProcessRunning('queue')) {
+                $this->launchTrackedProcess('queue', $phpPath, $basePath, 'artisan queue:work');
                 $messages[] = 'تم تشغيل عامل الطابور (Queue Worker).';
             } else {
                 $messages[] = 'عامل الطابور يعمل مسبقاً.';
             }
 
-            if (!$scheduleRunning) {
-                $cmdSchedule = "powershell -windowstyle hidden -command \"Start-Process '$phpPath' -ArgumentList 'artisan schedule:work' -WorkingDirectory '$basePath' -WindowStyle Hidden\"";
-                pclose(popen("start /B " . $cmdSchedule, "r"));
+            if (!$this->isTrackedProcessRunning('schedule')) {
+                $this->launchTrackedProcess('schedule', $phpPath, $basePath, 'artisan schedule:work');
                 $messages[] = 'تم تشغيل المجدول (Scheduler).';
             } else {
                 $messages[] = 'المجدول يعمل مسبقاً.';
@@ -260,31 +283,123 @@ class DashboardController extends Controller
     }
 
     /**
+     * Stop background services (queue & schedule).
+     */
+    public function stopServices()
+    {
+        activity('services')->causedBy(auth()->user())->log('إيقاف الخدمات (Queue/Scheduler) — تعطيل مؤقت لإرسال/استقبال الرسائل بالكامل للشركة');
+
+        try {
+            $this->killTrackedProcess('queue');
+            $this->killTrackedProcess('schedule');
+
+            return redirect()->route('dashboard')->with('success', 'تم إيقاف الخدمات بنجاح.');
+        } catch (\Exception $e) {
+            Log::error('Dashboard Stop Services failed', ['error' => $e->getMessage()]);
+            return redirect()->route('dashboard')->with('error', 'فشل إيقاف الخدمات: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Restart Queue workers.
      */
     public function restartQueue()
     {
+        activity('services')->causedBy(auth()->user())->log('إعادة تشغيل عامل الطابور (Queue Worker)');
+
         try {
             // Tell existing workers to stop gracefully (they will stop after finishing current job)
             Artisan::call('queue:restart');
-            
-            // Also forcefully kill the queue worker process to restart it immediately since we run it in a hidden window without a daemon manager
-            exec('wmic process where "name=\'php.exe\' and commandline like \'%artisan queue:work%\'" call terminate 2>NUL');
-            
-            // Wait a moment for processes to terminate
+
+            // Also forcefully kill our own tracked queue worker process to restart it immediately
+            // since we run it in a hidden window without a daemon manager
+            $this->killTrackedProcess('queue');
+
+            // Wait a moment for the process to terminate
             sleep(1);
-            
-            // Start the queue worker again
-            $basePath = base_path();
-            $phpPath = 'c:\xampp\php\php.exe';
-            
-            $cmdQueue = "powershell -windowstyle hidden -command \"Start-Process '$phpPath' -ArgumentList 'artisan queue:work' -WorkingDirectory '$basePath' -WindowStyle Hidden\"";
-            pclose(popen("start /B " . $cmdQueue, "r"));
-            
+
+            $this->launchTrackedProcess('queue', 'c:\xampp\php\php.exe', base_path(), 'artisan queue:work');
+
             return redirect()->route('dashboard')->with('success', 'تم إعادة تشغيل الطابور بنجاح.');
         } catch (\Exception $e) {
             Log::error('Dashboard Restart Queue failed', ['error' => $e->getMessage()]);
             return redirect()->route('dashboard')->with('error', 'فشل إعادة تشغيل الطابور: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * مسار ملف PID الخاص بخدمة معينة تابعة لهذا التطبيق فقط (queue أو schedule)
+     */
+    private function pidFilePath(string $service): string
+    {
+        return storage_path("app/{$service}_worker.pid");
+    }
+
+    /**
+     * التحقق من كون العملية المسجّلة في ملف الـ PID الخاص بهذا التطبيق لا تزال حية
+     * (بدل البحث في كل عمليات النظام عبر wmic، مما قد يطال تطبيقات أخرى على نفس الجهاز)
+     */
+    private function isTrackedProcessRunning(string $service): bool
+    {
+        $pidFile = $this->pidFilePath($service);
+        if (!File::exists($pidFile)) {
+            return false;
+        }
+
+        $pid = trim(File::get($pidFile));
+        if (!ctype_digit($pid)) {
+            return false;
+        }
+
+        exec('tasklist /FI "PID eq ' . $pid . '" /NH 2>NUL', $output);
+        foreach ($output as $line) {
+            if (str_contains($line, $pid)) {
+                return true;
+            }
+        }
+
+        // العملية لم تعد موجودة، نظّف ملف الـ PID القديم
+        File::delete($pidFile);
+        return false;
+    }
+
+    /**
+     * تشغيل عملية خلفية جديدة وتسجيل رقمها (PID) الخاص بهذا التطبيق فقط
+     */
+    private function launchTrackedProcess(string $service, string $phpPath, string $basePath, string $artisanCommand): void
+    {
+        $escapedPhpPath = str_replace("'", "''", $phpPath);
+        $escapedBasePath = str_replace("'", "''", $basePath);
+        $escapedArgs = str_replace("'", "''", $artisanCommand);
+
+        $psCommand = "\$p = Start-Process -FilePath '{$escapedPhpPath}' -ArgumentList '{$escapedArgs}' -WorkingDirectory '{$escapedBasePath}' -WindowStyle Hidden -PassThru; Write-Output \$p.Id";
+        $cmd = 'powershell -NoProfile -WindowStyle Hidden -Command "' . $psCommand . '"';
+
+        exec($cmd, $output);
+        $pid = trim($output[0] ?? '');
+
+        if (ctype_digit($pid)) {
+            File::put($this->pidFilePath($service), $pid);
+        } else {
+            Log::error("Failed to capture PID for {$service} worker", ['output' => $output]);
+        }
+    }
+
+    /**
+     * إيقاف عملية مُتتبَّعة تابعة لهذا التطبيق فقط عبر رقمها (PID) المسجل
+     */
+    private function killTrackedProcess(string $service): void
+    {
+        $pidFile = $this->pidFilePath($service);
+        if (!File::exists($pidFile)) {
+            return;
+        }
+
+        $pid = trim(File::get($pidFile));
+        if (ctype_digit($pid)) {
+            exec('taskkill /F /PID ' . $pid . ' 2>NUL');
+        }
+
+        File::delete($pidFile);
     }
 }

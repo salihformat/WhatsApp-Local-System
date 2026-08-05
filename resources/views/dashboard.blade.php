@@ -173,7 +173,7 @@
                     </svg>
                     <div>
                         <h4 style="font-weight: 700; font-size: 14px; margin: 0;">عملية ناجحة</h4>
-                        <p style="font-size: 13px; margin: 2px 0 0 0;">{!! session('success') !!}</p>
+                        <p style="font-size: 13px; margin: 2px 0 0 0;">{!! nl2br(e(session('success'))) !!}</p>
                     </div>
                 </div>
             @endif
@@ -199,11 +199,27 @@
                                 <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.298-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
                             </svg>
                         </div>
-                        <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight" style="color: #ffffff; margin: 0;">لوحة تحكم واتساب المحلي</h1>
+                        <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight flex flex-wrap items-center gap-3" style="color: #ffffff; margin: 0;">
+                            لوحة تحكم واتساب المحلي
+                            @if(isset($servicesStatus))
+                                @if($servicesStatus['all_running'])
+                                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold shadow-md" style="background-color: #ffffff; color: #15803d; border: 1px solid #bbf7d0;">
+                                        <span class="w-2.5 h-2.5 rounded-full animate-pulse" style="background-color: #22c55e;"></span>
+                                        الخدمات تعمل
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold shadow-md" style="background-color: #ffffff; color: #b91c1c; border: 1px solid #fecaca;">
+                                        <span class="w-2.5 h-2.5 rounded-full animate-pulse" style="background-color: #ef4444;"></span>
+                                        الخدمات متوقفة
+                                    </span>
+                                @endif
+                            @endif
+                        </h1>
                     </div>
                     <p class="text-sm mt-1 max-w-2xl leading-relaxed" style="color: rgba(255,255,255,0.9); margin: 0;">إدارة متكاملة لعمليات الإرسال، مراقبة المجلد النشط، معالجة الطوابير وإعادة إرسال الرسائل المتعثرة بضغطة زر.</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-3">
+                    @if(auth()->user()->isAdmin())
                     <form action="{{ route('dashboard.start-services') }}" method="POST" class="inline" style="margin: 0;">
                         @csrf
                         <button type="submit" class="btn-header-white" style="background-color: #fef08a !important; color: #854d0e !important; box-shadow: 0 4px 12px rgba(202, 138, 4, 0.3);">
@@ -212,6 +228,17 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                             </svg>
                             تشغيل الخدمات (مخفية)
+                        </button>
+                    </form>
+
+                    <form action="{{ route('dashboard.stop-services') }}" method="POST" class="inline" style="margin: 0;">
+                        @csrf
+                        <button type="submit" class="btn-header-white" style="background-color: #ffedd5 !important; color: #9a3412 !important; box-shadow: 0 4px 12px rgba(234, 88, 12, 0.3);">
+                            <svg style="width: 18px; height: 18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"></path>
+                            </svg>
+                            إيقاف الخدمات
                         </button>
                     </form>
 
@@ -254,6 +281,7 @@
                             إعادة تشغيل الطابور
                         </button>
                     </form>
+                    @endif
                 </div>
             </div>
 
@@ -359,19 +387,19 @@
                             @if(auth()->user()->isAdmin())
                                 <div class="flex flex-wrap justify-center gap-3">
                                     <!-- Mini Stat: Folder Pending -->
-                                    <div class="mini-square-card" style="width: 75px; height: 75px;">
+                                    <div class="mini-square-card" style="width: 75px; height: 75px; cursor: pointer;" onclick="openFolderModal('pending-files-modal')">
                                         <div class="mini-card-title" style="font-size: 9px;">بانتظار الفحص</div>
                                         <div class="mini-card-value" style="font-size: 20px;">{{ $folderStats['pending_files'] }}</div>
                                     </div>
 
                                     <!-- Mini Stat: Folder Archived -->
-                                    <div class="mini-square-card" style="width: 75px; height: 75px;">
+                                    <div class="mini-square-card" style="width: 75px; height: 75px; cursor: pointer;" onclick="openFolderModal('archived-files-modal')">
                                         <div class="mini-card-title" style="color: #16a34a; font-size: 9px;">مؤرشفة</div>
                                         <div class="mini-card-value" style="color: #16a34a; font-size: 20px;">{{ $folderStats['archived_files'] }}</div>
                                     </div>
 
                                     <!-- Mini Stat: Folder Failed -->
-                                    <div class="mini-square-card" style="width: 75px; height: 75px; border-color: #fca5a5;">
+                                    <div class="mini-square-card" style="width: 75px; height: 75px; border-color: #fca5a5; cursor: pointer;" onclick="openFolderModal('failed-files-modal')">
                                         <div class="mini-card-title" style="color: #dc2626; font-size: 9px;">ملفات خاطئة</div>
                                         <div class="mini-card-value" style="color: #dc2626; font-size: 20px;">{{ $folderStats['failed_files'] }}</div>
                                     </div>
@@ -562,7 +590,243 @@
         </div>
     </div>
 
+    <!-- Modals for Folder Files -->
+    <!-- Pending Files Modal -->
+    <div id="pending-files-modal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true" dir="rtl">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onclick="closeFolderModal('pending-files-modal')"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-right w-full">
+                            <h3 class="text-lg leading-6 font-bold text-gray-900 mb-4" id="modal-title">
+                                الملفات بانتظار الفحص
+                            </h3>
+                            <div class="mt-2 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                                @if(!empty($folderStats['files_list']))
+                                    <ul class="space-y-3">
+                                        @foreach($folderStats['files_list'] as $file)
+                                            <li class="p-4 bg-gray-50 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                                <div class="flex items-center gap-3 w-full sm:w-auto overflow-hidden">
+                                                    <div class="p-2 bg-white rounded-lg shadow-sm border border-gray-100 flex-shrink-0">
+                                                        <svg style="width: 24px; height: 24px; color: #64748b;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                                    </div>
+                                                    <div class="flex flex-col text-right">
+                                                        <span class="font-bold text-gray-800 break-all" dir="ltr">{{ $file['name'] }}</span>
+                                                    </div>
+                                                </div>
+                                                <div class="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-t-0 border-gray-200 pt-3 sm:pt-0">
+                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">{{ $file['size'] }}</span>
+                                                    <span class="text-xs font-medium text-gray-500 whitespace-nowrap">{{ $file['time'] }}</span>
+                                                </div>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                @else
+                                    <p class="text-sm text-gray-500 text-center py-4">لا توجد ملفات حالياً</p>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-slate-800 text-base font-medium text-white hover:bg-slate-700 focus:outline-none sm:w-auto sm:text-sm" onclick="closeFolderModal('pending-files-modal')">
+                        إغلاق
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Archived Files Modal -->
+    <div id="archived-files-modal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true" dir="rtl">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onclick="closeFolderModal('archived-files-modal')"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-right w-full">
+                            <h3 class="text-lg leading-6 font-bold text-gray-900 mb-4" id="modal-title">
+                                الملفات المؤرشفة (آخر 50 ملف)
+                            </h3>
+                            <div class="mt-2 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                                @if(!empty($folderStats['archived_files_list']))
+                                    <ul class="space-y-3">
+                                        @foreach(array_reverse($folderStats['archived_files_list']) as $file)
+                                            <div class="bg-white rounded-xl border border-green-100 shadow-sm overflow-hidden transition-all hover:shadow-md">
+                                                <div class="bg-green-50 px-4 py-3 border-b border-green-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                                                    <div class="flex items-center gap-3 w-full sm:w-auto">
+                                                        <div class="p-2 bg-white rounded-lg shadow-sm border border-green-100 flex-shrink-0">
+                                                            <svg style="width: 24px; height: 24px; color: #16a34a;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path></svg>
+                                                        </div>
+                                                        <span class="font-bold text-green-900 break-all" dir="ltr">{{ $file['name'] }}</span>
+                                                    </div>
+                                                    <div class="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-t-0 border-green-100 pt-2 sm:pt-0">
+                                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-white border border-green-200 text-green-800">{{ $file['size'] }}</span>
+                                                        <span class="text-xs font-medium text-gray-500 whitespace-nowrap">{{ $file['time'] }}</span>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="p-4 bg-white text-sm">
+                                                    <h4 class="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                                                        <svg style="width: 16px; height: 16px; color: #64748b;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                                        بيانات الاستخراج (Trace):
+                                                    </h4>
+                                                    @if(isset($file['trace']) && $file['trace'])
+                                                        <div class="bg-gray-50 border-r-4 border-green-500 p-3 rounded-l-lg">
+                                                            <p class="text-gray-700 mb-1"><span class="font-bold">المصدر:</span> {{ $file['trace']->source }}</p>
+                                                            @if($file['trace']->matched_label)
+                                                                <p class="text-gray-700 mb-1"><span class="font-bold">كلمة البحث المطابقة:</span> <strong class="bg-white px-1 border rounded">{{ $file['trace']->matched_label }}</strong></p>
+                                                            @endif
+                                                            @if($file['trace']->file_number)
+                                                                <p class="text-gray-700 mb-1"><span class="font-bold">رقم الملف المستخرج:</span> <strong class="bg-white px-1 border rounded">{{ $file['trace']->file_number }}</strong></p>
+                                                            @endif
+                                                            <p class="text-gray-700 mb-1"><span class="font-bold">الرقم النهائي المعتمد:</span> <strong class="bg-white px-1 border rounded text-green-700" dir="ltr">{{ $file['trace']->final_phone }}</strong></p>
+                                                        </div>
+                                                    @else
+                                                        <div class="bg-gray-50 border-r-4 border-gray-300 p-3 rounded-l-lg">
+                                                            <p class="text-gray-500 text-xs">لا يوجد سجل تتبع (Trace) متوفر لهذا الملف.</p>
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </ul>
+                                @else
+                                    <p class="text-sm text-gray-500 text-center py-4">لا توجد ملفات مؤرشفة</p>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-slate-800 text-base font-medium text-white hover:bg-slate-700 focus:outline-none sm:w-auto sm:text-sm" onclick="closeFolderModal('archived-files-modal')">
+                        إغلاق
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Failed Files Modal -->
+    <div id="failed-files-modal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true" dir="rtl">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onclick="closeFolderModal('failed-files-modal')"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-right w-full">
+                            <h3 class="text-lg leading-6 font-bold text-red-600 mb-4" id="modal-title">
+                                الملفات الخاطئة وأسباب الفشل
+                            </h3>
+                            <div class="mt-2 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                                @if(!empty($folderStats['failed_files_list']))
+                                    <div class="space-y-4">
+                                        @foreach($folderStats['failed_files_list'] as $file)
+                                            <div class="bg-white rounded-xl border border-red-100 shadow-sm overflow-hidden transition-all hover:shadow-md">
+                                                <div class="bg-red-50 px-4 py-3 border-b border-red-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                                                    <div class="flex items-center gap-3 overflow-hidden w-full sm:w-auto">
+                                                        <div class="p-2 bg-white rounded-lg shadow-sm border border-red-100 flex-shrink-0">
+                                                            <svg style="width: 20px; height: 20px; color: #dc2626;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                                                        </div>
+                                                        <span class="font-bold text-red-900 break-all" dir="ltr" title="{{ $file['name'] }}">{{ $file['name'] }}</span>
+                                                    </div>
+                                                    <div class="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-t-0 border-red-100 pt-2 sm:pt-0">
+                                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-white border border-red-100 text-red-800">{{ $file['size'] }}</span>
+                                                        <span class="text-xs font-medium text-gray-500 whitespace-nowrap">{{ $file['time'] }}</span>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="p-4 bg-white text-sm">
+                                                    <h4 class="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                                                        <svg style="width: 16px; height: 16px; color: #64748b;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                                        سبب الفشل (تتبع الاستخراج):
+                                                    </h4>
+                                                    @if($file['trace'])
+                                                        @if($file['trace']->source === 'none' || $file['trace']->source === 'no_match_in_content')
+                                                            <div class="bg-red-50 border-r-4 border-red-500 p-3 rounded-l-lg">
+                                                                <p class="text-red-700 font-bold mb-1">لم يتم العثور على أي أرقام مطابقة للبحث في محتوى الملف.</p>
+                                                                <p class="text-red-600 text-xs">تأكد من وجود كلمات البحث (مثل: file no, رقم الملف) وأنها مكتوبة بنفس الطريقة تماماً (حسب المطابقة الكاملة أو الجزئية)، وأن المسافة بينها وبين الرقم لا تتجاوز 5 أحرف.</p>
+                                                            </div>
+                                                        @elseif($file['trace']->source === 'file_number')
+                                                            <div class="bg-orange-50 border-r-4 border-orange-500 p-3 rounded-l-lg">
+                                                                <p class="text-orange-700 font-bold mb-2">تم العثور على رقم ملف ولكن لم يتم العثور على عميل مطابق في جهات الاتصال.</p>
+                                                                <ul class="list-disc list-inside text-orange-600 text-xs space-y-1">
+                                                                    <li>الكلمة المطابقة: <strong class="bg-white px-1 rounded">{{ $file['trace']->matched_label }}</strong></li>
+                                                                    <li>رقم الملف المستخرج: <strong class="bg-white px-1 rounded">{{ $file['trace']->file_number }}</strong></li>
+                                                                    <li>لم يتم العثور على أي عميل مسجل بهذا الرقم.</li>
+                                                                </ul>
+                                                            </div>
+                                                        @elseif($file['trace']->source === 'parse_error' || $file['trace']->source === 'ocr_error' || $file['trace']->source === 'empty_text')
+                                                            <div class="bg-red-50 border-r-4 border-red-500 p-3 rounded-l-lg">
+                                                                <p class="text-red-700 font-bold">فشل في قراءة أو استخراج النص من الملف.</p>
+                                                            </div>
+                                                        @else
+                                                            <div class="bg-gray-50 border-r-4 border-gray-500 p-3 rounded-l-lg">
+                                                                <p class="text-gray-700 font-bold mb-2">تم استخراج الرقم عبر ({{ $file['trace']->source }}) ولكن تعذر الإرسال لأسباب أخرى.</p>
+                                                                @if($file['trace']->excluded)
+                                                                    <div class="mt-3 bg-white p-3 rounded border border-gray-200">
+                                                                        <strong class="text-gray-800 text-xs flex items-center gap-1 mb-2">
+                                                                            <svg style="width: 14px; height: 14px; color: #f59e0b;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                                                                            أرقام تم استبعادها لوجودها في سياق مستبعد (مثل: هاتف المحل):
+                                                                        </strong>
+                                                                        <ul class="space-y-1 text-xs">
+                                                                            @foreach(is_string($file['trace']->excluded) ? json_decode($file['trace']->excluded, true) : $file['trace']->excluded as $ex)
+                                                                                <li class="flex items-center justify-between bg-gray-50 p-2 rounded">
+                                                                                    <span dir="ltr" class="font-bold text-gray-700">{{ $ex['value'] ?? '' }}</span>
+                                                                                    <span class="text-red-500 bg-red-50 px-2 py-0.5 rounded-full text-[10px]">مستبعد بسبب: {{ $ex['excluded_by'] ?? '' }}</span>
+                                                                                </li>
+                                                                            @endforeach
+                                                                        </ul>
+                                                                    </div>
+                                                                @endif
+                                                            </div>
+                                                        @endif
+                                                    @else
+                                                        <div class="bg-red-50 border-r-4 border-red-500 p-3 rounded-l-lg">
+                                                            <p class="text-red-700 font-bold"><span class="font-bold">السبب غير متوفر:</span> لا يوجد سجل استخراج (Trace) لهذا الملف. قد يكون امتداد الملف غير مسموح أو حجمه كبير.</p>
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @else
+                                    <p class="text-sm text-gray-500 text-center py-4">لا توجد ملفات خاطئة</p>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-slate-800 text-base font-medium text-white hover:bg-slate-700 focus:outline-none sm:w-auto sm:text-sm" onclick="closeFolderModal('failed-files-modal')">
+                        إغلاق
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Chart Configuration Script -->
+    <style>
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9; 
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+    </style>
     <script>
         // Toggle message text function for dashboard
         window.toggleDashboardMessage = function(button, textId) {
@@ -579,6 +843,14 @@
                 textSpan.innerText = '{{ __("عرض المزيد") }}';
                 icon.classList.remove('rotate-180');
             }
+        };
+
+        // Modal Functions
+        window.openFolderModal = function(modalId) {
+            document.getElementById(modalId).classList.remove('hidden');
+        };
+        window.closeFolderModal = function(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
         };
 
         document.addEventListener('DOMContentLoaded', function () {

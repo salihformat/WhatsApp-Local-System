@@ -1,0 +1,108 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Jobs\ProcessPrintJob;
+use App\Models\PrintJob;
+use Illuminate\Http\Request;
+
+class PrintJobController extends Controller
+{
+    public function index(Request $request)
+    {
+        $query = PrintJob::with(['printer', 'message']);
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->input('status'));
+        }
+
+        if ($request->filled('file_name')) {
+            $query->where('file_name', 'like', '%' . $request->input('file_name') . '%');
+        }
+
+        if ($request->filled('printer_id')) {
+            $query->where('printer_id', $request->input('printer_id'));
+        }
+
+        if ($request->filled('phone_number')) {
+            $query->whereHas('message', function ($q) use ($request) {
+                $q->where('phone_number', 'like', '%' . $request->input('phone_number') . '%');
+            });
+        }
+
+        if ($request->has('export') && $request->export === 'excel') {
+            return $this->exportCsv($query);
+        }
+
+        $printJobs = $query->latest()->paginate(20)->withQueryString();
+        $printers = \App\Models\Printer::all();
+
+        return view('print-jobs.index', compact('printJobs', 'printers'));
+    }
+
+    private function exportCsv($query)
+    {
+        $fileName = 'print_jobs_' . date('Y-m-d_H-i-s') . '.csv';
+        $printJobs = $query->latest()->get();
+
+        $headers = [
+            "Content-type"        => "text/csv; charset=UTF-8",
+            "Content-Disposition" => "attachment; filename=$fileName",
+            "Pragma"              => "no-cache",
+            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+            "Expires"             => "0"
+        ];
+
+        $columns = ['رقم المهمة', 'رقم الجوال', 'اسم الملف', 'اسم الطابعة', 'الحالة', 'المحاولات', 'وقت الوصول', 'وقت الطباعة', 'المدة', 'رسالة الخطأ'];
+
+        $callback = function() use($printJobs, $columns) {
+            $file = fopen('php://output', 'w');
+            
+            // إضافة BOM لدعم اللغة العربية في ملفات CSV عند فتحها في Excel
+            fputs($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
+
+            fputcsv($file, $columns);
+
+            foreach ($printJobs as $job) {
+                $statusLabels = [
+                    'pending' => 'قيد الانتظار',
+                    'printing' => 'جارٍ الطباعة',
+                    'completed' => 'مكتملة',
+                    'failed' => 'فشلت',
+                ];
+
+                $row = [
+                    $job->id,
+                    $job->message?->phone_number ?? '',
+                    $job->file_name,
+                    $job->printer?->name ?? '',
+                    $statusLabels[$job->status] ?? $job->status,
+                    $job->attempts,
+                    $job->created_at ? $job->created_at->format('Y-m-d H:i:s') : '',
+                    $job->printed_at ? $job->printed_at->format('Y-m-d H:i:s') : '',
+                    $job->duration_for_humans ?? '',
+                    $job->error_message ?? ''
+                ];
+
+                fputcsv($file, $row);
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    public function retry(PrintJob $printJob)
+    {
+        if (!$printJob->canRetry() && $printJob->status !== 'failed') {
+            return redirect()->back()->with('error', 'لا يمكن إعادة هذه المهمة');
+        }
+
+        $printJob->update(['status' => 'pending', 'error_message' => null]);
+
+        dispatch(new ProcessPrintJob($printJob->id));
+
+        return redirect()->back()->with('success', 'تمت إعادة جدولة مهمة الطباعة');
+    }
+}

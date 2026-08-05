@@ -39,7 +39,9 @@ return [
             'connection' => env('DB_QUEUE_CONNECTION'),
             'table' => env('DB_QUEUE_TABLE', 'jobs'),
             'queue' => env('DB_QUEUE', 'default'),
-            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 90),
+            // يجب أن تتجاوز مهلة SendMessageJob (200 ثانية) وإلا يُعاد طرح المهمة لعامل آخر
+            // قبل انتهاء الأولى فعلياً، مما يسبب إرسال الرسالة مرتين
+            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 220),
             'after_commit' => false,
         ],
 

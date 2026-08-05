@@ -19,9 +19,6 @@ class ContactSyncService
     private CentralApiService $apiService;
     private int $batchSize;
 
-    /** @var int الحد الأقصى لعدد محاولات المزامنة قبل الإيقاف */
-    private const MAX_RETRY_COUNT = 5;
-
     public function __construct(CentralApiService $apiService)
     {
         $this->apiService = $apiService;

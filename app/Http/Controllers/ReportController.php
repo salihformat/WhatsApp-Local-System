@@ -104,4 +104,41 @@ class ReportController extends Controller
 
         return response()->download($filePath)->deleteFileAfterSend(true);
     }
+
+    /**
+     * عرض صفحة تقارير أداء خدمة العملاء
+     */
+    public function performance(Request $request)
+    {
+        // إحصائيات عامة
+        $totalConversations = \App\Models\Conversation::count();
+        $openConversations = \App\Models\Conversation::where('status', 'open')->count();
+        $closedConversations = \App\Models\Conversation::where('status', 'closed')->count();
+        
+        // المحادثات هذا الشهر
+        $thisMonthConversations = \App\Models\Conversation::whereMonth('created_at', now()->month)
+                                        ->whereYear('created_at', now()->year)
+                                        ->count();
+
+        // أداء الوكلاء (عدد المحادثات المغلقة لكل وكيل)
+        $agentPerformance = \App\Models\User::withCount(['assignedConversations as closed_conversations_count' => function($q) {
+            $q->where('status', 'closed');
+        }])->having('closed_conversations_count', '>', 0)
+          ->orderByDesc('closed_conversations_count')
+          ->get();
+
+        // إحصائيات الرسائل (الواردة والصادرة)
+        $incomingMessages = Message::where('is_incoming', true)->count();
+        $outgoingMessages = Message::where('is_incoming', false)->count();
+
+        return view('reports.performance', compact(
+            'totalConversations',
+            'openConversations',
+            'closedConversations',
+            'thisMonthConversations',
+            'agentPerformance',
+            'incomingMessages',
+            'outgoingMessages'
+        ));
+    }
 }

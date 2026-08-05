@@ -18,16 +18,17 @@ return [
 
 
     'central_api_url' => env('CENTRAL_API_URL', 'http://localhost:8000/api'),
-    'central_api_token' => env('CENTRAL_API_TOKEN', 'test_security_token_123'),
+    'central_api_token' => env('CENTRAL_API_TOKEN'),
     'company_id' => env('CENTRAL_API_COMPANY_ID' ),
 
-    'files_storage_path' => env('FILES_STORAGE_PATH', 'invoices'),
-    'files_max_size' => env('FILES_MAX_SIZE_MB', 20) * 1024, // Convert to KB
-    'files_allowed_types' => explode(',', env('FILES_ALLOWED_TYPES', 'pdf,jpg,jpeg,png,doc,docx')),
+    'files_storage_path' => env('FILE_STORAGE_PATH', 'invoices'),
+    'files_max_size' => env('FILE_MAX_SIZE_MB', 20) * 1024, // Convert to KB
+    'files_allowed_types' => explode(',', env('FILE_ALLOWED_TYPES', 'pdf,jpg,jpeg,png,doc,docx')),
+    'file_auto_delete_days' => env('FILE_AUTO_DELETE_DAYS', 3),
 
-//    'device_name' => env('DEVICE_NAME'),
-//    'location' => env('LOCATION'),
-//    'plan_type' => env('PLAN_TYPE'),
+    'device_name' => env('DEVICE_NAME', 'Unknown Device'),
+    'location' => env('LOCATION', 'Unknown Location'),
+    'plan_type' => env('PLAN_TYPE', 'Standard'),
 
     'max_retry_attempts' => env('MAX_RETRY_ATTEMPTS', 5),
     'retry_delay_minutes' => env('RETRY_DELAY_MINUTES', 5),

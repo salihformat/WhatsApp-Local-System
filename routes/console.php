@@ -43,3 +43,12 @@ Schedule::command('monitor:folder')->everyMinute()->withoutOverlapping();
 
 // مزامنة جهات الاتصال مع النظام المركزي كل 15 دقيقة
 Schedule::command('contacts:sync')->everyFifteenMinutes()->withoutOverlapping();
+
+// حذف الملفات القديمة من الأرشيف والمجلدات الفاشلة يومياً
+Schedule::command('files:clean-old')->daily()->withoutOverlapping();
+
+// مزامنة سياسة التخزين وإعدادات الشركة من النظام المركزي دورياً (لمنع بقاء الإعدادات قديمة إلى الأبد)
+Schedule::command('local-system:sync-config')->hourly()->withoutOverlapping();
+
+// مراقبة حالة الطابعات (متصلة/ورق/حبر) وتنبيه عند تغيّر الحالة
+Schedule::command('monitor:printers')->everyTenMinutes()->withoutOverlapping();

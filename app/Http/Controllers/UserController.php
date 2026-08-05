@@ -32,14 +32,15 @@ class UserController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
-            'is_admin' => ['boolean'],
+            'role' => ['required', 'string', 'in:admin,supervisor,agent'],
         ]);
 
         User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
-            'is_admin' => $request->has('is_admin'),
+            'role' => $validated['role'],
+            'is_admin' => $validated['role'] === 'admin',
         ]);
 
         return redirect()->route('users.index')
@@ -62,18 +63,29 @@ class UserController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
             'password' => ['nullable', 'string', 'min:8', 'confirmed'],
-            'is_admin' => ['boolean'],
+            'role' => ['required', 'string', 'in:admin,supervisor,agent'],
         ]);
 
         $user->name = $validated['name'];
         $user->email = $validated['email'];
 
-        if (!empty($validated['password'])) {
+        $passwordChanged = !empty($validated['password']);
+        if ($passwordChanged) {
             $user->password = Hash::make($validated['password']);
         }
 
-        $user->is_admin = $request->has('is_admin');
+        $user->role = $validated['role'];
+        $user->is_admin = $validated['role'] === 'admin';
         $user->save();
+
+        // كلمة المرور مستثناة عمداً من التدقيق التلقائي للحقول (لا نُخزّن قيمتها ولو مُجزّأة)،
+        // لذا نُسجّل هنا فقط أن التغيير حدث، بمعزل عن تدقيق باقي الحقول (name/email/role) التلقائي.
+        if ($passwordChanged) {
+            activity('users')
+                ->causedBy(auth()->user())
+                ->performedOn($user)
+                ->log("تم تغيير كلمة مرور المستخدم: {$user->name}");
+        }
 
         return redirect()->route('users.index')
             ->with('success', 'تم تحديث المستخدم بنجاح');
