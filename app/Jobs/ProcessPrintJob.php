@@ -4,6 +4,8 @@ namespace App\Jobs;
 
 use App\Models\Message;
 use App\Models\PrintJob;
+use App\Services\FileTypeResolver;
+use App\Services\OfficeToPdfConverter;
 use App\Services\PrintService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -22,9 +24,10 @@ class ProcessPrintJob implements ShouldQueue
     protected $printJobId;
 
     public $tries = 3;
-    // يجب أن تتجاوز مهلة الطباعة الداخلية (printing.print_timeout) بهامش أمان، وإلا يقتل Laravel
-    // المهمة قبل أن تحصل عملية SumatraPDF نفسها على فرصة إنهاء الطباعة أو رفع استثناء واضح
-    public $timeout = 220;
+    // [Fix 2026-08-06] يجب أن تتجاوز مجموع مهلة تحويل ملفات الأوفيس (office_conversion_timeout)
+    // ومهلة الطباعة الداخلية (print_timeout) بهامش أمان، وإلا يقتل Laravel المهمة قبل أن تحصل
+    // العملية الفعلية (LibreOffice أو SumatraPDF) على فرصة إنهاء عملها أو رفع استثناء واضح.
+    public $timeout = 340;
     public $backoff = [30, 60, 120];
 
     public function __construct($printJobId)
@@ -32,7 +35,7 @@ class ProcessPrintJob implements ShouldQueue
         $this->printJobId = $printJobId;
     }
 
-    public function handle(PrintService $printService): void
+    public function handle(PrintService $printService, OfficeToPdfConverter $officeConverter): void
     {
         $job = PrintJob::find($this->printJobId);
 
@@ -49,7 +52,7 @@ class ProcessPrintJob implements ShouldQueue
         $job->update(['status' => 'printing', 'attempts' => $job->attempts + 1]);
 
         try {
-            $this->ensureLocalFile($job);
+            $this->ensureLocalFile($job, $officeConverter);
             $printService->print($job);
 
             $job->update(['status' => 'completed', 'printed_at' => now(), 'error_message' => null]);
@@ -228,7 +231,7 @@ class ProcessPrintJob implements ShouldQueue
      * الملفات الواردة عبر واتساب تُخزَّن كرابط بعيد من النظام المركزي (media_url)،
      * يجب تنزيلها محلياً أولاً لأن أدوات الطباعة (SumatraPDF) تتطلب مساراً محلياً فعلياً.
      */
-    private function ensureLocalFile(PrintJob $job): void
+    private function ensureLocalFile(PrintJob $job, OfficeToPdfConverter $officeConverter): void
     {
         if (file_exists($job->file_path)) {
             return;
@@ -254,12 +257,99 @@ class ProcessPrintJob implements ShouldQueue
         // ما يحتوي أحرفاً عربية). لوحظ فعلياً أن تمرير مسار بأحرف عربية لعملية SumatraPDF الخارجية
         // (عبر Symfony Process على Windows) يتسبب بتعليقها حتى انتهاء المهلة (60 ثانية) بصمت، على
         // الأرجح بسبب سوء تحويل ترميز سطر الأوامر لغير ASCII في هذه البيئة تحديداً.
-        $extension = pathinfo($job->file_name, PATHINFO_EXTENSION) ?: 'pdf';
+        //
+        // [Fix 2026-08-06] $job->file_name فارغ دائماً لصور واتساب، وكان يؤدي سابقاً لافتراض ".pdf"
+        // دوماً حتى للصور الحقيقية — فيُحفظ محتوى JPEG ثنائي باسم ملف ".pdf" فيفشل عند فتحه لاحقاً.
+        // FileTypeResolver يلجأ للرابط البعيد الأصلي (قبل استبداله أدناه بالمسار المحلي) ثم لنوع
+        // MIME (file_type) قبل الرجوع أخيراً لـ'pdf' كافتراض.
+        $extension = FileTypeResolver::resolveExtension($job->file_name, $job->file_path, $job->file_type, 'pdf');
         $safeFileName = 'print_job_' . $job->id . '.' . $extension;
 
         $relativePath = trim(config('printing.download_path'), '/') . '/' . $safeFileName;
         Storage::disk('local')->put($relativePath, $response->body());
 
-        $job->update(['file_path' => Storage::disk('local')->path($relativePath)]);
+        $localPath = Storage::disk('local')->path($relativePath);
+
+        // [Fix 2026-08-06] SumatraPDF لا يدعم ملفات Word/Excel/PowerPoint مباشرة (بعكس PDF والصور)
+        // — تُحوَّل أولاً إلى PDF عبر LibreOffice (headless)، ثم يُستكمل بقية المسار كأي PDF عادي.
+        // اسم ملف الإخراج من LibreOffice مطابق دائماً لاسم الملف المُدخَل بامتداد .pdf (نفس مجلد
+        // print_jobs)، لذا يبقى نمط التسمية print_job_{id}.pdf متسقاً بعد التحويل.
+        if (in_array($extension, config('printing.office_extensions', []), true)) {
+            $convertedPath = $officeConverter->convert($localPath);
+            Storage::disk('local')->delete($relativePath);
+            $localPath = $convertedPath;
+            $extension = 'pdf';
+        }
+
+        // [Fix 2026-08-06] لوحظ فعلياً (فحص حي) أن صور واتساب/S3 تصل بلا أي بيانات دقة (DPI) —
+        // فحص JFIF أظهر density=1x1 (بلا وحدة قياس مطلقة). المحاولة الأولى (تعيين DPI فقط عبر
+        // imageresolution) حلّت مشكلة عدم ظهور المحتوى، لكن كشفت مشكلة تالية: SumatraPDF يشتق حجم
+        // "صفحة" الطباعة مباشرة من أبعاد الصورة نفسها (بكسل ÷ DPI)، فينتج مقاس صفحة غير قياسي
+        // (custom) لا يطابق أي درج ورق مُعرَّف في الطابعة — فيظهر خطأ "الورق غير موجود" رغم وجود
+        // ورق A4/Letter فعلياً بالطابعة. الحل الجذري: وضع الصورة داخل صفحة كاملة بمقاس قياسي فعلي
+        // (بخلفية بيضاء، مع تصغير الصورة إن لزم لتناسب هامش الصفحة) بدل الاكتفاء بتعيين DPI فقط.
+        if (in_array($extension, ['jpg', 'jpeg', 'png', 'gif'], true)) {
+            $this->fitImageToStandardPage($localPath, $extension);
+        }
+
+        $job->update(['file_path' => $localPath]);
+    }
+
+    /**
+     * يضع الصورة داخل صفحة قياسية كاملة (A4/Letter افتراضياً حسب printing.image_page_size) بدقة
+     * printing.image_dpi، مع تصغيرها (بلا تكبير) لتناسب هامش الصفحة مع الحفاظ على أبعادها الأصلية —
+     * انظر الشرح في ensureLocalFile أعلاه. فشل GD بصمت (صورة تالفة مثلاً) لا يجب أن يمنع محاولة
+     * الطباعة بالملف الأصلي كما وصل.
+     */
+    private function fitImageToStandardPage(string $path, string $extension): void
+    {
+        try {
+            $source = @imagecreatefromstring(file_get_contents($path));
+            if (!$source) {
+                return;
+            }
+
+            $dpi = (int) config('printing.image_dpi', 200);
+            $pageSizeMm = strtolower(config('printing.image_page_size', 'a4')) === 'letter'
+                ? [215.9, 279.4]
+                : [210.0, 297.0]; // A4
+
+            $pageWidthPx = (int) round($pageSizeMm[0] / 25.4 * $dpi);
+            $pageHeightPx = (int) round($pageSizeMm[1] / 25.4 * $dpi);
+
+            $marginPx = (int) round(10 / 25.4 * $dpi); // هامش 10مم على كل جانب
+            $maxContentWidth = $pageWidthPx - (2 * $marginPx);
+            $maxContentHeight = $pageHeightPx - (2 * $marginPx);
+
+            $sourceWidth = imagesx($source);
+            $sourceHeight = imagesy($source);
+
+            // تصغير فقط عند الحاجة (بلا تكبير) — الحفاظ على نسبة الأبعاد الأصلية
+            $scale = min($maxContentWidth / $sourceWidth, $maxContentHeight / $sourceHeight, 1.0);
+            $targetWidth = (int) round($sourceWidth * $scale);
+            $targetHeight = (int) round($sourceHeight * $scale);
+
+            $page = imagecreatetruecolor($pageWidthPx, $pageHeightPx);
+            $white = imagecolorallocate($page, 255, 255, 255);
+            imagefill($page, 0, 0, $white);
+
+            $destX = (int) round(($pageWidthPx - $targetWidth) / 2);
+            $destY = (int) round(($pageHeightPx - $targetHeight) / 2);
+
+            imagecopyresampled($page, $source, $destX, $destY, 0, 0, $targetWidth, $targetHeight, $sourceWidth, $sourceHeight);
+            imagedestroy($source);
+
+            imageresolution($page, $dpi, $dpi);
+
+            match ($extension) {
+                'png' => imagepng($page, $path),
+                'gif' => imagegif($page, $path),
+                default => imagejpeg($page, $path, 92),
+            };
+
+            imagedestroy($page);
+        } catch (Throwable $e) {
+            Log::warning('Failed to fit image to standard page before printing', ['path' => $path, 'error' => $e->getMessage()]);
+        }
     }
 }

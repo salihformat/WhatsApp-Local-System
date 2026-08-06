@@ -47,8 +47,8 @@
                     </div>
                     
                     <div class="md:col-span-2">
-                        <label class="block text-sm font-bold text-gray-700 mb-2">القيمة <span class="text-xs text-gray-400 font-normal">(أو كلمات مفصولة بفاصلة)</span></label>
-                        <input type="text" name="match_value" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="مثال: طباعة,اطبع,print">
+                        <label class="block text-sm font-bold text-gray-700 mb-2">القيمة <span class="text-xs text-gray-400 font-normal">(يمكن وضع أكثر من قيمة مفصولة بفاصلة، لأي نوع مطابقة)</span></label>
+                        <input type="text" name="match_value" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="مثال: طباعة,اطبع,print — أو أرقام: 966501111111,966502222222">
                     </div>
                     
                     <div class="md:col-span-2">

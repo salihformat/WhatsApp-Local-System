@@ -38,7 +38,9 @@ class PrintRuleEngine
     }
 
     /**
-     * حالياً تدعم الطباعة الآلية ملفات PDF فقط (انظر دراسة الجدوى: البند 7)
+     * تدعم الطباعة الآلية PDF والصور (jpg/png/gif/bmp/tiff — يدعمها SumatraPDF مباشرة). ملفات
+     * Word/Excel/PowerPoint غير مدعومة بعد (تحتاج تحويلاً مسبقاً لـ PDF، انظر دراسة الجدوى: البند 7).
+     * القائمة قابلة للتخصيص عبر printing.printable_extensions.
      */
     private function isPrintable(Message $message): bool
     {
@@ -46,18 +48,40 @@ class PrintRuleEngine
             return false;
         }
 
-        return $this->fileExtension($message) === 'pdf';
+        $allowed = config('printing.printable_extensions', ['pdf']);
+
+        return in_array($this->fileExtension($message), $allowed, true);
     }
 
     private function ruleMatches(PrintRule $rule, Message $message): bool
     {
         return match ($rule->match_type) {
-            'phone_number' => $message->phone_number === $rule->match_value,
-            'phone_prefix' => str_starts_with((string) $message->phone_number, $rule->match_value),
+            'phone_number' => $this->matchesAnyPhoneValue($rule->match_value, (string) $message->phone_number, exact: true),
+            'phone_prefix' => $this->matchesAnyPhoneValue($rule->match_value, (string) $message->phone_number, exact: false),
             'keyword' => $this->matchesAnyKeyword($rule->match_value, $message->message_text),
             'file_type' => $this->fileExtension($message) === strtolower(ltrim($rule->match_value, '.')),
             default => false,
         };
+    }
+
+    /**
+     * يدعم عدة أرقام/بادئات مفصولة بفاصلة في نفس القاعدة (نفس أسلوب دعم عدة كلمات مفتاحية أدناه)،
+     * مثال: "966501111111,966502222222" أو بادئات فروع: "96650,96653". تكفي مطابقة رقم واحد فقط.
+     */
+    private function matchesAnyPhoneValue(string $matchValue, string $phoneNumber, bool $exact): bool
+    {
+        $values = array_filter(array_map('trim', explode(',', $matchValue)));
+
+        foreach ($values as $value) {
+            if ($value === '') {
+                continue;
+            }
+            if ($exact ? $phoneNumber === $value : str_starts_with($phoneNumber, $value)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -81,9 +105,14 @@ class PrintRuleEngine
         return false;
     }
 
+    /**
+     * [Fix 2026-08-06] لوحظ فعلياً أن واتساب لا يُرسل اسم ملف إطلاقاً للصور (بخلاف المستندات التي
+     * تحمل اسماً صريحاً دائماً)، ورابط التخزين المُرحَّل (S3) يستخدم مُعرِّفاً عشوائياً بلا امتداد —
+     * فيفشل استخراج الامتداد من كلا المصدرين، وتُرفض الصورة من الطباعة رغم مطابقتها فعلياً. الحل
+     * (FileTypeResolver المشترك) يلجأ لنوع MIME كمصدر أخير موثوق.
+     */
     private function fileExtension(Message $message): string
     {
-        $path = parse_url($message->file_path, PHP_URL_PATH) ?: $message->file_path;
-        return strtolower(pathinfo($message->file_name ?: $path, PATHINFO_EXTENSION));
+        return FileTypeResolver::resolveExtension($message->file_name, $message->file_path, $message->file_type);
     }
 }

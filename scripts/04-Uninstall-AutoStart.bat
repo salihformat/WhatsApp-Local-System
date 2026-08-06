@@ -1,5 +1,5 @@
 @echo off
-:: إزالة كل مهام/خدمات التشغيل التلقائي التي أنشأها Install-AutoStart.bat
+:: إزالة كل مهام/خدمات التشغيل التلقائي التي أنشأها 03-Install-AutoStart.bat
 
 net session >nul 2>&1
 if %errorLevel% NEQ 0 (

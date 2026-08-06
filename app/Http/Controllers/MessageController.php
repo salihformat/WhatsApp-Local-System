@@ -8,6 +8,7 @@ use App\Models\Message;
 use App\Models\PrintJob;
 use App\Jobs\SendMessageJob;
 use App\Jobs\ProcessPrintJob;
+use App\Services\FileTypeResolver;
 use App\Services\PrintRuleEngine;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -428,11 +429,18 @@ class MessageController extends Controller
             return;
         }
 
+        // [Fix 2026-08-06] عمود file_name غير قابل للـ NULL في قاعدة البيانات، بينما صور واتساب
+        // تصل دوماً بلا اسم ملف (راجع FileTypeResolver) — فيفشل الإدراج بخطأ قيد قاعدة بيانات.
+        // نولّد اسماً افتراضياً مقروءاً بالامتداد الصحيح بدل تمرير null.
+        $extension = FileTypeResolver::resolveExtension($message->file_name, $message->file_path, $message->file_type, 'pdf');
+        $fileName = $message->file_name ?: "ملف_{$message->id}.{$extension}";
+
         $printJob = PrintJob::create([
             'message_id' => $message->id,
             'printer_id' => $printer->id,
-            'file_name' => $message->file_name,
+            'file_name' => $fileName,
             'file_path' => $message->file_path,
+            'file_type' => $message->file_type,
             'status' => 'pending',
             'source' => 'whatsapp_incoming',
         ]);

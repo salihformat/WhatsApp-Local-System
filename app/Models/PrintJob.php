@@ -11,6 +11,7 @@ class PrintJob extends Model
         'printer_id',
         'file_name',
         'file_path',
+        'file_type',
         'status',
         'attempts',
         'error_message',

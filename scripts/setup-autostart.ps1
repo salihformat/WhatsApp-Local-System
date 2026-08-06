@@ -5,10 +5,15 @@
       آخر مثبّت على نفس الجهاز (يتفادى تعارضات المنافذ مع Apache أخرى/IIS/برامج أخرى قد تكون
       موجودة مسبقاً لدى العميل على المنفذ 80/443).
     - تسجيل هذه النسخة المعزولة كخدمة Windows تعمل تلقائياً عند الإقلاع.
+    - [Fix 2026-08-06] تسجيل MySQL نفسه (نفس تثبيت/بيانات XAMPP الحالية، بلا نسخ أو تعديل) كخدمة
+      Windows تلقائية أيضاً — لوحظ فعلياً أن XAMPP لا يُسجِّل MySQL كخدمة افتراضياً (يحتاج تشغيلاً
+      يدوياً من لوحة تحكم XAMPP بعد كل إقلاع)، وبدونه يفشل الموقع بالكامل (HTTP 500) لأن كل صفحة
+      تحتاج قاعدة البيانات، حتى مع نجاح Apache نفسه.
     - تسجيل عامل الطابور (queue:work) والمجدول (schedule:work) كمهام مجدولة تعمل عند الإقلاع
-      وتُعيد تشغيل نفسها تلقائياً عند التعطل، بدل نوافذ CMD يدوية يجب فتحها كل يوم.
+      **وعند تسجيل الدخول** (الأخيرة أكثر موثوقية للمهام التفاعلية)، وتُعيد تشغيل نفسها تلقائياً
+      عند التعطل، بدل نوافذ CMD يدوية يجب فتحها كل يوم.
 
-    الاستخدام: شغّل Install-AutoStart.bat (سيطلب صلاحيات المسؤول تلقائياً)، أو نفّذ هذا الملف
+    الاستخدام: شغّل 03-Install-AutoStart.bat (سيطلب صلاحيات المسؤول تلقائياً)، أو نفّذ هذا الملف
     مباشرة من PowerShell كمسؤول:  .\setup-autostart.ps1
     للإزالة: .\setup-autostart.ps1 -Uninstall
 #>
@@ -28,8 +33,12 @@ $standaloneHttpdExe   = Join-Path $standaloneApachePath "bin\httpd.exe"
 $standaloneHttpdConf  = Join-Path $standaloneApachePath "conf\httpd.conf"
 
 $apacheServiceName = "WhatsAppLocalApache"
+$mysqlServiceName  = "MySQL_XAMPP"
 $queueTaskName      = "WhatsAppLocalSystem-QueueWorker"
 $schedulerTaskName  = "WhatsAppLocalSystem-Scheduler"
+
+$mysqldExe = Join-Path $XamppPath "mysql\bin\mysqld.exe"
+$mysqlIni  = Join-Path $XamppPath "mysql\bin\my.ini"
 
 function Write-Step($msg) { Write-Host "==> $msg" -ForegroundColor Cyan }
 
@@ -49,7 +58,7 @@ function Stop-OrphanWorkerProcess {
 }
 
 if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    throw "يجب تشغيل هذا السكربت بصلاحيات المسؤول (Administrator). استخدم Install-AutoStart.bat بدلاً من ذلك."
+    throw "يجب تشغيل هذا السكربت بصلاحيات المسؤول (Administrator). استخدم 03-Install-AutoStart.bat بدلاً من ذلك."
 }
 
 if ($Uninstall) {
@@ -74,7 +83,11 @@ if ($Uninstall) {
         }
     }
 
-    Write-Host "تمت إزالة كل مهام/خدمات التشغيل التلقائي. (النسخة المعزولة من Apache في $standaloneApachePath لم تُحذف، يمكن حذف المجلد يدوياً إن أردت)." -ForegroundColor Green
+    # ملاحظة: لا نزيل خدمة MySQL هنا عمداً — قد تُستخدم قاعدة بياناتها من مشاريع أخرى على نفس
+    # الجهاز، وإزالتها مفاجئة قد تقطع خدمة عن غير قصد. إن أردت إزالتها فعلاً، استخدم لوحة تحكم
+    # الخدمات (services.msc) يدوياً بعد التأكد أن لا مشروع آخر يعتمد عليها.
+
+    Write-Host "تمت إزالة كل مهام/خدمات التشغيل التلقائي. (النسخة المعزولة من Apache في $standaloneApachePath وخدمة MySQL ($mysqlServiceName) لم تُحذفا، يمكن حذفهما يدوياً إن أردت)." -ForegroundColor Green
     exit 0
 }
 
@@ -138,6 +151,26 @@ Set-Service -Name $apacheServiceName -StartupType Automatic
 Start-Service -Name $apacheServiceName
 Write-Host "   Apache (نسخة معزولة) مسجّل كخدمة ($apacheServiceName) على المنفذ $appPort، وسيعمل تلقائياً مع كل إقلاع." -ForegroundColor Green
 
+# 3) تسجيل MySQL (نفس تثبيت/بيانات XAMPP الحالية بلا أي تغيير) كخدمة Windows تلقائية
+#
+# [Fix 2026-08-06] لوحظ فعلياً: XAMPP لا يُسجِّل MySQL كخدمة Windows افتراضياً — يبقى يحتاج تشغيلاً
+# يدوياً من لوحة تحكم XAMPP بعد كل إقلاع، وبدونه يفشل الموقع بالكامل (HTTP 500، "connection
+# refused") رغم نجاح Apache وكل شيء آخر، لأن كل صفحة تحتاج قاعدة البيانات. هذا يُسجِّل نفس تثبيت
+# MySQL الموجود (بنفس مجلد البيانات) كخدمة — لا يُنشئ نسخة منفصلة ولا يُغيّر أي بيانات.
+Write-Step "تسجيل خدمة Windows لـ MySQL..."
+if (!(Test-Path $mysqldExe)) {
+    Write-Host "   تحذير: لم يتم العثور على mysqld.exe في $mysqldExe — تخطّي تسجيل خدمة MySQL. تأكد من تشغيله يدوياً من لوحة تحكم XAMPP." -ForegroundColor Yellow
+} else {
+    if (Get-Service -Name $mysqlServiceName -ErrorAction SilentlyContinue) {
+        Stop-Service -Name $mysqlServiceName -Force -ErrorAction SilentlyContinue
+        & $mysqldExe --remove $mysqlServiceName | Out-Null
+    }
+    & $mysqldExe --install $mysqlServiceName --defaults-file="$mysqlIni" | Out-Null
+    Set-Service -Name $mysqlServiceName -StartupType Automatic
+    Start-Service -Name $mysqlServiceName
+    Write-Host "   MySQL مسجّل كخدمة ($mysqlServiceName)، وسيعمل تلقائياً مع كل إقلاع." -ForegroundColor Green
+}
+
 # دالة مساعدة: تسجيل مهمة مجدولة تُشغّل أمر php artisan دائم وتعيد تشغيل نفسها عند التعطل
 #
 # [Fix 2026-08-04] عامل الطابور (queue:work) تحديداً يحتاج تشغيلاً تفاعلياً (Interactive) لا
@@ -158,9 +191,15 @@ function Register-WorkerTask {
 
     $action = New-ScheduledTaskAction -Execute $phpExe -Argument "artisan $ArtisanCommand" -WorkingDirectory $ProjectPath
 
-    # محفّزان: عند الإقلاع مباشرة، وتذكير يومي (لتفادي استنفاد عداد إعادة المحاولة إن بقي الجهاز يعمل أياماً بلا إعادة تشغيل)
+    # [Fix 2026-08-06] لوحظ فعلياً: محفّز "عند الإقلاع" (AtStartup) وحده لمهمة تحتاج جلسة تفاعلية
+    # (Interactive) قد يفشل بصمت إذا نُفِّذ قبل اكتمال تسجيل دخول المستخدم المحدد فعلياً على سطح
+    # المكتب (Task Scheduler لا يعيد المحاولة تلقائياً في هذه الحالة رغم RestartCount أدناه، لأن
+    # المهمة لم "تبدأ" أصلاً من منظوره ليُعاد تشغيلها). محفّز "عند تسجيل الدخول" (AtLogOn) لنفس
+    # المستخدم أكثر موثوقية للمهام التفاعلية لأنه يُطلق فعلياً بعد اكتمال تسجيل الدخول، ونُبقي
+    # محفّز الإقلاع أيضاً كطبقة أمان إضافية (يفيد المهام غير التفاعلية أو حال نجاحه أحياناً).
     $triggerStartup = New-ScheduledTaskTrigger -AtStartup
     $triggerDaily    = New-ScheduledTaskTrigger -Daily -At 4am
+    $triggers = @($triggerStartup, $triggerDaily)
 
     if ($RequiresInteractiveSession) {
         $currentUser = (Get-CimInstance Win32_ComputerSystem).UserName
@@ -169,6 +208,7 @@ function Register-WorkerTask {
             $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
         } else {
             $principal = New-ScheduledTaskPrincipal -UserId $currentUser -LogonType Interactive -RunLevel Highest
+            $triggers += New-ScheduledTaskTrigger -AtLogOn -User $currentUser
         }
     } else {
         $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
@@ -181,7 +221,7 @@ function Register-WorkerTask {
         -MultipleInstances IgnoreNew
 
     Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
-    Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger @($triggerStartup, $triggerDaily) `
+    Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $triggers `
         -Principal $principal -Settings $settings | Out-Null
 
     Start-ScheduledTask -TaskName $TaskName
@@ -203,7 +243,7 @@ Write-Host "ملاحظة مهمة: بعد هذا الإعداد، لا تستخ�
 Write-Host "لوحة تحكم النظام، لأن العمليات أصبحت مُدارة بواسطة Windows Task Scheduler مباشرة —" -ForegroundColor Yellow
 Write-Host "استخدامها معاً قد يؤدي لتشغيل عاملين مكررين لنفس المهمة." -ForegroundColor Yellow
 Write-Host ""
-Write-Host "للإزالة لاحقاً: نفّذ Uninstall-AutoStart.bat" -ForegroundColor DarkGray
+Write-Host "للإزالة لاحقاً: نفّذ 04-Uninstall-AutoStart.bat" -ForegroundColor DarkGray
 
 
 

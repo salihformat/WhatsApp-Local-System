@@ -603,7 +603,7 @@
                             <h3 class="text-lg leading-6 font-bold text-gray-900 mb-4" id="modal-title">
                                 الملفات بانتظار الفحص
                             </h3>
-                            <div class="mt-2 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                            <div class="mt-2 overflow-y-auto pr-2 custom-scrollbar" style="max-height: 60vh;">
                                 @if(!empty($folderStats['files_list']))
                                     <ul class="space-y-3">
                                         @foreach($folderStats['files_list'] as $file)
@@ -651,7 +651,7 @@
                             <h3 class="text-lg leading-6 font-bold text-gray-900 mb-4" id="modal-title">
                                 الملفات المؤرشفة (آخر 50 ملف)
                             </h3>
-                            <div class="mt-2 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                            <div class="mt-2 overflow-y-auto pr-2 custom-scrollbar" style="max-height: 60vh;">
                                 @if(!empty($folderStats['archived_files_list']))
                                     <ul class="space-y-3">
                                         @foreach(array_reverse($folderStats['archived_files_list']) as $file)
@@ -722,7 +722,7 @@
                             <h3 class="text-lg leading-6 font-bold text-red-600 mb-4" id="modal-title">
                                 الملفات الخاطئة وأسباب الفشل
                             </h3>
-                            <div class="mt-2 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                            <div class="mt-2 overflow-y-auto pr-2 custom-scrollbar" style="max-height: 60vh;">
                                 @if(!empty($folderStats['failed_files_list']))
                                     <div class="space-y-4">
                                         @foreach($folderStats['failed_files_list'] as $file)

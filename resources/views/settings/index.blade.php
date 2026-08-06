@@ -36,22 +36,22 @@
                                 <h3 class="text-lg font-bold mb-4 text-indigo-700 border-b pb-2">الواجهة المركزية (Central API)</h3>
                                 
                                 <div class="mb-4">
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Company ID (CENTRAL_API_COMPANY_ID)</label>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">معرف الشركة (CENTRAL_API_COMPANY_ID)</label>
                                     <input type="text" name="CENTRAL_API_COMPANY_ID" value="{{ old('CENTRAL_API_COMPANY_ID', env('CENTRAL_API_COMPANY_ID')) }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                 </div>
 
                                 <div class="mb-4">
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Token (CENTRAL_API_TOKEN)</label>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">رمز المصادقة (CENTRAL_API_TOKEN)</label>
                                     <input type="text" name="CENTRAL_API_TOKEN" value="{{ old('CENTRAL_API_TOKEN', env('CENTRAL_API_TOKEN')) }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                 </div>
 
                                 <div class="mb-4">
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Retry Attempts (CENTRAL_API_RETRY_ATTEMPTS)</label>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">محاولات إعادة الاتصال (CENTRAL_API_RETRY_ATTEMPTS)</label>
                                     <input type="number" name="CENTRAL_API_RETRY_ATTEMPTS" value="{{ old('CENTRAL_API_RETRY_ATTEMPTS', env('CENTRAL_API_RETRY_ATTEMPTS')) }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                 </div>
 
                                 <div class="mb-4">
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Retry Delay (CENTRAL_API_RETRY_DELAY)</label>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">تأخير إعادة الاتصال (CENTRAL_API_RETRY_DELAY)</label>
                                     <input type="number" name="CENTRAL_API_RETRY_DELAY" value="{{ old('CENTRAL_API_RETRY_DELAY', env('CENTRAL_API_RETRY_DELAY')) }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                 </div>
                             </div>
@@ -61,12 +61,12 @@
                                 <h3 class="text-lg font-bold mb-4 text-indigo-700 border-b pb-2">إعادة المحاولة (Local Retry)</h3>
                                 
                                 <div class="mb-4">
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Max Retry Attempts (MAX_RETRY_ATTEMPTS)</label>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">الحد الأقصى لمحاولات إعادة الإرسال (MAX_RETRY_ATTEMPTS)</label>
                                     <input type="number" name="MAX_RETRY_ATTEMPTS" value="{{ old('MAX_RETRY_ATTEMPTS', env('MAX_RETRY_ATTEMPTS')) }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                 </div>
 
                                 <div class="mb-4">
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Retry Delay Minutes (RETRY_DELAY_MINUTES)</label>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">تأخير إعادة الإرسال بالدقائق (RETRY_DELAY_MINUTES)</label>
                                     <input type="number" name="RETRY_DELAY_MINUTES" value="{{ old('RETRY_DELAY_MINUTES', env('RETRY_DELAY_MINUTES')) }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                 </div>
                             </div>
@@ -76,17 +76,17 @@
                                 <h3 class="text-lg font-bold mb-4 text-indigo-700 border-b pb-2">المراقبة المحلية (Local Monitoring)</h3>
                                 
                                 <div class="mb-4">
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Folder Path (MONITORING_FOLDER_PATH)</label>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">مسار المجلد (MONITORING_FOLDER_PATH)</label>
                                     <input type="text" name="MONITORING_FOLDER_PATH" value="{{ old('MONITORING_FOLDER_PATH', env('MONITORING_FOLDER_PATH', env('MONITOR_FOLDER_PATH'))) }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                 </div>
 
                                 <div class="mb-4">
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Interval Seconds (MONITORING_INTERVAL_SECONDS)</label>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">فترة الفحص بالثواني (MONITORING_INTERVAL_SECONDS)</label>
                                     <input type="number" name="MONITORING_INTERVAL_SECONDS" value="{{ old('MONITORING_INTERVAL_SECONDS', env('MONITORING_INTERVAL_SECONDS', env('MONITOR_INTERVAL_SECONDS'))) }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                 </div>
 
                                 <div class="mb-4">
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Message Text (MONITORING_MESSAGE_TEXT)</label>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">نص الرسالة (MONITORING_MESSAGE_TEXT)</label>
                                     <textarea name="MONITORING_MESSAGE_TEXT" rows="2" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">{{ old('MONITORING_MESSAGE_TEXT', env('MONITORING_MESSAGE_TEXT', env('MONITOR_MESSAGE_TEXT'))) }}</textarea>
                                 </div>
                             </div>
@@ -96,17 +96,17 @@
                                 <h3 class="text-lg font-bold mb-4 text-indigo-700 border-b pb-2">بيانات الجهاز (Device Info)</h3>
                                 
                                 <div class="mb-4">
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Device Name (DEVICE_NAME)</label>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">اسم الجهاز (DEVICE_NAME)</label>
                                     <input type="text" name="DEVICE_NAME" value="{{ old('DEVICE_NAME', env('DEVICE_NAME')) }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                 </div>
 
                                 <div class="mb-4">
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Location (LOCATION)</label>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">الموقع (LOCATION)</label>
                                     <input type="text" name="LOCATION" value="{{ old('LOCATION', env('LOCATION')) }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                 </div>
 
                                 <div class="mb-4">
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Plan Type (PLAN_TYPE)</label>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">نوع الباقة (PLAN_TYPE)</label>
                                     <input type="text" name="PLAN_TYPE" value="{{ old('PLAN_TYPE', env('PLAN_TYPE')) }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                 </div>
                             </div>
@@ -117,22 +117,22 @@
                                 
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div class="mb-4">
-                                        <label class="block text-sm font-medium text-gray-700 mb-1">Storage Path (FILE_STORAGE_PATH)</label>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">مسار التخزين (FILE_STORAGE_PATH)</label>
                                         <input type="text" name="FILE_STORAGE_PATH" value="{{ old('FILE_STORAGE_PATH', env('FILE_STORAGE_PATH')) }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                     </div>
 
                                     <div class="mb-4">
-                                        <label class="block text-sm font-medium text-gray-700 mb-1">Max Size MB (FILE_MAX_SIZE_MB)</label>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">أقصى حجم بالميغابايت (FILE_MAX_SIZE_MB)</label>
                                         <input type="number" name="FILE_MAX_SIZE_MB" value="{{ old('FILE_MAX_SIZE_MB', env('FILE_MAX_SIZE_MB')) }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                     </div>
 
                                     <div class="mb-4">
-                                        <label class="block text-sm font-medium text-gray-700 mb-1">Auto Delete Days (FILE_AUTO_DELETE_DAYS)</label>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">الحذف التلقائي بعد (أيام) (FILE_AUTO_DELETE_DAYS)</label>
                                         <input type="number" name="FILE_AUTO_DELETE_DAYS" value="{{ old('FILE_AUTO_DELETE_DAYS', env('FILE_AUTO_DELETE_DAYS')) }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                     </div>
                                     
                                     <div class="mb-4 md:col-span-2">
-                                        <label class="block text-sm font-medium text-gray-700 mb-1">Allowed Types (FILE_ALLOWED_TYPES) <span class="text-xs text-gray-500">مفصول بفاصلة</span></label>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">الأنواع المسموحة (FILE_ALLOWED_TYPES) <span class="text-xs text-gray-500">مفصول بفاصلة</span></label>
                                         <input type="text" name="FILE_ALLOWED_TYPES" value="{{ old('FILE_ALLOWED_TYPES', env('FILE_ALLOWED_TYPES')) }}" placeholder="pdf,jpg,png" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                     </div>
                                 </div>

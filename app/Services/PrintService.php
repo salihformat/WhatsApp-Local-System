@@ -7,8 +7,9 @@ use Exception;
 use Illuminate\Support\Facades\Process;
 
 /**
- * يرسل ملفات PDF فعلياً إلى طابعة Windows عبر SumatraPDF (طباعة صامتة بلا نافذة).
- * دعم أنواع ملفات أخرى (Word/Excel/صور/طابعات حرارية) مُخطَّط له لاحقاً — انظر دراسة الجدوى.
+ * يرسل ملفات PDF والصور فعلياً إلى طابعة Windows عبر SumatraPDF (طباعة صامتة بلا نافذة).
+ * دعم Word/Excel/PowerPoint (يحتاج تحويلاً مسبقاً لـ PDF عبر أداة خارجية) وطابعات حرارية
+ * مُخطَّط له لاحقاً — انظر دراسة الجدوى.
  */
 class PrintService
 {
@@ -30,9 +31,14 @@ class PrintService
             throw new Exception("الملف غير موجود محلياً: {$job->file_path}");
         }
 
+        // [Fix 2026-08-06] كان يقبل PDF فقط. SumatraPDF يدعم فتح وطباعة ملفات الصور مباشرة بنفس
+        // آلية `-print-to` بلا أي أداة تحويل إضافية (تحقّق فعلي: فتح ملف PNG تجريبي نجح) — وسّعنا
+        // القبول لتشمل امتدادات الصور المُعدَّة في printing.printable_extensions. صيغ Word/Excel/
+        // PowerPoint تبقى غير مدعومة (تحتاج تحويلاً مسبقاً لـ PDF عبر أداة خارجية غير مُفعَّلة بعد).
         $extension = strtolower(pathinfo($job->file_path, PATHINFO_EXTENSION));
-        if ($extension !== 'pdf') {
-            throw new Exception("نوع الملف '{$extension}' غير مدعوم للطباعة الآلية حالياً (PDF فقط في هذه النسخة)");
+        $allowedExtensions = config('printing.printable_extensions', ['pdf']);
+        if (!in_array($extension, $allowedExtensions, true)) {
+            throw new Exception("نوع الملف '{$extension}' غير مدعوم للطباعة الآلية حالياً (المدعوم: " . implode(', ', $allowedExtensions) . ")");
         }
 
         if ($job->printer->type !== 'document') {

@@ -135,7 +135,8 @@ php artisan serve --port=8001</pre>
 
                         <section class="mb-10">
                             <h2 class="text-2xl font-semibold mb-4 border-b pb-2">4. الطباعة الذكية بالتفصيل (Smart Printing)</h2>
-                            <p class="mb-4">عند وصول ملف PDF عبر واتساب (أو وضعه في مجلد المراقبة) يحتوي على كلمة طباعة (مثل "اطبع"، "print")، يعمل النظام تلقائياً وفق الخطوات التالية:</p>
+                            <p class="mb-4">عند وصول ملف PDF أو صورة (jpg, png, gif, bmp, tiff) أو مستند أوفيس (doc, docx, xls, xlsx, ppt, pptx) عبر واتساب (أو وضعه في مجلد المراقبة) يحتوي على كلمة طباعة (مثل "اطبع"، "print")، يعمل النظام تلقائياً وفق الخطوات التالية:</p>
+                            <p class="text-xs text-gray-500 mb-4">ملاحظة: ملفات Word/Excel/PowerPoint تُحوَّل تلقائياً إلى PDF عبر LibreOffice (راجع القسم 5) قبل طباعتها — بلا أي إجراء إضافي مطلوب منك. الامتدادات المدعومة قابلة للتخصيص عبر <code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">PRINTABLE_EXTENSIONS</code> في <code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">.env</code>.</p>
 
                             <div class="space-y-4">
                                 <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border-r-4 border-blue-500">
@@ -170,11 +171,41 @@ php artisan serve --port=8001</pre>
                             <p class="mt-4 text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg">
                                 ⚠️ ملاحظة تشغيلية هامة: أي تعديل على الكود (مثل صياغة الرسائل أو منطق الفحص) يتطلب <strong>إعادة تشغيل قائمة الانتظار (Queue Worker)</strong> من لوحة التحكم حتى يعمل — العامل يحتفظ بنسخة الكود في الذاكرة منذ آخر تشغيل ولا يقرأ الملفات المُعدَّلة تلقائياً.
                             </p>
+
+                            <div class="mt-6 bg-gray-50 dark:bg-gray-700 p-5 rounded-lg">
+                                <h3 class="font-bold mb-3 text-[#f53003]">طباعة الصور — تجهيز خاص قبل الطباعة</h3>
+                                <p class="text-sm mb-3">صور واتساب (JPG/PNG...) تصل دائماً <strong>بلا أي بيانات دقة (DPI)</strong> مضمَّنة في الملف. لو أُرسلت للطابعة كما هي، يحسب SumatraPDF حجم "صفحة" الطباعة مباشرة من أبعاد الصورة بالبكسل، فينتج مقاساً غير قياسي (custom) لا يطابق أي درج ورق — إما لا يظهر محتوى مطبوع إطلاقاً رغم نجاح الأمر برمجياً، أو تظهر رسالة "الورق غير موجود" رغم وجود ورق فعلياً. لذلك يضع النظام تلقائياً كل صورة داخل صفحة قياسية كاملة (خلفية بيضاء، الصورة مُصغَّرة عند الحاجة بمنتصف الصفحة مع الحفاظ على أبعادها) قبل إرسالها للطباعة.</p>
+                                <ul class="list-disc list-inside text-sm space-y-1 mr-4">
+                                    <li><code class="bg-white dark:bg-gray-800 px-1">PRINT_IMAGE_PAGE_SIZE</code> (في <code class="bg-white dark:bg-gray-800 px-1">.env</code>، الافتراضي <code class="bg-white dark:bg-gray-800 px-1">a4</code>): مقاس الصفحة (<code class="bg-white dark:bg-gray-800 px-1">a4</code> أو <code class="bg-white dark:bg-gray-800 px-1">letter</code>) — <strong>يجب أن يطابق مقاس الورق الفعلي المُحمَّل في الطابعة</strong>، وإلا ستظهر رسالة "الورق غير موجود" من جديد.</li>
+                                    <li><code class="bg-white dark:bg-gray-800 px-1">PRINT_IMAGE_DPI</code> (الافتراضي <code class="bg-white dark:bg-gray-800 px-1">200</code>): الدقة المفروضة على الصورة قبل الطباعة. قيمة متوازنة بين الوضوح وحجم الملف — لا حاجة لتغييرها عادة.</li>
+                                </ul>
+                                <p class="text-xs text-gray-500 mt-2">النسخ المحلية المُجهَّزة تُحفظ في <code class="bg-white dark:bg-gray-800 px-1">storage/app/private/print_jobs</code>، وتُحذف تلقائياً بعد نفس مدة <code class="bg-white dark:bg-gray-800 px-1">FILE_AUTO_DELETE_DAYS</code> المستخدمة لتنظيف مجلد المراقبة (راجع القسم 6) — عبر نفس الأمر المجدول <code class="bg-white dark:bg-gray-800 px-1">files:clean-old</code>، بلا حاجة لإعداد منفصل.</p>
+                            </div>
+
+                            <div class="mt-6 bg-gray-50 dark:bg-gray-700 p-5 rounded-lg">
+                                <h3 class="font-bold mb-3 text-[#f53003]">كيف يختار النظام الطابعة المناسبة؟ (قواعد التوجيه)</h3>
+                                <p class="text-sm mb-3">من صفحة "الطابعات وقواعد التوجيه"، يمكنك إضافة قواعد تحدّد أي طابعة تُستخدم حسب: رقم جوال محدد، بادئة رقم، كلمة مفتاحية في نص الرسالة، أو امتداد الملف. الترتيب: القواعد تُفحص حسب الأولوية (الأصغر أولاً)، وأول قاعدة مفعّلة تُطابق تفوز. <strong>يمكن وضع أكثر من قيمة في نفس القاعدة مفصولة بفاصلة</strong> — لأي نوع مطابقة، وليس فقط الكلمات المفتاحية. مثال لقاعدة أرقام جوال: <code class="bg-white dark:bg-gray-800 px-1" dir="ltr">966501111111,966502222222,966503333333</code> تُطابق أياً من هذه الأرقام الثلاثة.</p>
+
+                                <div class="bg-red-50 dark:bg-red-900/20 border-r-4 border-red-400 p-4 rounded-lg mb-3">
+                                    <p class="text-sm font-semibold text-red-700 dark:text-red-400 mb-1">⚠️ تنبيه مهم جداً بخصوص "الطابعة الافتراضية" (Default)</p>
+                                    <p class="text-sm">إذا لم تُطابق أي قاعدة الرسالة الواردة، يستخدم النظام <strong>الطابعة المُحدَّدة كافتراضية</strong> (إن وُجدت) لطباعة الملف — <strong>بصرف النظر تماماً عن وجود أي كلمة طباعة في الرسالة من عدمه</strong>. بمعنى آخر: أي طابعة افتراضية تطبع كل ملف PDF وارد تلقائياً، حتى لو لم يكتب العميل "اطبع" إطلاقاً. لهذا: لا تُحدّد طابعة افتراضية إلا إذا كنت تريد فعلاً طباعة كل PDF وارد بلا استثناء. إذا كنت تعتمد على كلمات مفتاحية للتحكم بما يُطبع، اترك كل الطابعات "غير افتراضية" واعتمد فقط على قواعد الكلمات/الأرقام.</p>
+                                </div>
+
+                                <h4 class="font-bold text-sm mb-2">سيناريو: النظام المحلي يعمل في عدة فروع</h4>
+                                <p class="text-sm mb-2">إذا كانت عدة فروع تشترك في نفس رقم واتساب الشركة المركزي (الوضع الافتراضي حالياً، بلا توجيه تلقائي للفرع الصحيح من النظام المركزي)، فإن كل رسالة واردة تصل لكل الأنظمة المحلية المسجَّلة في آن واحد. لتفادي طباعة نفس الملف في كل الفروع معاً:</p>
+                                <ol class="list-decimal list-inside text-sm space-y-1 mr-4">
+                                    <li>اجعل كلمة الطباعة <strong>مختلفة وفريدة لكل فرع</strong> (وليست كلمة عامة مشتركة مثل "اطبع" وحدها) — مثلاً فرع الرياض: <code class="bg-white dark:bg-gray-800 px-1" dir="ltr">طباعة_رياض,اطبع_رياض</code>، وفرع جدة: <code class="bg-white dark:bg-gray-800 px-1" dir="ltr">طباعة_جدة,اطبع_جدة</code>.</li>
+                                    <li><strong>لا تُحدّد طابعة افتراضية في أي فرع</strong> (راجع التنبيه أعلاه) — وإلا سيطبع كل فرع أي ملف بلا شرط، بصرف النظر عن الكلمة.</li>
+                                    <li>أبلغ عملاء كل فرع بالكلمة الصحيحة الخاصة به (لافتة، رسالة ترحيب تلقائية، إلخ) بما أن العميل هو من يحدد الفرع فعلياً بالكلمة التي يكتبها.</li>
+                                    <li>بديل/تكميل أكثر أماناً لعملاء معروفين: أضف قاعدة <code class="bg-white dark:bg-gray-800 px-1">رقم جوال محدد</code> بأرقام هؤلاء العملاء (مفصولة بفاصلة كما سبق) لكل فرع، فتُوجَّه رسائلهم لطابعة فرعهم تلقائياً دون الحاجة لكتابة أي كلمة.</li>
+                                </ol>
+                                <p class="text-xs text-gray-500 mt-2">الحل الأشمل معمارياً (يحتاج تعديلاً في النظام المركزي، غير مطبَّق حالياً) هو ربط كل فرع برقم واتساب مستقل خاص به. طريقة الكلمات المفتاحية أعلاه بديل عملي لا يحتاج أي تعديل، ويعمل بالإعدادات الحالية مباشرة.</p>
+                            </div>
                         </section>
 
                         <section class="mb-10">
                             <h2 class="text-2xl font-semibold mb-4 border-b pb-2">5. البرامج الخارجية المطلوبة</h2>
-                            <p class="mb-4">النظام لا يقوم بالطباعة أو قراءة الصور بنفسه — يعتمد على برنامجين خارجيين مجانيين يجب تثبيتهما على نفس الجهاز:</p>
+                            <p class="mb-4">النظام لا يقوم بالطباعة أو قراءة الصور/المستندات الممسوحة ضوئياً بنفسه — يعتمد على برامج خارجية مجانية يجب تثبيتها على نفس الجهاز:</p>
 
                             <div class="space-y-6">
                                 <div class="bg-gray-50 dark:bg-gray-700 p-5 rounded-lg border-r-4 border-blue-500">
@@ -186,6 +217,17 @@ php artisan serve --port=8001</pre>
                                         <li>تأكد أن مسار الملف مطابق تماماً لقيمة <code class="bg-white dark:bg-gray-800 px-1">SUMATRA_PDF_PATH</code> في ملف <code class="bg-white dark:bg-gray-800 px-1">.env</code> (يمكن تعديله أيضاً من صفحة الإعدادات لاحقاً إن أُضيف هناك).</li>
                                         <li>تأكد أن <code class="bg-white dark:bg-gray-800 px-1">PRINTING_ENABLED=true</code> في <code class="bg-white dark:bg-gray-800 px-1">.env</code> لتفعيل الميزة بالكامل.</li>
                                     </ol>
+                                </div>
+
+                                <div class="bg-gray-50 dark:bg-gray-700 p-5 rounded-lg border-r-4 border-indigo-500">
+                                    <h3 class="text-lg font-bold mb-2 text-[#f53003]">LibreOffice — لطباعة ملفات Word/Excel/PowerPoint</h3>
+                                    <p class="text-sm mb-2">SumatraPDF لا يفهم صيغ الأوفيس مباشرة، لذا يُستخدم LibreOffice بوضع "بصمت" (headless، بلا فتح أي نافذة) لتحويل الملف إلى PDF أولاً، ثم يُطبع بنفس مسار PDF المعتاد. اختياري — بدونه تبقى طباعة PDF والصور تعمل بشكل طبيعي، وتفشل فقط طباعة ملفات الأوفيس تحديداً.</p>
+                                    <ol class="list-decimal list-inside text-sm space-y-1 mr-4">
+                                        <li>نزّل ونثبّت النسخة الكاملة (وليست Portable) من الموقع الرسمي: <a href="https://www.libreoffice.org/download/download/" class="text-blue-500 underline" target="_blank">libreoffice.org</a></li>
+                                        <li>المسار الافتراضي بعد التثبيت: <code class="bg-white dark:bg-gray-800 px-1">C:/Program Files/LibreOffice/program/soffice.exe</code> — يطابق قيمة <code class="bg-white dark:bg-gray-800 px-1">LIBREOFFICE_PATH</code> الافتراضية في <code class="bg-white dark:bg-gray-800 px-1">.env</code>، فلا حاجة لتعديل شيء إن ثبَّتّه بالمسار الافتراضي.</li>
+                                        <li>إن اخترت مساراً مختلفاً، حدّثه في <code class="bg-white dark:bg-gray-800 px-1">LIBREOFFICE_PATH</code> بملف <code class="bg-white dark:bg-gray-800 px-1">.env</code>.</li>
+                                    </ol>
+                                    <p class="text-xs text-gray-500 mt-2">ملاحظة أداء: أول تحويل بعد كل إعادة تشغيل لعامل الطابور (Queue Worker) قد يستغرق دقيقة أو أكثر (تهيئة داخلية لمرة واحدة)، والتحويلات التالية أسرع من ذلك عادة. مهلة الانتظار قابلة للتعديل عبر <code class="bg-white dark:bg-gray-800 px-1">OFFICE_CONVERSION_TIMEOUT_SECONDS</code> (الافتراضي 120 ثانية).</p>
                                 </div>
 
                                 <div class="bg-gray-50 dark:bg-gray-700 p-5 rounded-lg border-r-4 border-teal-500">
@@ -201,10 +243,23 @@ php artisan serve --port=8001</pre>
                                     </ol>
                                     <p class="text-xs text-gray-500 mt-2">للتحقق من التثبيت الصحيح: افتح Command Prompt ونفّذ <code class="bg-white dark:bg-gray-800 px-1">"C:\Program Files\Tesseract-OCR\tesseract.exe" --version</code> — يجب أن يظهر رقم الإصدار بلا أخطاء.</p>
                                 </div>
+
+                                <div class="bg-gray-50 dark:bg-gray-700 p-5 rounded-lg border-r-4 border-purple-500">
+                                    <h3 class="text-lg font-bold mb-2 text-[#f53003]">Ghostscript — لتحويل صفحة PDF إلى صورة قبل قراءتها بـ OCR</h3>
+                                    <p class="text-sm mb-2">مكمّل لـ Tesseract OCR أعلاه: عندما تكون طبقة نص ملف PDF تالفة تماماً (عطل ترميز خط شائع في بعض الملفات الممسوحة ضوئياً) أو غير موجودة أصلاً، يُستخدم Ghostscript لتحويل الصفحة الأولى من الملف إلى صورة PNG، ثم تُقرأ هذه الصورة عبر Tesseract كحل أخير. اختياري تماماً مثل Tesseract — بدونه يعمل النظام بشكل طبيعي، لكن هذه الحالة المحددة (PDF بطبقة نص تالفة) لن تُحل تلقائياً.</p>
+                                    <ol class="list-decimal list-inside text-sm space-y-1 mr-4">
+                                        <li>نزّل المثبِّت لويندوز (64-bit) من الموقع الرسمي: <a href="https://ghostscript.com/releases/gsdnld.html" class="text-blue-500 underline" target="_blank">ghostscript.com/releases</a> أو من <a href="https://github.com/ArtifexSoftware/ghostpdl-downloads/releases" class="text-blue-500 underline" target="_blank">GitHub الرسمي</a>.</li>
+                                        <li>ثبّته بالإعدادات الافتراضية (المسار المعتاد: <code class="bg-white dark:bg-gray-800 px-1">C:/Program Files/gs/gsX.XX.X/bin/gswin64c.exe</code>، حيث X.XX.X رقم الإصدار).</li>
+                                        <li>أضف السطر التالي في ملف <code class="bg-white dark:bg-gray-800 px-1">.env</code> بالمسار الفعلي بعد التثبيت لديك:
+                                            <pre class="bg-gray-900 text-gray-100 p-2 rounded mt-1 text-xs dir-ltr">GHOSTSCRIPT_BIN_PATH="C:/Program Files/gs/gs10.07.1/bin/gswin64c.exe"</pre>
+                                        </li>
+                                    </ol>
+                                    <p class="text-xs text-gray-500 mt-2">للتحقق من التثبيت الصحيح: نفّذ <code class="bg-white dark:bg-gray-800 px-1">"C:\Program Files\gs\gsX.XX.X\bin\gswin64c.exe" --version</code> في Command Prompt — يجب أن يظهر رقم الإصدار بلا أخطاء.</p>
+                                </div>
                             </div>
 
                             <p class="mt-4 text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg">
-                                ⚠️ بعد تثبيت أو تعديل مسار أي من البرنامجين في <code>.env</code>، يجب <strong>إعادة تشغيل قائمة الانتظار (Queue Worker)</strong> من لوحة التحكم حتى يقرأ الإعداد الجديد.
+                                ⚠️ بعد تثبيت أو تعديل مسار أي من هذه البرامج في <code>.env</code>، يجب <strong>إعادة تشغيل قائمة الانتظار (Queue Worker)</strong> من لوحة التحكم حتى يقرأ الإعداد الجديد.
                             </p>
                         </section>
 
@@ -238,6 +293,17 @@ php artisan serve --port=8001</pre>
                                 </ul>
                                 <p class="text-sm mt-3">لمتابعة حالة كل ملف لحظياً (وصل، بانتظار مراجعة، نجح، فشل ولماذا)، استخدم صفحة <strong>متابعة الإرسال</strong> بدل فتح هذه المجلدات يدوياً.</p>
                             </div>
+
+                            <div class="bg-gray-50 dark:bg-gray-700 p-5 rounded-lg mt-4">
+                                <h3 class="font-bold mb-2 text-[#f53003]">الحذف التلقائي للملفات القديمة</h3>
+                                <p class="text-sm mb-2">حتى لا تمتلئ هذه المجلدات بمرور الوقت، يحذف النظام تلقائياً كل يوم الملفات الأقدم من مدة معينة من المجلدات الفرعية الأربعة (<code class="bg-white dark:bg-gray-800 px-1">processing</code>، <code class="bg-white dark:bg-gray-800 px-1">review</code>، <code class="bg-white dark:bg-gray-800 px-1">archive</code>، <code class="bg-white dark:bg-gray-800 px-1">failed</code>) — وليس مجلد الانتظار الرئيسي (جذر المجلد) الذي يحتوي ملفات لم تُعالَج بعد. <strong>ونفس المدة تُطبَّق أيضاً على النسخ المحلية المؤقتة لملفات الطباعة</strong> في <code class="bg-white dark:bg-gray-800 px-1">storage/app/private/print_jobs</code> (راجع القسم 4).</p>
+                                <ul class="list-disc list-inside text-sm space-y-1 mr-4">
+                                    <li><strong>لتحديد المدة:</strong> من صفحة الإعدادات → <code class="bg-white dark:bg-gray-800 px-1">Auto Delete Days (FILE_AUTO_DELETE_DAYS)</code> — عدد الأيام كما تريد، بلا حاجة لتعديل أي ملف. القيمة الحالية الافتراضية: 3 أيام.</li>
+                                    <li>ضع القيمة <code class="bg-white dark:bg-gray-800 px-1">0</code> لتعطيل الحذف التلقائي بالكامل والاحتفاظ بكل الملفات إلى الأبد.</li>
+                                    <li>ملفات مجلد <code class="bg-white dark:bg-gray-800 px-1">review</code> التي تنتهي مهلتها بلا مراجعة يدوية تُحذف أيضاً، وتتحول حالة رسالتها تلقائياً إلى "فشلت" مع توضيح السبب (انتهاء المهلة)، بدل بقائها معلّقة في صفحة متابعة الإرسال إلى ما لا نهاية.</li>
+                                    <li>الأمر المسؤول عن هذا: <code class="bg-white dark:bg-gray-800 px-1">php artisan files:clean-old</code> — يعمل تلقائياً ضمن الجدولة اليومية (لا حاجة لتشغيله يدوياً).</li>
+                                </ul>
+                            </div>
                         </section>
 
                         <section class="mb-10">
@@ -262,38 +328,65 @@ php artisan serve --port=8001</pre>
 
                         <section class="mb-10">
                             <h2 class="text-2xl font-semibold mb-4 border-b pb-2">8. التشغيل التلقائي الكامل (سكربتات الإعداد الجاهزة)</h2>
-                            <p class="mb-4">بدل تشغيل الأوامر السابقة يدوياً في نوافذ Terminal تبقى مفتوحة (وتتوقف عند إغلاقها أو إعادة تشغيل الجهاز)، يوفّر النظام سكربتات جاهزة في مجلد <code class="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">scripts/</code> تُعِدّ تشغيلاً تلقائياً كاملاً يعمل من نفسه بعد كل إقلاع للجهاز. هذه هي الطريقة الموصى بها لجهاز العمل الفعلي.</p>
+                            <p class="mb-4">بدل تشغيل الأوامر السابقة يدوياً في نوافذ Terminal تبقى مفتوحة (وتتوقف عند إغلاقها أو إعادة تشغيل الجهاز)، يوفّر النظام سكربتات جاهزة في مجلد <code class="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">scripts/</code> تُعِدّ تشغيلاً تلقائياً كاملاً يعمل من نفسه بعد كل إقلاع للجهاز — الموقع، قاعدة البيانات، الطباعة، والجدولة، بلا أي تدخل يدوي. هذه هي الطريقة الموصى بها لجهاز العمل الفعلي، وهي نفسها المطلوبة لإعداد النظام على جهاز جديد.</p>
 
                             <div class="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-lg border-r-4 border-indigo-400 mb-4">
-                                <p class="text-sm">ماذا يفعل هذا الإعداد فعلياً؟</p>
-                                <ul class="list-disc list-inside text-sm space-y-1 mr-4 mt-2">
-                                    <li>ينسخ نسخة معزولة خاصة من Apache (لا يلمس تثبيت XAMPP الأصلي أو أي مشروع آخر على الجهاز) ويسجّلها كخدمة Windows تعمل تلقائياً على المنفذ المحدد في <code class="bg-white dark:bg-gray-800 px-1">APP_URL</code>.</li>
-                                    <li>يسجّل عامل الطابور (<code class="bg-white dark:bg-gray-800 px-1">queue:work</code>) والمجدول (<code class="bg-white dark:bg-gray-800 px-1">schedule:work</code>) كمهمّتين في "جدولة المهام" (Task Scheduler) تعملان تلقائياً عند الإقلاع، وتُعيدان تشغيل نفسيهما تلقائياً في حال توقفتا لأي سبب.</li>
+                                <p class="text-sm font-semibold mb-2">كيف يعمل؟ (4 مكوّنات مستقلة، كل منها يُسجَّل بطريقة مختلفة حسب طبيعته)</p>
+                                <ul class="list-disc list-inside text-sm space-y-2 mr-4">
+                                    <li>
+                                        <strong>Apache (تقديم الموقع):</strong> يُنسخ من تثبيت XAMPP إلى نسخة معزولة خاصة بهذا المشروع فقط (<code class="bg-white dark:bg-gray-800 px-1">scripts/apache-standalone</code>)، بمنفذ خاص بها (من <code class="bg-white dark:bg-gray-800 px-1">APP_URL</code>)، دون أي تعديل على تثبيت XAMPP الأصلي أو أي مشروع آخر على نفس الجهاز — ثم تُسجَّل كخدمة Windows (<code class="bg-white dark:bg-gray-800 px-1">WhatsAppLocalApache</code>) تعمل تلقائياً عند الإقلاع.
+                                    </li>
+                                    <li>
+                                        <strong>MySQL (قاعدة البيانات):</strong> بخلاف Apache، هنا يُسجَّل نفس تثبيت MySQL الموجود أصلاً ضمن XAMPP (بنفس بياناته الحالية، بلا نسخ أو تعديل) كخدمة Windows (<code class="bg-white dark:bg-gray-800 px-1">MySQL_XAMPP</code>). هذه الخطوة ضرورية لأن XAMPP <strong>لا يُسجِّل MySQL كخدمة تلقائية افتراضياً</strong> — بدونها يفشل الموقع بالكامل (خطأ HTTP 500، "connection refused") بعد كل إعادة تشغيل للجهاز رغم عمل Apache نفسه بنجاح، لأن كل صفحة تحتاج قاعدة البيانات.
+                                    </li>
+                                    <li>
+                                        <strong>عامل الطابور (<code class="bg-white dark:bg-gray-800 px-1">queue:work</code>):</strong> يُسجَّل كمهمة في "جدولة المهام" (Task Scheduler) باسم <code class="bg-white dark:bg-gray-800 px-1">WhatsAppLocalSystem-QueueWorker</code>، بمحفّزين: "عند الإقلاع" و"عند تسجيل الدخول" (الثاني أكثر موثوقية لهذه المهمة تحديداً — راجع التنبيه أدناه)، مع إعادة تشغيل تلقائية عند التعطل.
+                                    </li>
+                                    <li>
+                                        <strong>المجدول (<code class="bg-white dark:bg-gray-800 px-1">schedule:work</code>):</strong> نفس فكرة عامل الطابور، بمهمة منفصلة باسم <code class="bg-white dark:bg-gray-800 px-1">WhatsAppLocalSystem-Scheduler</code>، وهو المسؤول عن تشغيل كل المهام الدورية (مزامنة، فحص الطابعات، الحذف التلقائي...) — راجع القسم 7.
+                                    </li>
                                 </ul>
                             </div>
 
                             <div class="space-y-4">
                                 <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border-r-4 border-green-500">
-                                    <h3 class="text-lg font-bold mb-2">للتفعيل (مرة واحدة فقط)</h3>
-                                    <ol class="list-decimal list-inside text-sm space-y-1 mr-4">
-                                        <li>افتح مجلد المشروع <code class="bg-white dark:bg-gray-800 px-1">C:\xampp\htdocs\whatsapp-local-system\scripts</code>.</li>
-                                        <li>انقر نقراً مزدوجاً على <code class="bg-white dark:bg-gray-800 px-1">Install-AutoStart.bat</code>.</li>
-                                        <li>سيطلب صلاحيات المسؤول (Administrator) تلقائياً — اضغط "نعم".</li>
-                                        <li>انتظر حتى تظهر رسالة "تم الإعداد بنجاح!" ثم اضغط أي مفتاح لإغلاق النافذة.</li>
+                                    <h3 class="text-lg font-bold mb-2">للتفعيل على جهاز جديد — بما فيه التحميل من GitHub (مرة واحدة فقط)</h3>
+                                    <p class="text-sm mb-2">المتطلبات: XAMPP مثبَّت بمساره الافتراضي <code class="bg-white dark:bg-gray-800 px-1">C:\xampp</code> فقط (يحتوي PHP وApache وMySQL) — <strong>لا حاجة لتثبيت Node.js أو Composer يدوياً</strong>، السكربتات التالية تُثبِّتهما تلقائياً. نفّذ الملفات الأربعة التالية من مجلد <code class="bg-white dark:bg-gray-800 px-1">scripts</code> <strong>بالترتيب الرقمي</strong> (نفس الترتيب موثّق أيضاً في <code class="bg-white dark:bg-gray-800 px-1">scripts/README-Installation.txt</code>):</p>
+                                    <ol class="list-decimal list-inside text-sm space-y-2 mr-4">
+                                        <li>
+                                            <code class="bg-white dark:bg-gray-800 px-1">01-Install-Prerequisites.bat</code> (كليك يمين ← Run as Administrator): يضيف مسار PHP للنظام، ويثبّت Node.js وComposer، بالإضافة لـ SumatraPDF وTesseract OCR وLibreOffice (الثلاثة الأخيرة عبر winget، ويتخطّى أي برنامج مثبَّت مسبقاً بأمان).
+                                            <br><strong class="text-amber-700 dark:text-amber-400">مهم جداً:</strong> بعد ظهور رسالة النجاح، <strong>أغلق نافذة CMD السوداء</strong> قبل المتابعة — ضروري حتى يتعرّف Windows على مسارات Node وComposer الجديدة في أي نافذة تُفتح لاحقاً.
+                                        </li>
+                                        <li>
+                                            <code class="bg-white dark:bg-gray-800 px-1">02-Setup-Project.bat</code> (تشغيل عادي بنقرتين، بلا صلاحيات مسؤول): يجهّز <code class="bg-white dark:bg-gray-800 px-1">.env</code> (نسخ من <code class="bg-white dark:bg-gray-800 px-1">.env.example</code> إن لم يكن موجوداً)، يشغّل <code class="bg-white dark:bg-gray-800 px-1">composer install</code>، يولّد <code class="bg-white dark:bg-gray-800 px-1">APP_KEY</code>، ينشئ قاعدة البيانات (<code class="bg-white dark:bg-gray-800 px-1">whatsapp_local</code>) وينفّذ <code class="bg-white dark:bg-gray-800 px-1">migrate</code>، يربط مجلد التخزين العام (<code class="bg-white dark:bg-gray-800 px-1">storage:link</code> — ضروري لعرض مرفقات واتساب بشكل صحيح)، ثم يبني الواجهات (<code class="bg-white dark:bg-gray-800 px-1">npm install &amp;&amp; npm run build</code>).
+                                            <br><strong>تأكد أن خدمة MySQL تعمل</strong> (من لوحة تحكم XAMPP) قبل تشغيل هذا الملف، وإلا فشلت خطوة إنشاء قاعدة البيانات.
+                                        </li>
+                                        <li><code class="bg-white dark:bg-gray-800 px-1">03-Install-AutoStart.bat</code> (كليك يمين ← Run as Administrator): يُعِدّ التشغيل التلقائي الكامل (Apache + MySQL كخدمتي Windows، وعامل الطابور والمجدول كمهام مجدولة) — نفس السكربت الموصوف بالتفصيل في بقية هذا القسم.</li>
+                                        <li>انتظر حتى تظهر رسالة "تم الإعداد بنجاح!" في الخطوة الأخيرة، ثم افتح الرابط الظاهر (مثال: <code class="bg-white dark:bg-gray-800 px-1" dir="ltr">http://localhost:8006</code>) للتأكد أن الموقع يعمل فعلياً.</li>
                                     </ol>
+                                    <p class="text-xs text-gray-500 mt-2"><strong>Ghostscript وحده</strong> يبقى تثبيته يدوياً (لا توجد له حزمة winget موثوقة؛ حالة نادرة أصلاً — راجع القسم 5).</p>
+                                </div>
+
+                                <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border-r-4 border-blue-500">
+                                    <h3 class="text-lg font-bold mb-2">كيف أتأكد أن كل شيء يعمل بعد إعادة تشغيل الجهاز؟</h3>
+                                    <p class="text-sm mb-2">افتح PowerShell كمسؤول ونفّذ الأوامر التالية — يجب أن تظهر كل الحالات <code class="bg-white dark:bg-gray-800 px-1">Running</code>:</p>
+                                    <pre class="bg-gray-900 text-gray-100 p-3 rounded dir-ltr text-xs">Get-Service WhatsAppLocalApache, MySQL_XAMPP | Select Name, Status
+Get-ScheduledTask WhatsAppLocalSystem-QueueWorker, WhatsAppLocalSystem-Scheduler | Select TaskName, State</pre>
+                                    <p class="text-xs text-gray-500 mt-2">إن ظهرت مهمة بحالة <code class="bg-white dark:bg-gray-800 px-1">Ready</code> بدل <code class="bg-white dark:bg-gray-800 px-1">Running</code>، شغّلها يدوياً مرة واحدة بـ <code class="bg-white dark:bg-gray-800 px-1" dir="ltr">Start-ScheduledTask -TaskName "الاسم"</code> — راجع التنبيه أدناه عن سبب حدوث هذا أحياناً.</p>
                                 </div>
 
                                 <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border-r-4 border-red-500">
                                     <h3 class="text-lg font-bold mb-2">للإزالة</h3>
-                                    <p class="text-sm">شغّل <code class="bg-white dark:bg-gray-800 px-1">Uninstall-AutoStart.bat</code> من نفس المجلد بنفس الطريقة — يزيل خدمة Apache ومهمّتي الطابور والمجدول.</p>
+                                    <p class="text-sm">شغّل <code class="bg-white dark:bg-gray-800 px-1">04-Uninstall-AutoStart.bat</code> من نفس المجلد بنفس الطريقة — يزيل خدمة Apache ومهمّتي الطابور والمجدول. <strong>لا يزيل خدمة MySQL عمداً</strong> (قد تُستخدم من مشاريع أخرى على نفس الجهاز) — أزلها يدوياً من <code class="bg-white dark:bg-gray-800 px-1">services.msc</code> إن أردت فعلاً وتأكدت أن لا شيء آخر يعتمد عليها.</p>
                                 </div>
                             </div>
 
                             <div class="mt-4 bg-amber-50 dark:bg-amber-900/20 p-4 rounded-lg border-r-4 border-amber-400">
                                 <p class="text-sm font-semibold mb-1">تنبيهات مهمة جداً:</p>
                                 <ul class="list-disc list-inside text-sm space-y-1 mr-4">
-                                    <li>بعد هذا الإعداد، <strong>لا تستخدم</strong> أزرار (تشغيل/إيقاف/إعادة تشغيل الخدمات) في لوحة تحكم النظام — أصبحت العمليات مُدارة عبر Task Scheduler مباشرة، واستخدام الطريقتين معاً قد يشغّل عاملين مكررين لنفس المهمة.</li>
+                                    <li>بعد هذا الإعداد، <strong>لا تستخدم</strong> أزرار (تشغيل/إيقاف/إعادة تشغيل الخدمات) في لوحة تحكم النظام أو لوحة تحكم XAMPP — أصبحت العمليات مُدارة عبر Windows Services / Task Scheduler مباشرة، واستخدام الطريقتين معاً قد يشغّل عاملين مكررين لنفس المهمة.</li>
                                     <li>عامل الطابور تحديداً يحتاج أن يكون هناك <strong>مستخدم مسجّل دخوله فعلياً</strong> على الجهاز (وليس فقط الجهاز مُشغَّلاً) — هذا مطلوب تقنياً لأن الطباعة الصامتة عبر SumatraPDF تحتاج جلسة تفاعلية حقيقية ولا تعمل بشكل موثوق تحت حساب النظام الخلفي (SYSTEM). لجهاز مكتب يبقى مسجَّل الدخول باستمرار، هذا غير ملحوظ عملياً.</li>
+                                    <li><strong>لوحظ فعلياً:</strong> محفّز "عند الإقلاع" وحده لمهمة عامل الطابور قد يفشل بصمت أحياناً إذا حاول العمل قبل اكتمال تسجيل الدخول الفعلي على سطح المكتب (Windows لا يعيد المحاولة تلقائياً في هذه الحالة رغم إعداد إعادة التشغيل، لأن المهمة لم "تبدأ" أصلاً من منظوره). لذلك يُضاف أيضاً محفّز "عند تسجيل الدخول" لنفس المستخدم كطبقة أمان — إن لاحظت رغم ذلك أن المهمة بقيت متوقفة بعد إقلاع نادر، شغّلها يدوياً مرة واحدة كما في الفقرة أعلاه.</li>
                                     <li>أي تعديل على ملفات الكود (PHP) بعد هذا الإعداد <strong>يتطلب إعادة تشغيل عامل الطابور</strong> يدوياً من لوحة التحكم (زر "إعادة تشغيل قائمة الانتظار") حتى تُطبَّق التعديلات — العامل المسجَّل يحتفظ بنسخة الكود من وقت آخر تشغيل له فقط.</li>
                                 </ul>
                             </div>
