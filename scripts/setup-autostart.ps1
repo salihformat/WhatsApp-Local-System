@@ -12,6 +12,9 @@
     - تسجيل عامل الطابور (queue:work) والمجدول (schedule:work) كمهام مجدولة تعمل عند الإقلاع
       **وعند تسجيل الدخول** (الأخيرة أكثر موثوقية للمهام التفاعلية)، وتُعيد تشغيل نفسها تلقائياً
       عند التعطل، بدل نوافذ CMD يدوية يجب فتحها كل يوم.
+    - [Fix 2026-08-06] تسجيل مهمة سحب تحديثات تلقائي من فرع main على GitHub (auto-update.ps1) تعمل
+      كل 10 دقائق: تفحص وجود تحديث جديد، وإن وُجد تسحبه وتُطبِّق composer/npm/migrate وتُعيد تشغيل
+      عامل الطابور تلقائياً. لا تلمس أي تعديلات محلية غير مرفوعة (تتوقف وتُسجِّل تحذيراً فقط).
 
     الاستخدام: شغّل 03-Install-AutoStart.bat (سيطلب صلاحيات المسؤول تلقائياً)، أو نفّذ هذا الملف
     مباشرة من PowerShell كمسؤول:  .\setup-autostart.ps1
@@ -36,6 +39,7 @@ $apacheServiceName = "WhatsAppLocalApache"
 $mysqlServiceName  = "MySQL_XAMPP"
 $queueTaskName      = "WhatsAppLocalSystem-QueueWorker"
 $schedulerTaskName  = "WhatsAppLocalSystem-Scheduler"
+$autoUpdateTaskName = "WhatsAppLocalSystem-AutoUpdate"
 
 $mysqldExe = Join-Path $XamppPath "mysql\bin\mysqld.exe"
 $mysqlIni  = Join-Path $XamppPath "mysql\bin\my.ini"
@@ -64,7 +68,7 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
 if ($Uninstall) {
     Write-Step "إزالة الإعداد التلقائي..."
 
-    foreach ($t in @($queueTaskName, $schedulerTaskName)) {
+    foreach ($t in @($queueTaskName, $schedulerTaskName, $autoUpdateTaskName)) {
         if (Get-ScheduledTask -TaskName $t -ErrorAction SilentlyContinue) {
             Stop-ScheduledTask -TaskName $t -ErrorAction SilentlyContinue
         }
@@ -75,6 +79,7 @@ if ($Uninstall) {
 
     Unregister-ScheduledTask -TaskName $queueTaskName -Confirm:$false -ErrorAction SilentlyContinue
     Unregister-ScheduledTask -TaskName $schedulerTaskName -Confirm:$false -ErrorAction SilentlyContinue
+    Unregister-ScheduledTask -TaskName $autoUpdateTaskName -Confirm:$false -ErrorAction SilentlyContinue
 
     if (Get-Service -Name $apacheServiceName -ErrorAction SilentlyContinue) {
         Stop-Service -Name $apacheServiceName -Force -ErrorAction SilentlyContinue
@@ -234,6 +239,29 @@ Write-Host "   تم تسجيل وتشغيل المهمة: $queueTaskName" -Foreg
 Write-Step "تسجيل مهمة تشغيل المجدول (schedule:work)..."
 Register-WorkerTask -TaskName $schedulerTaskName -ArtisanCommand "schedule:work"
 Write-Host "   تم تسجيل وتشغيل المهمة: $schedulerTaskName" -ForegroundColor Green
+
+# تسجيل مهمة السحب التلقائي للتحديثات من GitHub (فرع main) كل 10 دقائق — راجع auto-update.ps1
+# للتفاصيل الكاملة. بخلاف عامل الطابور، هذه المهمة لا تحتاج جلسة تفاعلية (git/composer/npm/php لا
+# تحتاج سطح مكتب حقيقي)، فتعمل بأمان تحت حساب SYSTEM بلا قيد تسجيل الدخول.
+Write-Step "تسجيل مهمة السحب التلقائي للتحديثات من GitHub..."
+$autoUpdateScript = Join-Path $PSScriptRoot "auto-update.ps1"
+if (Get-ScheduledTask -TaskName $autoUpdateTaskName -ErrorAction SilentlyContinue) {
+    Stop-ScheduledTask -TaskName $autoUpdateTaskName -ErrorAction SilentlyContinue
+    Unregister-ScheduledTask -TaskName $autoUpdateTaskName -Confirm:$false -ErrorAction SilentlyContinue
+}
+$autoUpdateAction = New-ScheduledTaskAction -Execute "powershell.exe" `
+    -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$autoUpdateScript`"" -WorkingDirectory $ProjectPath
+# [Fix] [TimeSpan]::MaxValue يُنتج قيمة مدة (P99999999D...) خارج المدى الذي يقبله مخطط Task
+# Scheduler's XML، فيفشل التسجيل بخطأ "incorrectly formatted or out of range". 10 سنوات كافية
+# عملياً لتكرار "بلا توقف" (يمكن دائماً إعادة تشغيل هذا السكربت لتجديدها لاحقاً إن لزم).
+$autoUpdateTrigger = New-ScheduledTaskTrigger -Once -At (Get-Date) `
+    -RepetitionInterval (New-TimeSpan -Minutes 10) -RepetitionDuration (New-TimeSpan -Days 3650)
+$autoUpdatePrincipal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+$autoUpdateSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+    -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 30)
+Register-ScheduledTask -TaskName $autoUpdateTaskName -Action $autoUpdateAction -Trigger $autoUpdateTrigger `
+    -Principal $autoUpdatePrincipal -Settings $autoUpdateSettings | Out-Null
+Write-Host "   تم تسجيل المهمة: $autoUpdateTaskName (تفحص GitHub كل 10 دقائق، سجلها في storage/logs/auto-update.log)" -ForegroundColor Green
 
 Write-Host ""
 Write-Host "تم الإعداد بنجاح! سيعمل النظام بالكامل تلقائياً بعد كل إعادة تشغيل للجهاز دون أي تدخل يدوي." -ForegroundColor Green

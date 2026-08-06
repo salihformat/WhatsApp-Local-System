@@ -331,7 +331,7 @@ php artisan serve --port=8001</pre>
                             <p class="mb-4">بدل تشغيل الأوامر السابقة يدوياً في نوافذ Terminal تبقى مفتوحة (وتتوقف عند إغلاقها أو إعادة تشغيل الجهاز)، يوفّر النظام سكربتات جاهزة في مجلد <code class="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">scripts/</code> تُعِدّ تشغيلاً تلقائياً كاملاً يعمل من نفسه بعد كل إقلاع للجهاز — الموقع، قاعدة البيانات، الطباعة، والجدولة، بلا أي تدخل يدوي. هذه هي الطريقة الموصى بها لجهاز العمل الفعلي، وهي نفسها المطلوبة لإعداد النظام على جهاز جديد.</p>
 
                             <div class="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-lg border-r-4 border-indigo-400 mb-4">
-                                <p class="text-sm font-semibold mb-2">كيف يعمل؟ (4 مكوّنات مستقلة، كل منها يُسجَّل بطريقة مختلفة حسب طبيعته)</p>
+                                <p class="text-sm font-semibold mb-2">كيف يعمل؟ (5 مكوّنات مستقلة، كل منها يُسجَّل بطريقة مختلفة حسب طبيعته)</p>
                                 <ul class="list-disc list-inside text-sm space-y-2 mr-4">
                                     <li>
                                         <strong>Apache (تقديم الموقع):</strong> يُنسخ من تثبيت XAMPP إلى نسخة معزولة خاصة بهذا المشروع فقط (<code class="bg-white dark:bg-gray-800 px-1">scripts/apache-standalone</code>)، بمنفذ خاص بها (من <code class="bg-white dark:bg-gray-800 px-1">APP_URL</code>)، دون أي تعديل على تثبيت XAMPP الأصلي أو أي مشروع آخر على نفس الجهاز — ثم تُسجَّل كخدمة Windows (<code class="bg-white dark:bg-gray-800 px-1">WhatsAppLocalApache</code>) تعمل تلقائياً عند الإقلاع.
@@ -345,6 +345,20 @@ php artisan serve --port=8001</pre>
                                     <li>
                                         <strong>المجدول (<code class="bg-white dark:bg-gray-800 px-1">schedule:work</code>):</strong> نفس فكرة عامل الطابور، بمهمة منفصلة باسم <code class="bg-white dark:bg-gray-800 px-1">WhatsAppLocalSystem-Scheduler</code>، وهو المسؤول عن تشغيل كل المهام الدورية (مزامنة، فحص الطابعات، الحذف التلقائي...) — راجع القسم 7.
                                     </li>
+                                    <li>
+                                        <strong>السحب التلقائي للتحديثات (<code class="bg-white dark:bg-gray-800 px-1">auto-update.ps1</code>):</strong> مهمة منفصلة باسم <code class="bg-white dark:bg-gray-800 px-1">WhatsAppLocalSystem-AutoUpdate</code> تعمل تحت حساب SYSTEM (لا تحتاج جلسة تفاعلية) كل 10 دقائق — تفحص فرع <code class="bg-white dark:bg-gray-800 px-1" dir="ltr">main</code> على GitHub، وإن وُجد تحديث جديد تسحبه (<code class="bg-white dark:bg-gray-800 px-1">git pull</code>) وتُطبِّق <code class="bg-white dark:bg-gray-800 px-1">composer install</code> و<code class="bg-white dark:bg-gray-800 px-1">npm run build</code> و<code class="bg-white dark:bg-gray-800 px-1">migrate</code> تلقائياً، ثم تُعيد تشغيل عامل الطابور ليطبّق الكود الجديد. راجع الصندوق أدناه للتفاصيل الكاملة.
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg border-r-4 border-purple-400 mb-4">
+                                <h3 class="text-lg font-bold mb-2 text-[#f53003]">السحب التلقائي للتحديثات من GitHub</h3>
+                                <p class="text-sm mb-2">بمجرد إتمام إعداد التشغيل التلقائي (القسم أدناه)، يفحص النظام فرع <code class="bg-white dark:bg-gray-800 px-1" dir="ltr">main</code> على GitHub كل 10 دقائق تلقائياً — أي تحديث يُدفع (<code class="bg-white dark:bg-gray-800 px-1">push</code>) لهذا الفرع يصل لهذا الجهاز ويُطبَّق بالكامل خلال 10 دقائق كحد أقصى، بلا أي تدخل يدوي.</p>
+                                <ul class="list-disc list-inside text-sm space-y-1 mr-4">
+                                    <li><strong>الأمان:</strong> لا يلمس السكربت أي تعديلات محلية غير مرفوعة على الجهاز — إن وجد الشجرة المحلية غير نظيفة (<code class="bg-white dark:bg-gray-800 px-1" dir="ltr">git status</code> غير فارغ)، يتوقف فوراً ويُسجِّل تحذيراً بدل تجاهل التعديلات أو حذفها.</li>
+                                    <li><strong>السجل:</strong> كل عملية تحديث (نجحت أم فشلت) تُسجَّل بالتفصيل في <code class="bg-white dark:bg-gray-800 px-1">storage/logs/auto-update.log</code> — راجعه للتأكد من آخر تحديث تم تطبيقه أو لمعرفة سبب أي فشل.</li>
+                                    <li><strong>تنبيه مهم:</strong> بما أن أي <code class="bg-white dark:bg-gray-800 px-1">push</code> على <code class="bg-white dark:bg-gray-800 px-1" dir="ltr">main</code> يصل مباشرة لجهاز الإنتاج الحقيقي بلا مراجعة بشرية، <strong>لا تدفع كوداً غير مختبر على هذا الفرع</strong> — اختبره على فرع آخر أولاً إن كان تجريبياً.</li>
+                                    <li>لتعطيل هذه الميزة: <code class="bg-white dark:bg-gray-800 px-1" dir="ltr">Unregister-ScheduledTask -TaskName "WhatsAppLocalSystem-AutoUpdate"</code> من PowerShell كمسؤول.</li>
                                 </ul>
                             </div>
 
@@ -373,6 +387,7 @@ php artisan serve --port=8001</pre>
                                     <pre class="bg-gray-900 text-gray-100 p-3 rounded dir-ltr text-xs">Get-Service WhatsAppLocalApache, MySQL_XAMPP | Select Name, Status
 Get-ScheduledTask WhatsAppLocalSystem-QueueWorker, WhatsAppLocalSystem-Scheduler | Select TaskName, State</pre>
                                     <p class="text-xs text-gray-500 mt-2">إن ظهرت مهمة بحالة <code class="bg-white dark:bg-gray-800 px-1">Ready</code> بدل <code class="bg-white dark:bg-gray-800 px-1">Running</code>، شغّلها يدوياً مرة واحدة بـ <code class="bg-white dark:bg-gray-800 px-1" dir="ltr">Start-ScheduledTask -TaskName "الاسم"</code> — راجع التنبيه أدناه عن سبب حدوث هذا أحياناً.</p>
+                                    <p class="text-xs text-gray-500 mt-2">ملاحظة: مهمة <code class="bg-white dark:bg-gray-800 px-1">WhatsAppLocalSystem-AutoUpdate</code> تختلف عن البقية — تعمل لثوانٍ فقط كل 10 دقائق ثم تعود لحالة <code class="bg-white dark:bg-gray-800 px-1">Ready</code> بين كل تشغيل (طبيعي وليس عطلاً)، بدل البقاء <code class="bg-white dark:bg-gray-800 px-1">Running</code> باستمرار كعامل الطابور والمجدول.</p>
                                 </div>
 
                                 <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border-r-4 border-red-500">
