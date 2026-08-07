@@ -55,6 +55,38 @@ try {
     npm install 2>&1 | ForEach-Object { Write-Log "  npm: $_" }
     npm run build 2>&1 | ForEach-Object { Write-Log "  npm build: $_" }
 
+    # [Fix 2026-08-06] نسخة احتياطية سريعة لقاعدة البيانات قبل migrate مباشرة — لو وصل تحديث فيه
+    # migration به خطأ (يحذف عمود/جدولاً مثلاً)، هذه النسخة هي طريقة التراجع الوحيدة المتاحة بما أن
+    # كل هذا يعمل تلقائياً بلا مراجعة بشرية. إن فشل النسخ الاحتياطي نفسه، نتوقف قبل migrate عمداً
+    # (أفضل تأجيل تحديث آمن من تطبيق migration خطر بلا أي نسخة نرجع إليها).
+    $envContent = Get-Content (Join-Path $ProjectPath ".env") -Raw
+    $dbName = if ($envContent -match '(?m)^\s*DB_DATABASE\s*=\s*(\S+)\s*$') { $Matches[1] } else { $null }
+    $dbUser = if ($envContent -match '(?m)^\s*DB_USERNAME\s*=\s*(\S*)\s*$') { $Matches[1] } else { 'root' }
+    $dbPass = if ($envContent -match '(?m)^\s*DB_PASSWORD\s*=\s*(\S*)\s*$') { $Matches[1] } else { '' }
+
+    if ($dbName) {
+        $backupDir = Join-Path $ProjectPath "storage\app\private\db_backups"
+        New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
+        $backupFile = Join-Path $backupDir "backup_$(Get-Date -Format 'yyyy-MM-dd_HHmmss').sql"
+
+        Write-Log "نسخ احتياطي لقاعدة البيانات قبل migrate..."
+        $mysqldumpArgs = @('-u', $dbUser)
+        if ($dbPass) { $mysqldumpArgs += "-p$dbPass" }
+        $mysqldumpArgs += $dbName
+        & "C:\xampp\mysql\bin\mysqldump.exe" @mysqldumpArgs > $backupFile 2>$null
+
+        if ((Test-Path $backupFile) -and (Get-Item $backupFile).Length -gt 0) {
+            Write-Log "  تم النسخ الاحتياطي: $backupFile"
+            # الاحتفاظ بآخر 10 نسخ فقط، حذف الأقدم — يمنع تراكماً غير محدود بمرور الوقت
+            Get-ChildItem $backupDir -Filter "backup_*.sql" | Sort-Object LastWriteTime -Descending |
+                Select-Object -Skip 10 | Remove-Item -Force -ErrorAction SilentlyContinue
+        } else {
+            throw "فشل النسخ الاحتياطي لقاعدة البيانات قبل migrate — تم التوقف عمداً قبل تطبيق أي migration بلا نسخة احتياطية."
+        }
+    } else {
+        Write-Log "  تحذير: تعذّر قراءة DB_DATABASE من .env — تخطّي النسخ الاحتياطي (المتابعة على أي حال)."
+    }
+
     Write-Log "تنفيذ أي جداول جديدة (migrate)..."
     & $phpExe artisan migrate --force 2>&1 | ForEach-Object { Write-Log "  migrate: $_" }
 
@@ -75,5 +107,14 @@ try {
 
     Write-Log "اكتمل التحديث بنجاح: $remoteCommit"
 } catch {
-    Write-Log "فشل التحديث التلقائي: $($_.Exception.Message)"
+    $errorMsg = $_.Exception.Message
+    Write-Log "فشل التحديث التلقائي: $errorMsg"
+
+    # تنبيه فوري لصاحب المنشأة عبر واتساب (نفس رقم تنبيهات الطابعات) — بدون هذا، فشل التحديث
+    # التلقائي يبقى مخفياً في ملف سجل لا يراجعه أحد إلا عند الاكتشاف بالصدفة لاحقاً.
+    try {
+        & "C:\xampp\php\php.exe" artisan system:notify-owner "⚠️ فشل التحديث التلقائي للنظام من GitHub.`nالسبب: $errorMsg`nراجع storage/logs/auto-update.log للتفاصيل." 2>&1 | Out-Null
+    } catch {
+        Write-Log "  تعذّر إرسال تنبيه الفشل عبر واتساب أيضاً: $($_.Exception.Message)"
+    }
 }

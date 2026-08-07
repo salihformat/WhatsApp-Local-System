@@ -46,6 +46,18 @@ $mysqlIni  = Join-Path $XamppPath "mysql\bin\my.ini"
 
 function Write-Step($msg) { Write-Host "==> $msg" -ForegroundColor Cyan }
 
+# [Fix 2026-08-06] لوحظ فعلياً (فحص حي عبر sc.exe qfailure): خدمات Windows بلا إجراءات استرداد
+# مُعرَّفة تبقى متوقفة إلى الأبد لو انهارت (انهيار حقيقي أثناء التشغيل، وليس إعادة تشغيل الجهاز) —
+# بعكس عامل الطابور المُعَدّ بإعادة محاولة 999 مرة، Apache/MySQL كخدمات Windows لا يُعاد تشغيلهما
+# تلقائياً افتراضياً إطلاقاً بدون هذا الإعداد الصريح.
+function Set-ServiceCrashRecovery {
+    param([string]$ServiceName)
+    # reset= 86400 (ثانية): يُصفّر عدّاد الفشل بعد يوم كامل بلا انهيار جديد. actions: إعادة تشغيل
+    # بعد 60 ثانية في كل مرة (حتى الفشل الرابع فما فوق أيضاً، لأن آخر إجراء في القائمة يتكرر).
+    sc.exe failure $ServiceName reset= 86400 actions= restart/60000/restart/60000/restart/60000 | Out-Null
+    sc.exe failureflag $ServiceName 1 | Out-Null
+}
+
 # تُنهي أي عملية php.exe يتيمة تطابق أمر artisan معيّن، بقيت خارج تتبع Task Scheduler
 # (لوحظ أن Stop-ScheduledTask لا يضمن دائماً إنهاء العملية الفعلية على Windows، مما قد يسبب
 # تشغيل عاملين متوازيين لنفس المهمة عند إعادة تشغيل هذا السكربت، أو بقاءها بعد الإزالة)
@@ -154,7 +166,8 @@ if (Get-Service -Name $apacheServiceName -ErrorAction SilentlyContinue) {
 & $standaloneHttpdExe -k install -n $apacheServiceName
 Set-Service -Name $apacheServiceName -StartupType Automatic
 Start-Service -Name $apacheServiceName
-Write-Host "   Apache (نسخة معزولة) مسجّل كخدمة ($apacheServiceName) على المنفذ $appPort، وسيعمل تلقائياً مع كل إقلاع." -ForegroundColor Green
+Set-ServiceCrashRecovery -ServiceName $apacheServiceName
+Write-Host "   Apache (نسخة معزولة) مسجّل كخدمة ($apacheServiceName) على المنفذ $appPort، وسيعمل تلقائياً مع كل إقلاع (بما فيه إعادة تشغيل تلقائية عند الانهيار)." -ForegroundColor Green
 
 # 3) تسجيل MySQL (نفس تثبيت/بيانات XAMPP الحالية بلا أي تغيير) كخدمة Windows تلقائية
 #
@@ -173,7 +186,8 @@ if (!(Test-Path $mysqldExe)) {
     & $mysqldExe --install $mysqlServiceName --defaults-file="$mysqlIni" | Out-Null
     Set-Service -Name $mysqlServiceName -StartupType Automatic
     Start-Service -Name $mysqlServiceName
-    Write-Host "   MySQL مسجّل كخدمة ($mysqlServiceName)، وسيعمل تلقائياً مع كل إقلاع." -ForegroundColor Green
+    Set-ServiceCrashRecovery -ServiceName $mysqlServiceName
+    Write-Host "   MySQL مسجّل كخدمة ($mysqlServiceName)، وسيعمل تلقائياً مع كل إقلاع (بما فيه إعادة تشغيل تلقائية عند الانهيار)." -ForegroundColor Green
 }
 
 # دالة مساعدة: تسجيل مهمة مجدولة تُشغّل أمر php artisan دائم وتعيد تشغيل نفسها عند التعطل
