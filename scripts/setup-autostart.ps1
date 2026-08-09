@@ -46,6 +46,10 @@ $mysqlIni  = Join-Path $XamppPath "mysql\bin\my.ini"
 
 function Write-Step($msg) { Write-Host "==> $msg" -ForegroundColor Cyan }
 
+Write-Host "Stopping any manually running XAMPP processes to avoid port conflicts..." -ForegroundColor Yellow
+Stop-Process -Name "httpd" -Force -ErrorAction SilentlyContinue
+Stop-Process -Name "mysqld" -Force -ErrorAction SilentlyContinue
+
 # [Fix 2026-08-06] لوحظ فعلياً (فحص حي عبر sc.exe qfailure): خدمات Windows بلا إجراءات استرداد
 # مُعرَّفة تبقى متوقفة إلى الأبد لو انهارت (انهيار حقيقي أثناء التشغيل، وليس إعادة تشغيل الجهاز) —
 # بعكس عامل الطابور المُعَدّ بإعادة محاولة 999 مرة، Apache/MySQL كخدمات Windows لا يُعاد تشغيلهما
@@ -289,3 +293,13 @@ Write-Host "للإزالة لاحقاً: نفّذ 04-Uninstall-AutoStart.bat" -F
 
 
 
+
+$browserTaskName = "WhatsApp_System_Browser"
+if (Get-ScheduledTask -TaskName $browserTaskName -ErrorAction SilentlyContinue) {
+    Unregister-ScheduledTask -TaskName $browserTaskName -Confirm:$false -ErrorAction SilentlyContinue
+}
+$browserAction = New-ScheduledTaskAction -Execute "$PSScriptRoot\open-browser.bat"
+$browserTrigger = New-ScheduledTaskTrigger -AtLogOn
+$browserPrincipal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive
+Register-ScheduledTask -TaskName $browserTaskName -Action $browserAction -Trigger $browserTrigger -Principal $browserPrincipal | Out-Null
+Write-Host "   [v] Added: $browserTaskName (Opens browser on logon)" -ForegroundColor Green

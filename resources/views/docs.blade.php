@@ -461,6 +461,27 @@ stdout_logfile=/path-to-your-project/storage/logs/worker.log</pre>
                                 <li>SumatraPDF مطلوب لتشغيل ميزة الطباعة الذكية، وTesseract OCR اختياري ويُستخدم فقط كحل أخير لقراءة الملفات الممسوحة ضوئياً أو الصور — راجع القسم 5.</li>
                             </ul>
                         </section>
+
+                        <section class="mb-10">
+                            <h2 class="text-2xl font-semibold mb-4 border-b pb-2">12. ربط النظام بالإنترنت مجاناً (Cloudflare)</h2>
+                            <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                                <h3 class="text-lg font-bold mb-2 text-[#f53003]">الطريقة الأولى: الاتصال السريع للتجربة (بدون حساب)</h3>
+                                <p class="mb-2">قم بتشغيل الملف التالي الموجود في مجلد السكربتات:</p>
+                                <pre class="bg-gray-900 text-gray-100 p-3 rounded dir-ltr mb-4">scripts\05-Start-Quick-Tunnel.bat</pre>
+                                <p class="text-sm mb-6">سيعطيك رابطاً عشوائياً يمكنك استخدامه فوراً للوصول للنظام من أي مكان في العالم (يتغير هذا الرابط عند إعادة تشغيل الكمبيوتر).</p>
+                                
+                                <h3 class="text-lg font-bold mb-2 text-[#f53003]">الطريقة الثانية: الاتصال الدائم (يتطلب حساب مجاني)</h3>
+                                <p class="mb-2">للحصول على رابط احترافي ثابت يعمل دائماً في الخلفية كخدمة ويندوز:</p>
+                                <ul class="list-decimal list-inside space-y-2 mr-4 text-gray-700 dark:text-gray-300">
+                                    <li>قم بإنشاء حساب في منصة <strong>Cloudflare Zero Trust</strong> المجانية.</li>
+                                    <li>انتقل إلى <code class="bg-gray-100 dark:bg-gray-600 px-1 rounded">Networks</code> &gt; <code class="bg-gray-100 dark:bg-gray-600 px-1 rounded">Tunnels</code> واضغط على <code class="bg-gray-100 dark:bg-gray-600 px-1 rounded">Create a tunnel</code> (اختر نوع Cloudflared).</li>
+                                    <li>في صفحة التثبيت (Windows)، ستجد أمراً يحتوي على الرمز الخاص بك (Token).</li>
+                                    <li>افتح موجه الأوامر (CMD) <strong>كمسؤول</strong> في مجلد <code class="bg-gray-100 dark:bg-gray-600 px-1 rounded">scripts</code>، وقم بتشغيل الأمر:</li>
+                                </ul>
+                                <pre class="bg-gray-900 text-gray-100 p-3 rounded dir-ltr mt-2 mb-2">cloudflared.exe service install YOUR_TOKEN_HERE</pre>
+                                <p class="text-sm">بعدها من موقع Cloudflare، قم بتوجيه النفق (Service) إلى <code class="bg-gray-100 dark:bg-gray-600 px-1 rounded">http://localhost:8006</code> وسيعمل الرابط بشكل دائم وثابت!</p>
+                            </div>
+                        </section>
                     </div>
                 </div>
             </div>

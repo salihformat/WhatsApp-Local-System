@@ -1,54 +1,79 @@
 @echo off
-chcp 65001 >nul
+chcp 1256 >nul
 echo ==================================================
-echo  ุฅุนุฏุงุฏ ูุชุฌููุฒ ุงูู…ุดุฑูุน (Setup Project)
+echo  ลฺฯวฯ ๆสฬๅํา วแใิัๆฺ (Setup Project)
 echo ==================================================
 echo.
 
 cd /d "%~dp0\.."
 
-echo [1/7] ุชุฌููุฒ ู…ูู ุงูุจูุฆุฉ .env ...
-if not exist .env (
-    copy .env.example .env
-    echo ุชู… ูุณุฎ .env ุจูุฌุงุญ.
-) else (
-    echo ู…ูู .env ู…ูุฌูุฏ ู…ุณุจูุงู.
-)
+echo [1/8] สฬๅํา ใแÝ วแศํฦษ .env ...
+if not exist .env copy .env.example .env
 
 echo.
-echo [2/7] ุชุซุจูุช ุญุฒู… PHP (Composer)...
+echo [2/8] สÝฺํแ ลึวÝวส PHP วแใุแๆศษ (GD, ZIP) สแÞวฦํว๐...
+powershell -NoProfile -Command "$ini = 'C:\xampp\php\php.ini'; if (Test-Path $ini) { $c = Get-Content $ini; $c = $c -replace '(?m)^;extension=gd', 'extension=gd' -replace '(?m)^;extension=zip', 'extension=zip'; [System.IO.File]::WriteAllText($ini, ($c -join \"`r`n\"), [System.Text.Encoding]::UTF8) }"
+
+echo.
+echo [3/8] สหศํส อาใ PHP (Composer)...
 call composer install
+if %errorLevel% neq 0 goto composer_error
 
 echo.
-echo [3/7] ุฅูุดุงุก ู…ูุชุงุญ ุงูุชุทุจูู...
+echo [4/8] ลไิวม ใÝสวอ วแสุศํÞ...
 call C:\xampp\php\php.exe artisan key:generate
 
 echo.
-echo [4/7] ุฅูุดุงุก ูุงุนุฏุฉ ุงูุจูุงูุงุช...
+echo [5/8] ลไิวม Þวฺฯษ วแศํวไวส...
 C:\xampp\mysql\bin\mysql.exe -u root -e "CREATE DATABASE IF NOT EXISTS whatsapp_local CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" 2>nul
-if %errorLevel% neq 0 (
-    echo [ERROR] ุญุฏุซ ุฎุทุฃ ุฃุซูุงุก ุงูุงุชุตุงู ุจูุงุนุฏุฉ ุงูุจูุงูุงุช. ุชุฃูุฏ ู…ู ุฃู ุฎุฏู…ุฉ MySQL ูู XAMPP ููุฏ ุงูุชุดุบูู.
-    pause
-    exit /b 1
-)
+if %errorLevel% neq 0 goto mysql_error
 
 echo.
-echo [5/7] ุชูููุฐ ุงูุฌุฏุงูู (Migrations)...
-call C:\xampp\php\php.exe artisan migrate --force
+echo [6/8] สไÝํะ วแฬฯวๆแ (Migrations)...
+call C:\xampp\php\php.exe artisan migrate --force --seed
 
 echo.
-echo [6/7] ุฑุจุท ู…ุฌูุฏ ุงูุชุฎุฒูู ุงูุนุงู… (Storage Link)...
-:: [Fix] ูุงู ู…ูููุฏุงู โ€” ุงูู…ุดุฑูุน ูุนุชู…ุฏ ูุนููุงู ุนูู ูุฐุง ุงูุฑุงุจุท ูุนุฑุถ ู…ุฑููุงุช ูุงุชุณุงุจ (ุตูุฑ/ู…ููุงุช) ุนุจุฑ
-:: Storage::disk('public')->url()/asset('storage/...')ุ ูุจุฏููู ุชุธูุฑ ุฑูุงุจุท ุงูู…ููุงุช ู…ุนุทูุจุฉ (404).
+echo [7/8] ัศุ ใฬแฯ วแสฮาํไ วแฺวใ (Storage Link)...
 call C:\xampp\php\php.exe artisan storage:link
 
 echo.
-echo [7/7] ุชุซุจูุช ูุจูุงุก ุงููุงุฌูุงุช (NPM)...
+echo [8/8] สหศํส ๆศไวม วแๆวฬๅวส (NPM)...
 call npm install
 call npm run build
 
 echo.
 echo ==================================================
-echo ุชู… ุฅุนุฏุงุฏ ุงูู…ุดุฑูุน ูุจูุงุก ุงููุงุฌูุงุช ุจูุฌุงุญ!
+echo สใ ลฺฯวฯ วแใิัๆฺ ๆศไวม วแๆวฬๅวส ศไฬวอ!
+echo ==================================================
+echo ==================================================
+echo              ศํวไวส วแฯฮๆแ วแวÝสัวึํษ
+echo ==================================================
+echo  [วแใฯํั - Admin]
+echo  วแศัํฯ: admin@rasayily.com
+echo  ฿แใษ วแใัๆั: admin123
+echo.
+echo  [วแใำสฮฯใ วแฺวฯํ - User]
+echo  วแศัํฯ: user@rasayily.com
+echo  ฿แใษ วแใัๆั: user123
 echo ==================================================
 pause
+
+
+:: Open Browser automatically
+FOR /F "tokens=1,2 delims==" %%A IN (.env) DO (
+    IF "%%A"=="APP_URL" set APP_URL=%%B
+)
+start "" "%APP_URL%"
+exit /b 0
+
+:composer_error
+echo.
+echo [ERROR] Ýิแ สหศํส อาใ Composer! ํัฬ์ ใัวฬฺษ วแรฮุวม รฺแวๅ.
+pause
+exit /b 1
+
+:mysql_error
+echo.
+echo [ERROR] อฯห ฮุร รหไวม วแวสีวแ ศÞวฺฯษ วแศํวไวส. สร฿ฯ ใไ รไ ฮฯใษ MySQL Þํฯ วแสิÛํแ.
+pause
+exit /b 1

@@ -36,7 +36,7 @@ class PrinterMonitorService
      */
     public function check(Printer $printer): array
     {
-        $escapedName = str_replace("'", "''", $printer->windows_printer_name);
+        $escapedName = str_replace(['\\', "'"], ['\\\\', "''"], $printer->windows_printer_name);
 
         $psCommand = "Get-CimInstance Win32_Printer -Filter \"Name='{$escapedName}'\" | "
             . "Select-Object WorkOffline, DetectedErrorState | ConvertTo-Json -Compress";

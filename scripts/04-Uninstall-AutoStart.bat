@@ -1,9 +1,9 @@
 @echo off
-:: ุฅุฒุงูุฉ ูู ู…ูุงู…/ุฎุฏู…ุงุช ุงูุชุดุบูู ุงูุชููุงุฆู ุงูุชู ุฃูุดุฃูุง 03-Install-AutoStart.bat
+:: ลาวแษ ฿แ ใๅวใ/ฮฯใวส วแสิÛํแ วแสแÞวฦํ วแสํ รไิรๅว 03-Install-AutoStart.bat
 
 net session >nul 2>&1
 if %errorLevel% NEQ 0 (
-    echo ูุชุทูุจ ูุฐุง ุงูุฅุนุฏุงุฏ ุตูุงุญูุงุช ุงูู…ุณุคูู ^(Administrator^)ุ ุณูุชู… ุทูุจูุง ุงูุขู...
+    echo ํสุแศ ๅะว วแลฺฯวฯ ีแวอํวส วแใำฤๆแ ^(Administrator^)ก ำํสใ ุแศๅว วแยไ...
     powershell -NoProfile -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
     exit /b
 )
