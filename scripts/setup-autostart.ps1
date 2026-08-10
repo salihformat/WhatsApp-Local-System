@@ -1,4 +1,4 @@
-﻿<#
+<#
     إعداد التشغيل التلقائي الكامل للنظام المحلي عند إقلاع Windows:
     - نسخ Apache من تثبيت XAMPP إلى نسخة معزولة خاصة بهذا المشروع فقط (apache-standalone)،
       بمنفذ وإعدادات خاصة به، بدون أي تعديل على إعدادات XAMPP المشتركة أو تأثير على أي مشروع
@@ -161,6 +161,16 @@ if ($LASTEXITCODE -ne 0) { throw "فشل التحقق من إعدادات Apache
 
 Write-Host "   إعدادات النسخة المعزولة صحيحة (منفذ $appPort، جذر المستندات: $projectPublicPath)." -ForegroundColor Green
 
+Write-Host "=======================================================" -ForegroundColor Cyan
+Write-Host " Printer Access Setup (Optional)" -ForegroundColor Cyan
+Write-Host "=======================================================" -ForegroundColor Cyan
+Write-Host "If you want the background services to see your locally connected printer," -ForegroundColor Yellow
+Write-Host "they must run under your Windows user account." -ForegroundColor Yellow
+Write-Host "A popup will ask for your Windows username (e.g. .\Administrator) and password." -ForegroundColor Yellow
+Write-Host "If you do not need printer access, just click Cancel." -ForegroundColor Yellow
+Write-Host ""
+$printerCreds = Get-Credential -Message "Enter Windows Username/Password for Printer Access. Click Cancel if not needed." -ErrorAction SilentlyContinue
+
 # 2) تسجيل النسخة المعزولة كخدمة Windows تعمل تلقائياً عند الإقلاع
 Write-Step "تسجيل خدمة Windows للنسخة المعزولة..."
 if (Get-Service -Name $apacheServiceName -ErrorAction SilentlyContinue) {
@@ -168,6 +178,16 @@ if (Get-Service -Name $apacheServiceName -ErrorAction SilentlyContinue) {
     & $standaloneHttpdExe -k uninstall -n $apacheServiceName
 }
 & $standaloneHttpdExe -k install -n $apacheServiceName
+
+if ($printerCreds) {
+    $username = $printerCreds.UserName
+    $password = $printerCreds.GetNetworkCredential().Password
+    $wmiService = Get-WmiObject -Class Win32_Service -Filter "Name='$apacheServiceName'"
+    if ($wmiService) {
+        $wmiService.Change($null,$null,$null,$null,$null,$null,$username,$password) | Out-Null
+    }
+}
+
 Set-Service -Name $apacheServiceName -StartupType Automatic
 Start-Service -Name $apacheServiceName
 Set-ServiceCrashRecovery -ServiceName $apacheServiceName
@@ -246,6 +266,13 @@ function Register-WorkerTask {
     Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
     Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $triggers `
         -Principal $principal -Settings $settings | Out-Null
+
+    if ($printerCreds) {
+        $username = $printerCreds.UserName
+        $password = $printerCreds.GetNetworkCredential().Password
+        $schtasksArgs = "/change /tn `"$TaskName`" /ru `"$username`" /rp `"$password`""
+        Start-Process -FilePath "schtasks.exe" -ArgumentList $schtasksArgs -NoNewWindow -Wait -ErrorAction SilentlyContinue
+    }
 
     Start-ScheduledTask -TaskName $TaskName
 }

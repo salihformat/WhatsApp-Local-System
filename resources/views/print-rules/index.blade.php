@@ -113,10 +113,95 @@
                                     </form>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-center">
-                                    <form action="{{ route('print-rules.destroy', $rule) }}" method="POST" class="inline" onsubmit="return confirm('هل أنت متأكد من حذف هذه القاعدة؟');">
-                                        @csrf @method('DELETE')
-                                        <button type="submit" class="text-red-500 hover:text-red-700 font-medium transition-colors">حذف</button>
-                                    </form>
+                                    <div class="flex items-center justify-center gap-2" x-data="{ editModalOpen: false }">
+                                        <!-- Edit Button -->
+                                        <button @click="editModalOpen = true" class="text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-md transition-colors flex items-center gap-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                            </svg>
+                                            تعديل
+                                        </button>
+
+                                        <!-- Delete Button -->
+                                        <form action="{{ route('print-rules.destroy', $rule) }}" method="POST" class="inline" onsubmit="return confirm('هل أنت متأكد من حذف هذه القاعدة؟');">
+                                            @csrf @method('DELETE')
+                                            <button type="submit" class="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-md transition-colors flex items-center gap-1">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                                حذف
+                                            </button>
+                                        </form>
+
+                                        <!-- Edit Modal -->
+                                        <div x-show="editModalOpen" style="display: none;" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+                                            <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                                                <div x-show="editModalOpen" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="editModalOpen = false" aria-hidden="true"></div>
+
+                                                <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+                                                <div x-show="editModalOpen" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full" @click.stop>
+                                                    <form action="{{ route('print-rules.update', $rule) }}" method="POST">
+                                                        @csrf @method('PUT')
+                                                        <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4 text-right whitespace-normal text-base">
+                                                            <h3 class="text-lg leading-6 font-bold text-indigo-700 mb-6 border-b pb-3" id="modal-title">
+                                                                تعديل قاعدة: {{ $rule->name }}
+                                                            </h3>
+                                                            <div class="space-y-4 text-right">
+                                                                <div>
+                                                                    <label class="block text-sm font-bold text-gray-700 mb-2">اسم القاعدة</label>
+                                                                    <input type="text" name="name" value="{{ $rule->name }}" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                                                </div>
+                                                                
+                                                                <div>
+                                                                    <label class="block text-sm font-bold text-gray-700 mb-2">نوع المطابقة</label>
+                                                                    <select name="match_type" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                                                        <option value="phone_number" {{ $rule->match_type == 'phone_number' ? 'selected' : '' }}>رقم جوال محدد</option>
+                                                                        <option value="phone_prefix" {{ $rule->match_type == 'phone_prefix' ? 'selected' : '' }}>بادئة رقم الجوال</option>
+                                                                        <option value="keyword" {{ $rule->match_type == 'keyword' ? 'selected' : '' }}>كلمة مفتاحية</option>
+                                                                        <option value="file_type" {{ $rule->match_type == 'file_type' ? 'selected' : '' }}>امتداد الملف</option>
+                                                                    </select>
+                                                                </div>
+
+                                                                <div>
+                                                                    <label class="block text-sm font-bold text-gray-700 mb-2">القيمة <span class="text-xs text-gray-400 font-normal">(يمكن وضع أكثر من قيمة مفصولة بفاصلة)</span></label>
+                                                                    <input type="text" name="match_value" value="{{ $rule->match_value }}" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                                                </div>
+
+                                                                <div class="grid grid-cols-2 gap-4">
+                                                                    <div>
+                                                                        <label class="block text-sm font-bold text-gray-700 mb-2">الأولوية</label>
+                                                                        <input type="number" name="priority" value="{{ $rule->priority }}" min="0" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                                                    </div>
+
+                                                                    <div>
+                                                                        <label class="block text-sm font-bold text-gray-700 mb-2">الطابعة</label>
+                                                                        <select name="printer_id" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                                                            @foreach($printers as $printer)
+                                                                                <option value="{{ $printer->id }}" {{ $rule->printer_id == $printer->id ? 'selected' : '' }}>{{ $printer->name }}</option>
+                                                                            @endforeach
+                                                                        </select>
+                                                                    </div>
+                                                                </div>
+                                                                
+                                                                @if($rule->is_active)
+                                                                    <input type="hidden" name="is_active" value="1">
+                                                                @endif
+                                                            </div>
+                                                        </div>
+                                                        <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse sm:justify-start gap-2 text-right">
+                                                            <button type="submit" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-bold text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:w-auto sm:text-sm">
+                                                                حفظ التعديلات
+                                                            </button>
+                                                            <button type="button" @click="editModalOpen = false" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-bold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-200 sm:mt-0 sm:w-auto sm:text-sm">
+                                                                إلغاء
+                                                            </button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </td>
                             </tr>
                         @empty
