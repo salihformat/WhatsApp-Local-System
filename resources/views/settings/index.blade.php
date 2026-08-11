@@ -193,6 +193,46 @@
                                 </div>
                             </div>
 
+                            <!-- Conversation Distribution -->
+                            <div class="bg-gray-50 p-6 rounded-lg shadow-sm border border-gray-100 md:col-span-2">
+                                <h3 class="text-lg font-bold mb-4 text-indigo-700 border-b pb-2">توزيع المحادثات الجديدة (Conversation Distribution)</h3>
+
+                                @php $distributionMode = old('CONVERSATION_DISTRIBUTION_MODE', env('CONVERSATION_DISTRIBUTION_MODE', 'manual')); @endphp
+
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">وضع التعيين (CONVERSATION_DISTRIBUTION_MODE)</label>
+                                    <select name="CONVERSATION_DISTRIBUTION_MODE" id="distribution-mode" class="w-full md:w-1/2 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" onchange="document.getElementById('distribution-users-box').style.display = this.value === 'specific' ? 'block' : 'none';">
+                                        <option value="manual" @selected($distributionMode === 'manual')>يدوي (بلا تعيين تلقائي — التعيين من صفحة المحادثات فقط)</option>
+                                        <option value="specific" @selected($distributionMode === 'specific')>تلقائي لمستخدمين محددين</option>
+                                        <option value="all" @selected($distributionMode === 'all')>تلقائي لكل الموظفين (role = agent) المتاحين للتعيين</option>
+                                    </select>
+                                    <p class="text-xs text-gray-400 mt-1">
+                                        عند التعيين التلقائي (أي وضع غير "يدوي")، تذهب كل محادثة جديدة تلقائياً لمن لديه حالياً <strong>أقل عدد محادثات مفتوحة</strong> من المجموعة المؤهّلة — توازن حمل حقيقي، وليس تناوباً دورياً أعمى لا يراعي تراكم محادثات موظف معيّن.
+                                        قواعد الأتمتة (تعيين حسب رقم/كلمة مفتاحية من صفحة "الأتمتة") تبقى تعمل بمعزل عن هذا الإعداد وتُطبَّق بعده، فتستطيع أن تُلغي التعيين التلقائي لحالات محددة.
+                                    </p>
+                                </div>
+
+                                <div id="distribution-users-box" class="mb-2" style="display: {{ $distributionMode === 'specific' ? 'block' : 'none' }};">
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">المستخدمون المشمولون بالتوزيع (CONVERSATION_DISTRIBUTION_USER_IDS)</label>
+                                    @php
+                                        $selectedIds = array_filter(array_map('trim', explode(',', old('CONVERSATION_DISTRIBUTION_USER_IDS', env('CONVERSATION_DISTRIBUTION_USER_IDS', '')))));
+                                    @endphp
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 bg-white p-3 rounded-md border border-gray-200">
+                                        @forelse($assignableUsers as $user)
+                                            <label class="flex items-center gap-2 text-sm text-gray-700">
+                                                <input type="checkbox" name="_distribution_user_checkbox[]" value="{{ $user->id }}" {{ in_array((string) $user->id, $selectedIds, true) ? 'checked' : '' }} onchange="document.getElementById('distribution-user-ids-hidden').value = Array.from(document.querySelectorAll('input[name=\'_distribution_user_checkbox[]\']:checked')).map(el => el.value).join(',');">
+                                                {{ $user->name }}
+                                                <span class="text-xs text-gray-400">({{ $user->role }}{{ !$user->is_available_for_assignment ? ' — غير متاح حالياً' : '' }})</span>
+                                            </label>
+                                        @empty
+                                            <p class="text-sm text-gray-400">لا يوجد مستخدمون بعد.</p>
+                                        @endforelse
+                                    </div>
+                                    <input type="hidden" name="CONVERSATION_DISTRIBUTION_USER_IDS" id="distribution-user-ids-hidden" value="{{ implode(',', $selectedIds) }}">
+                                    <p class="text-xs text-gray-400 mt-1">مستخدم "غير متاح حالياً" (راجع صفحة إدارة المستخدمين) يُستبعد تلقائياً من التوزيع حتى لو بقي محدداً هنا — مفيد لاستثنائه مؤقتاً (إجازة) بلا تعديل هذه القائمة.</p>
+                                </div>
+                            </div>
+
                             <!-- Smart Printing Status Replies -->
                             <div class="bg-gray-50 p-6 rounded-lg shadow-sm border border-gray-100 md:col-span-2">
                                 <h3 class="text-lg font-bold mb-4 text-indigo-700 border-b pb-2">إشعارات حالة الطباعة الذكية</h3>

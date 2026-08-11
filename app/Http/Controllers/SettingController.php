@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\UpdateSettingRequest;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 
@@ -10,7 +11,9 @@ class SettingController extends Controller
 {
     public function index()
     {
-        return view('settings.index');
+        $assignableUsers = User::orderBy('name')->get(['id', 'name', 'role', 'is_available_for_assignment']);
+
+        return view('settings.index', compact('assignableUsers'));
     }
 
     public function update(UpdateSettingRequest $request)

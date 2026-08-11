@@ -5,8 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Support\Facades\File;
 use App\Models\Message;
 use App\Models\ExtractionTrace;
-use App\Jobs\SendMessageJob;
-use Illuminate\Support\Facades\Log;
+use App\Services\MonitorFolderReviewService;
 
 /**
  * صفحة متابعة مجلد المراقبة C:\PrintMonitor: أي الملفات وصلت، أُرسلت بنجاح (archive)،
@@ -135,113 +134,54 @@ class PrintMonitorController extends Controller
     /**
      * الموافقة على ملف محجوز للمراجعة اليدوية: نقله من مجلد review إلى processing وإرساله فعلياً.
      */
-    public function approve(Message $message)
+    public function approve(Message $message, MonitorFolderReviewService $review)
     {
-        if ($message->status !== 'review_pending') {
-            return back()->with('error', 'هذا الملف ليس بانتظار المراجعة حالياً.');
-        }
+        $result = $review->approve($message);
 
-        $folderPath = config('app.monitor_folder_path', 'C:/PrintMonitor');
-        $reviewFile = $this->locatePhysicalFile($folderPath . '/review', $message);
-
-        if (!$reviewFile) {
-            return back()->with('error', 'تعذّر العثور على الملف الفعلي في مجلد المراجعة.');
-        }
-
-        $processingPath = $folderPath . '/processing';
-        if (!File::exists($processingPath)) {
-            File::makeDirectory($processingPath, 0755, true);
-        }
-
-        try {
-            $targetPath = $processingPath . '/' . basename($reviewFile);
-            if (File::exists($targetPath)) {
-                File::delete($reviewFile);
-            } else {
-                File::move($reviewFile, $targetPath);
-            }
-
-            $message->update(['status' => 'pending']);
-            dispatch(new SendMessageJob($message->id));
-
+        if ($result['success']) {
             activity('print-monitor')
                 ->causedBy(auth()->user())
                 ->withProperties(['message_id' => $message->id, 'phone_number' => $message->phone_number, 'file_name' => $message->file_name])
                 ->log('تمت الموافقة على إرسال ملف كان بانتظار المراجعة اليدوية');
-
-            Log::info('PrintMonitor: manual review approved', ['message_id' => $message->id, 'phone' => $message->phone_number]);
-
-            return back()->with('success', "تمت الموافقة، سيُرسل الملف إلى {$message->phone_number} الآن.");
-        } catch (\Exception $e) {
-            Log::error('PrintMonitor: failed to approve reviewed file: ' . $e->getMessage());
-            return back()->with('error', 'فشلت الموافقة: ' . $e->getMessage());
         }
+
+        return back()->with($result['success'] ? 'success' : 'error', $result['message']);
     }
 
     /**
      * رفض ملف محجوز للمراجعة اليدوية: نقله لمجلد failed وتحديث حالة الرسالة دون إرسالها.
      */
-    public function reject(Message $message)
+    public function reject(Message $message, MonitorFolderReviewService $review)
     {
-        if ($message->status !== 'review_pending') {
-            return back()->with('error', 'هذا الملف ليس بانتظار المراجعة حالياً.');
-        }
+        $result = $review->reject($message, (auth()->user()->name ?? 'مستخدم') . ' من صفحة متابعة الإرسال');
 
-        $folderPath = config('app.monitor_folder_path', 'C:/PrintMonitor');
-        $reviewFile = $this->locatePhysicalFile($folderPath . '/review', $message);
-
-        $failedPath = $folderPath . '/failed';
-        if (!File::exists($failedPath)) {
-            File::makeDirectory($failedPath, 0755, true);
-        }
-
-        try {
-            if ($reviewFile) {
-                $targetPath = $failedPath . '/' . basename($reviewFile);
-                if (File::exists($targetPath)) {
-                    File::delete($reviewFile);
-                } else {
-                    File::move($reviewFile, $targetPath);
-                }
-            }
-
-            $message->update([
-                'status' => 'failed',
-                'error_message' => 'تم الرفض يدوياً من قبل ' . (auth()->user()->name ?? 'مستخدم') . ' من صفحة متابعة الإرسال.',
-            ]);
-
+        if ($result['success']) {
             activity('print-monitor')
                 ->causedBy(auth()->user())
                 ->withProperties(['message_id' => $message->id, 'phone_number' => $message->phone_number, 'file_name' => $message->file_name])
                 ->log('تم رفض ملف كان بانتظار المراجعة اليدوية');
-
-            Log::info('PrintMonitor: manual review rejected', ['message_id' => $message->id, 'phone' => $message->phone_number]);
-
-            return back()->with('success', 'تم رفض الملف ونقله لمجلد "فشلت".');
-        } catch (\Exception $e) {
-            Log::error('PrintMonitor: failed to reject reviewed file: ' . $e->getMessage());
-            return back()->with('error', 'فشل الرفض: ' . $e->getMessage());
         }
+
+        return back()->with($result['success'] ? 'success' : 'error', $result['message']);
     }
 
     /**
-     * البحث عن الملف الفعلي المطابق لرسالة بانتظار المراجعة داخل مجلد معيّن، عبر source_filename أولاً
-     * ثم file_name كخيار احتياطي (نفس أسلوب المطابقة المستخدم في SendMessageJob::moveFolderFile).
+     * الموافقة على كل الملفات الحالية بانتظار المراجعة دفعة واحدة.
      */
-    private function locatePhysicalFile(string $dir, Message $message): ?string
+    public function approveAll(MonitorFolderReviewService $review)
     {
-        if (!File::exists($dir)) {
-            return null;
+        $count = $review->approveAllPending();
+
+        if ($count > 0) {
+            activity('print-monitor')
+                ->causedBy(auth()->user())
+                ->withProperties(['count' => $count])
+                ->log("تمت الموافقة الجماعية على {$count} ملف كانت بانتظار المراجعة اليدوية");
         }
 
-        foreach (File::files($dir) as $file) {
-            $fn = $file->getFilename();
-            if ($fn === $message->source_filename || $fn === $message->file_name) {
-                return $file->getPathname();
-            }
-        }
-
-        return null;
+        return back()->with($count > 0 ? 'success' : 'info', $count > 0
+            ? "تمت الموافقة على {$count} ملف."
+            : 'لا توجد ملفات بانتظار المراجعة حالياً.');
     }
 
     private function formatSize(int $bytes): string

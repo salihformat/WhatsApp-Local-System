@@ -15,7 +15,7 @@ class Printer extends Model
         // نتجاهل عمود حالة الفحص الدوري (last_status/last_checked_at) عمداً لئلا يُغرق سجل
         // التدقيق بمئات الإدخالات الروتينية كل 10 دقائق — التدقيق هنا لتغييرات الإعداد اليدوية فقط
         return LogOptions::defaults()
-            ->logOnly(['name', 'windows_printer_name', 'type', 'is_default', 'is_active', 'notes', 'supports_status_check'])
+            ->logOnly(['name', 'windows_printer_name', 'type', 'print_mode', 'is_default', 'is_active', 'notes', 'supports_status_check'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
             ->useLogName('printers');
@@ -25,6 +25,7 @@ class Printer extends Model
         'name',
         'windows_printer_name',
         'type',
+        'print_mode',
         'is_default',
         'is_active',
         'notes',
@@ -33,6 +34,7 @@ class Printer extends Model
         'last_status_healthy',
         'last_status_detail',
         'last_checked_at',
+        'pages_printed',
     ];
 
     protected $casts = [
@@ -41,6 +43,7 @@ class Printer extends Model
         'supports_status_check' => 'boolean',
         'last_status_healthy' => 'boolean',
         'last_checked_at' => 'datetime',
+        'pages_printed' => 'integer',
     ];
 
     public function rules()
@@ -61,5 +64,10 @@ class Printer extends Model
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
+    }
+
+    public function needsApproval(): bool
+    {
+        return $this->print_mode === 'approval';
     }
 }

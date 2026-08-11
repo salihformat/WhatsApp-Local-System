@@ -31,9 +31,11 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'phone_number',
         'password',
         'is_admin',
         'role',
+        'is_available_for_assignment',
     ];
 
     /**
@@ -57,6 +59,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_admin' => 'boolean',
+            'is_available_for_assignment' => 'boolean',
         ];
     }
     public function isAdmin()
@@ -97,6 +100,11 @@ class User extends Authenticatable
     public function quickReplies()
     {
         return $this->hasMany(QuickReply::class);
+    }
+
+    public function scopeAvailableForAssignment($query)
+    {
+        return $query->where('is_available_for_assignment', true);
     }
 
 }

@@ -285,6 +285,34 @@
                 </div>
             </div>
 
+            @if(($pendingApprovals['print_jobs'] ?? 0) > 0 || ($pendingApprovals['review_messages'] ?? 0) > 0)
+            <div class="mb-8" style="background-color: #fff7ed; border: 1px solid #fdba74; border-radius: 16px; padding: 20px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="font-size: 24px;">⏸️</span>
+                    <div>
+                        <div style="font-weight: 800; color: #9a3412; font-size: 15px;">هناك طلبات بانتظار موافقتك</div>
+                        <div style="color: #c2410c; font-size: 13px; margin-top: 2px;">
+                            @if(($pendingApprovals['print_jobs'] ?? 0) > 0)
+                                {{ $pendingApprovals['print_jobs'] }} طلب طباعة
+                            @endif
+                            @if(($pendingApprovals['print_jobs'] ?? 0) > 0 && ($pendingApprovals['review_messages'] ?? 0) > 0) &middot; @endif
+                            @if(($pendingApprovals['review_messages'] ?? 0) > 0)
+                                {{ $pendingApprovals['review_messages'] }} ملف بانتظار مراجعة الإرسال
+                            @endif
+                        </div>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    @if(($pendingApprovals['print_jobs'] ?? 0) > 0)
+                        <a href="{{ route('print-jobs.index', ['status' => 'awaiting_approval']) }}" class="btn-header-white" style="background-color: #fff !important; color: #c2410c !important;">مراجعة طلبات الطباعة</a>
+                    @endif
+                    @if(($pendingApprovals['review_messages'] ?? 0) > 0)
+                        <a href="{{ route('print-monitor.index') }}" class="btn-header-white" style="background-color: #fff !important; color: #c2410c !important;">مراجعة طلبات الإرسال</a>
+                    @endif
+                </div>
+            </div>
+            @endif
+
             <div class="flex flex-wrap justify-center gap-4 mb-8">
                 <!-- Stat Card: Total -->
                 <a href="{{ route('messages.index') }}" class="mini-square-card">

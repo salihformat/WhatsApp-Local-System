@@ -46,6 +46,7 @@ class Message extends Model
         'error_message',
         'metadata',
         'last_retry_at',
+        'reminder_sent_at',
     ];
 
     public function conversation()
@@ -70,6 +71,7 @@ class Message extends Model
         'metadata' => 'array',
 
         'last_retry_at' => 'datetime',
+        'reminder_sent_at' => 'datetime',
 
     ];
 
@@ -81,6 +83,20 @@ class Message extends Model
     public function isSent(): bool
     {
         return in_array($this->status, ['sent', 'delivered', 'read']);
+    }
+
+    /**
+     * يستبعد فقاعات فارغة بلا أي محتوى فعلي (لا نص ولا ملف) — نتيجة خلل سابق كان يُنشئ رسالة واردة
+     * فارغة من حمولات تحديث حالة وصلت خطأً لمسار الرسائل الواردة بدل مسار الحالة المخصص (تم إصلاحه
+     * في MessageController::incomingMessage، لكن سجلات فارغة قد تكون تراكمت قبل الإصلاح). لا تُخفي
+     * أي رسالة نصية أو وسائط فعلية بصرف النظر عن حالتها.
+     */
+    public function scopeHasContent($query)
+    {
+        return $query->where(function ($q) {
+            $q->whereNotNull('message_text')->where('message_text', '!=', '')
+                ->orWhereNotNull('file_path');
+        });
     }
 
     public function isFailed(): bool

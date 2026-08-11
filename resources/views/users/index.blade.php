@@ -40,6 +40,7 @@
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الاسم</th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">البريد الإلكتروني</th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الدور</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider" title="هل يستلم هذا المستخدم محادثات جديدة عبر التوزيع التلقائي؟ راجع إعدادات توزيع المحادثات">التوزيع التلقائي 🛈</th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">تاريخ الإنشاء</th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الإجراءات</th>
                             </tr>
@@ -68,6 +69,15 @@
                                         @else
                                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">موظف خدمة عملاء</span>
                                         @endif
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <form action="{{ route('users.toggle-availability', $user) }}" method="POST" class="inline-flex items-center gap-1">
+                                            @csrf
+                                            <input type="checkbox" onchange="this.form.submit()" {{ $user->is_available_for_assignment ? 'checked' : '' }} title="متاح لاستلام محادثات جديدة تلقائياً">
+                                            <span class="text-xs {{ $user->is_available_for_assignment ? 'text-green-700 font-medium' : 'text-gray-400' }}">
+                                                {{ $user->is_available_for_assignment ? 'متاح' : 'غير متاح' }}
+                                            </span>
+                                        </form>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $user->created_at->diffForHumans() }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">

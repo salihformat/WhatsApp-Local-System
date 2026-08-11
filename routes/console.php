@@ -52,3 +52,9 @@ Schedule::command('local-system:sync-config')->hourly()->withoutOverlapping();
 
 // مراقبة حالة الطابعات (متصلة/ورق/حبر) وتنبيه عند تغيّر الحالة
 Schedule::command('monitor:printers')->everyTenMinutes()->withoutOverlapping();
+
+// تذكير المسؤول تلقائياً بطلبات الموافقة (طباعة/إرسال) المعلّقة منذ فترة طويلة بلا رد
+Schedule::command('printing:send-approval-reminders')->everyTenMinutes()->withoutOverlapping();
+
+// نسخ احتياطي يومي لقاعدة البيانات (mysqldump مضغوط)، مع حذف النسخ الأقدم من backup_retention_days
+Schedule::command('backup:database')->dailyAt('03:00')->withoutOverlapping();

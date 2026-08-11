@@ -59,9 +59,16 @@
                             <option value="thermal" disabled>حرارية / ملصقات (قريباً)</option>
                         </select>
                     </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">وضع الطباعة</label>
+                        <select name="print_mode" class="w-full rounded-md border-gray-300 shadow-sm">
+                            <option value="auto">تلقائي (يُطبع فوراً)</option>
+                            <option value="approval">يتطلب موافقة</option>
+                        </select>
+                    </div>
                     <div class="flex items-center gap-2">
                         <input type="checkbox" name="is_default" value="1" id="is_default_new" class="rounded border-gray-300">
-                        <label for="is_default_new" class="text-sm text-gray-700">طابعة افتراضية</label>
+                        <label for="is_default_new" class="text-sm text-gray-700" title="تُستخدم هذه الطابعة تلقائياً لطباعة أي ملف قابل للطباعة لا يُطابق أي قاعدة توجيه محددة في صفحة قواعد التوجيه (رقم جوال/كلمة مفتاحية/نوع ملف) — بلا هذا الخيار، أي ملف لا يُطابق قاعدة يبقى بلا طابعة ولا يُطبع إطلاقاً. طابعة واحدة فقط يمكن أن تكون افتراضية.">طابعة افتراضية 🛈</label>
                     </div>
                     <div>
                         <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 w-full">إضافة</button>
@@ -73,7 +80,24 @@
                         </label>
                     </div>
                 </form>
+                <p class="text-xs text-gray-500 mt-2">
+                    "يتطلب موافقة": لن يُطبع أي ملف مطابق لهذه الطابعة تلقائياً — يصل طلب لرقم
+                    <code>PRINTER_ALERT_PHONE</code> (المسؤول) عبر واتساب، ويوافَق عليه إما بزر من صفحة
+                    <a href="{{ route('print-jobs.index') }}" class="text-indigo-600 hover:underline">سجل عمليات الطباعة</a>
+                    أو بالرد على واتساب بـ "وافق طباعة &lt;رقم المهمة&gt;" أو "رفض طباعة &lt;رقم المهمة&gt;"
+                    (أو "ارسل لي الملف طباعة &lt;رقم المهمة&gt;" لمعاينته أولاً).
+                </p>
                 <p class="text-xs text-gray-500 mt-2">استخدم بالضبط الاسم كما يظهر في أمر <code>Get-Printer</code> على Windows.</p>
+                <p class="text-xs text-gray-500 mt-2">
+                    <strong>الطابعة الافتراضية:</strong> هي الطابعة التي تُستخدم تلقائياً لأي ملف قابل للطباعة وصل عبر واتساب ولم يُطابق أي
+                    <a href="{{ route('print-rules.index') }}" class="text-indigo-600 hover:underline">قاعدة توجيه</a>
+                    محددة (رقم جوال/كلمة مفتاحية/نوع ملف). بدون تعيين طابعة افتراضية، أي ملف لا يُطابق قاعدة صريحة يبقى بلا طباعة إطلاقاً. يمكن تعيين طابعة واحدة فقط كافتراضية في نفس الوقت — تفعيلها لطابعة يُلغيها تلقائياً من أي طابعة أخرى.
+                </p>
+                <p class="text-xs text-gray-500 mt-2">
+                    <strong>طباعة محلية مباشرة (بلا واتساب):</strong> ضع أي ملف داخل
+                    <code>{{ rtrim(config('app.monitor_folder_path'), '/\\') }}\print\&lt;اسم الطابعة&gt;\</code>
+                    وسيُطبع تلقائياً (أو ينتظر موافقة) حسب "وضع الطباعة" أعلاه لتلك الطابعة — المسار الدقيق لكل طابعة موضّح تحت اسمها في الجدول أدناه، ويُنشأ تلقائياً عند أول تشغيل لأمر <code>monitor:folder</code>.
+                </p>
             </div>
 
             <!-- قائمة الطابعات -->
@@ -84,20 +108,42 @@
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">الاسم</th>
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">اسم Windows</th>
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">النوع</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">افتراضية</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">وضع الطباعة</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase" title="الطابعة التي تُستخدم تلقائياً لأي ملف لا يُطابق أي قاعدة توجيه محددة">افتراضية 🛈</th>
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">مفعّلة</th>
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">تأكيد الطباعة للعميل</th>
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">حالة الطابعة</th>
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">عدد مهام الطباعة</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase" title="إجمالي الصفحات المطبوعة فعلياً — تقدير تقريبي لتخطيط استهلاك الحبر/الورق">الصفحات المطبوعة 🛈</th>
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">إجراءات</th>
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                         @forelse($printers as $printer)
                             <tr>
-                                <td class="px-6 py-4 whitespace-nowrap font-medium">{{ $printer->name }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap font-medium">
+                                    {{ $printer->name }}
+                                    <div class="text-xs text-gray-400 font-normal" title="مجلد الطباعة المحلية المباشرة لهذه الطابعة">
+                                        {{ app(\App\Services\PrintFolderManager::class)->printerFolderPath($printer) }}
+                                    </div>
+                                </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-gray-500">{{ $printer->windows_printer_name }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-gray-500">{{ $printer->type === 'document' ? 'مستندات' : 'حرارية' }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <form action="{{ route('printers.update', $printer) }}" method="POST" class="inline-flex items-center gap-1">
+                                        @csrf @method('PUT')
+                                        <input type="hidden" name="name" value="{{ $printer->name }}">
+                                        <input type="hidden" name="windows_printer_name" value="{{ $printer->windows_printer_name }}">
+                                        <input type="hidden" name="type" value="{{ $printer->type }}">
+                                        <input type="hidden" name="is_default" value="{{ $printer->is_default ? 1 : 0 }}">
+                                        <input type="hidden" name="is_active" value="{{ $printer->is_active ? 1 : 0 }}">
+                                        <input type="hidden" name="supports_status_check" value="{{ $printer->supports_status_check ? 1 : 0 }}">
+                                        <select name="print_mode" onchange="this.form.submit()" class="text-xs rounded-md border-gray-300 shadow-sm {{ $printer->print_mode === 'approval' ? 'text-orange-700 font-medium' : 'text-gray-600' }}" title="تلقائي: يُطبع فوراً. يتطلب موافقة: يُحجز الطلب حتى تُوافق عليه عبر لوحة التحكم أو رد واتساب.">
+                                            <option value="auto" {{ $printer->print_mode === 'auto' ? 'selected' : '' }}>تلقائي</option>
+                                            <option value="approval" {{ $printer->print_mode === 'approval' ? 'selected' : '' }}>يتطلب موافقة</option>
+                                        </select>
+                                    </form>
+                                </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <form action="{{ route('printers.update', $printer) }}" method="POST" class="inline-flex items-center gap-1">
                                         @csrf @method('PUT')
@@ -154,6 +200,7 @@
                                     @endif
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-gray-500">{{ $printer->print_jobs_count }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-gray-500">{{ number_format($printer->pages_printed) }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap space-x-2 space-x-reverse">
                                     <form action="{{ route('printers.check-now', $printer) }}" method="POST" class="inline">
                                         @csrf
@@ -186,7 +233,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="9" class="px-6 py-4 text-center text-gray-500">لا توجد طابعات مضافة بعد</td>
+                                <td colspan="11" class="px-6 py-4 text-center text-gray-500">لا توجد طابعات مضافة بعد</td>
                             </tr>
                         @endforelse
                     </tbody>

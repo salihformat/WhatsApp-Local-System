@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Message;
+use App\Models\PrintJob;
 use App\Jobs\SendMessageJob;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Artisan;
@@ -112,6 +113,14 @@ class DashboardController extends Controller
             }
         }
 
+        // 2.5 Fetch pending-approval counts (print jobs awaiting approval + monitor-folder files
+        // awaiting manual review before sending) — تظهر كتنبيه بارز في اللوحة الرئيسية حتى لا ينسى
+        // المسؤول طلباً معلّقاً لساعات لمجرد أنه لم يفتح صفحة الطباعة أو متابعة الإرسال بنفسه.
+        $pendingApprovals = [
+            'print_jobs' => PrintJob::where('status', 'awaiting_approval')->count(),
+            'review_messages' => Message::where('status', 'review_pending')->count(),
+        ];
+
         // 3. Fetch Recent Messages
         $messagesQuery = Message::query();
         if (!$isAdmin) {
@@ -181,7 +190,7 @@ class DashboardController extends Controller
             'all_running' => $queueRunning && $scheduleRunning
         ];
 
-        return view('dashboard', compact('stats', 'folderStats', 'recentMessages', 'chartData', 'serverStatus', 'servicesStatus'));
+        return view('dashboard', compact('stats', 'folderStats', 'recentMessages', 'chartData', 'serverStatus', 'servicesStatus', 'pendingApprovals'));
     }
 
     /**

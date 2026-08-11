@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Conversation;
+use App\Models\User;
 use App\Http\Requests\StoreMessageRequest;
+use App\Notifications\ConversationAssigned;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -61,6 +63,7 @@ class ConversationController extends Controller
 
         // Load messages with related user info if any (paginated, latest first, then reversed for display)
         $messages = $conversation->messages()
+            ->hasContent()
             ->with('user')
             ->orderBy('created_at', 'desc')
             ->paginate(50);
@@ -107,6 +110,19 @@ class ConversationController extends Controller
                 'user_id' => auth()->id(),
                 'properties' => ['assigned_to' => $request->assigned_to]
             ]);
+
+            // تنبيه الموظف الجديد المُعيَّن يدوياً — لا يُرسَل عند إلغاء التعيين (assigned_to = null)
+            // ولا لمن عيّن المحادثة لنفسه (لا داعي لتنبيه نفسك بإجراء قمت به للتو).
+            if ($request->assigned_to && (int) $request->assigned_to !== auth()->id()) {
+                $assignee = User::find($request->assigned_to);
+                if ($assignee) {
+                    $assignee->notify(new ConversationAssigned(
+                        $conversation,
+                        $conversation->lastMessage,
+                        auth()->user()->name . ' (يدوياً)'
+                    ));
+                }
+            }
         }
 
         return back()->with('success', 'تم تحديث تعيين المحادثة بنجاح.');
@@ -229,6 +245,7 @@ class ConversationController extends Controller
         
         // Get new messages
         $newMessages = $conversation->messages()
+            ->hasContent()
             ->with('user')
             ->where('id', '>', $lastMessageId)
             ->orderBy('created_at', 'asc')

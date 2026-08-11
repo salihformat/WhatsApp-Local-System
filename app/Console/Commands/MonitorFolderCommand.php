@@ -7,7 +7,11 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use App\Models\Contact;
 use App\Models\Message;
+use App\Models\Printer;
 use App\Jobs\SendMessageJob;
+use App\Services\PrintFolderManager;
+use App\Services\PrintJobDispatcher;
+use App\Services\PrintRuleEngine;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use Smalot\PdfParser\Parser as PdfParser;
@@ -212,8 +216,9 @@ class MonitorFolderCommand extends Command
             // من التسمية الصريحة أو رقم الملف المطابق لجهة اتصال — تُحجز للمراجعة اليدوية بدلاً من
             // الإرسال التلقائي، لتفادي تكرار حادثة إرسال ملف لرقم غير صحيح (قابلة للتخصيص من الإعدادات).
             $reviewRequiredSources = $this->getConfiguredList('PHONE_REVIEW_REQUIRED_SOURCES', ['unlabeled_fallback', 'corrupted_fallback', 'env_fallback']);
-            if (in_array($trace['source'], $reviewRequiredSources, true)) {
-                $this->warn("Phone number '{$phoneNumber}' for '{$filename}' extracted via low-confidence source '{$trace['source']}'. Holding for manual review instead of auto-sending.");
+            $requiresApproval = config('app.monitor_folder_require_approval') || in_array($trace['source'], $reviewRequiredSources, true);
+            if ($requiresApproval) {
+                $this->warn("Holding '{$filename}' for manual review before sending via WhatsApp (phone: {$phoneNumber}, reason: " . (config('app.monitor_folder_require_approval') ? 'approval required for all files' : "low-confidence source '{$trace['source']}'") . ').');
                 $this->holdForManualReview($filename, $extension, $fullPath, $reviewPath, $phoneNumber, $extractedFromFilename);
                 continue;
             }
@@ -291,6 +296,8 @@ class MonitorFolderCommand extends Command
                 // Dispatch the job asynchronously to prevent single-threaded server deadlock
                 dispatch(new SendMessageJob($message->id));
 
+                $this->dispatchLocalPrintIfMatched($message);
+
                 Log::info("Dispatched file from PrintMonitor to queue", [
                     'filename' => $filename,
                     'phone' => $phoneNumber,
@@ -313,6 +320,145 @@ class MonitorFolderCommand extends Command
         }
 
         $this->info("Scan complete. Processed {$processedCount} files.");
+
+        $this->scanPrintFolders();
+    }
+
+    /**
+     * يفحص مجلد الطباعة المستقل C:\PrintMonitor\print\<اسم الطابعة>\ لكل طابعة فعّالة — بلا أي علاقة
+     * بواتساب إطلاقاً (لا رقم جوال، لا رسالة). أي ملف يوضع مباشرة في مجلد طابعة معيّنة يُطبع عليها
+     * تلقائياً أو ينتظر موافقة حسب Printer::print_mode، بنفس آلية PrintJobDispatcher المستخدمة لطباعة
+     * مرفقات واتساب تماماً. يُنشئ مجلدات كل طابعة تلقائياً عند أول تشغيل عبر PrintFolderManager.
+     */
+    protected function scanPrintFolders(): void
+    {
+        if (!config('printing.enabled')) {
+            return;
+        }
+
+        $folderManager = app(PrintFolderManager::class);
+        $dispatcher = app(PrintJobDispatcher::class);
+        $allowedExtensions = array_map('trim', array_map('strtolower', config('printing.printable_extensions', ['pdf'])));
+        $maxSizeMb = config('app.files_max_size', 20480) / 1024;
+
+        foreach (Printer::active()->get() as $printer) {
+            $paths = $folderManager->ensureFolders($printer);
+
+            foreach (File::files($paths['inbox']) as $file) {
+                $filename = $file->getFilename();
+                if (str_starts_with($filename, '.')) {
+                    continue;
+                }
+
+                $extension = strtolower($file->getExtension());
+                $fullPath = $file->getPathname();
+
+                if (!in_array($extension, $allowedExtensions, true)) {
+                    $this->warn("Print folder for '{$printer->name}': skipping unsupported extension '{$filename}'.");
+                    $this->moveFileSafely($fullPath, $paths['failed'] . '/' . $filename);
+                    continue;
+                }
+
+                $fileSizeMb = $file->getSize() / (1024 * 1024);
+                if ($fileSizeMb > $maxSizeMb) {
+                    $this->warn("Print folder for '{$printer->name}': '{$filename}' exceeds max size ({$maxSizeMb}MB).");
+                    $this->moveFileSafely($fullPath, $paths['failed'] . '/' . $filename);
+                    continue;
+                }
+
+                $processingPath = $paths['processing'] . '/' . $filename;
+                if (!$this->moveFileSafely($fullPath, $processingPath)) {
+                    continue;
+                }
+
+                try {
+                    $printJob = $dispatcher->dispatchFromFile($processingPath, $filename, $this->getMimeTypeByExtension($extension), $printer, 'print_folder');
+
+                    $this->info($printJob->status === 'awaiting_approval'
+                        ? "🖨️ ⏸️ '{$filename}' بانتظار موافقة المسؤول (طابعة \"{$printer->name}\")."
+                        : "🖨️ '{$filename}' جارٍ طباعتها على \"{$printer->name}\".");
+
+                    Log::info('MonitorFolder: print-folder job dispatched', [
+                        'printer' => $printer->name,
+                        'print_job_id' => $printJob->id,
+                        'status' => $printJob->status,
+                        'file' => $filename,
+                    ]);
+                } catch (\Exception $e) {
+                    Log::error("MonitorFolder: failed to dispatch print-folder job for '{$filename}' (printer {$printer->name}): " . $e->getMessage());
+                    $this->moveFileSafely($processingPath, $paths['failed'] . '/' . $filename);
+                }
+            }
+        }
+    }
+
+    /**
+     * نقل ملف بأمان: يحذف المصدر إن كان الهدف موجوداً فعلاً بنفس الاسم (تفادي تعارض إعادة التشغيل)،
+     * وإلا ينقله فعلياً. يُعيد false ويسجّل الخطأ بدل رمي استثناء يوقف فحص بقية الملفات.
+     */
+    protected function moveFileSafely(string $from, string $to): bool
+    {
+        try {
+            if (File::exists($to)) {
+                File::delete($from);
+            } else {
+                File::move($from, $to);
+            }
+            return true;
+        } catch (\Exception $e) {
+            Log::error("MonitorFolder: failed to move file from '{$from}' to '{$to}': " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * إضافة إلى إرسال الملف عبر واتساب، يفحص قواعد التوجيه (نفس PrintRuleEngine المستخدم للمرفقات
+     * الواردة عبر واتساب) ليطبعه محلياً أيضاً إن طابقت إحدى القواعد (أو الطابعة الافتراضية) طابعة
+     * فعّالة. يحترم وضع الطابعة (تلقائي/يتطلب موافقة) عبر PrintJobDispatcher. لا يُفشل معالجة الملف
+     * أو إرساله عبر واتساب في حال تعذّر جدولة الطباعة.
+     */
+    protected function dispatchLocalPrintIfMatched(Message $message): void
+    {
+        if (!config('printing.enabled')) {
+            return;
+        }
+
+        try {
+            $printer = app(PrintRuleEngine::class)->resolvePrinter($message);
+            if (!$printer) {
+                return;
+            }
+
+            $printJob = app(PrintJobDispatcher::class)->dispatch($message, $printer, 'monitor_folder');
+
+            $this->info($printJob->status === 'awaiting_approval'
+                ? "🖨️ ⏸️ طلب طباعة لـ \"{$message->file_name}\" بانتظار موافقة المسؤول (طابعة \"{$printer->name}\")."
+                : "🖨️ تمت جدولة طباعة \"{$message->file_name}\" على طابعة \"{$printer->name}\".");
+
+            Log::info("MonitorFolder: local print job dispatched", [
+                'message_id' => $message->id,
+                'print_job_id' => $printJob->id,
+                'printer' => $printer->name,
+                'status' => $printJob->status,
+            ]);
+        } catch (\Exception $e) {
+            Log::error("MonitorFolder: failed to dispatch local print job for message {$message->id}: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * إبلاغ المسؤول (رقم printing.alert_phone_number، نفس رقم تنبيهات الطباعة) عبر واتساب بملف
+     * بانتظار موافقته قبل إرساله، مع تعليمات الرد النصي البسيط للموافقة/الرفض — النظام لا يدعم أزرار
+     * تفاعلية حتى الآن (راجع MessageController::handleAdminCommand لمعالجة الرد).
+     */
+    protected function notifyAdminForSendApproval(Message $message): void
+    {
+        if (empty(app(\App\Services\AdminNotifier::class)->phones())) {
+            Log::warning("MonitorFolder: message {$message->id} needs send approval but no printing.alert_phone_number configured — it will remain stuck until approved manually from /print-monitor.");
+            return;
+        }
+
+        app(\App\Services\MonitorFolderReviewService::class)->notifyAdminForApproval($message);
     }
 
     /**
@@ -361,13 +507,15 @@ class MonitorFolderCommand extends Command
                 File::move($fullPath, $reviewFile);
             }
 
-            Log::info("Held file from PrintMonitor for manual review (low-confidence phone extraction)", [
+            Log::info("Held file from PrintMonitor for manual review", [
                 'filename' => $filename,
                 'phone' => $phoneNumber,
                 'message_id' => $message->id,
             ]);
 
             $this->warn("⏸️ File held for manual review: {$filename} (phone: {$phoneNumber})");
+
+            $this->notifyAdminForSendApproval($message);
         } catch (\Exception $e) {
             $this->error("Failed to hold file {$filename} for review: " . $e->getMessage());
             Log::error("PrintMonitor Error (holdForManualReview): " . $e->getMessage());

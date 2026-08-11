@@ -39,6 +39,8 @@ class UpdateSettingRequest extends FormRequest
             'PRINTING_REPLY_STATUS_TO_SENDER' => 'nullable|in:true,false',
             'PRINTING_REPLY_ACK_ON_RECEIPT' => 'nullable|in:true,false',
             'PRINTING_NOTIFY_OWNER_ON_JOB_FAILURE' => 'nullable|in:true,false',
+            'CONVERSATION_DISTRIBUTION_MODE' => 'nullable|in:manual,specific,all',
+            'CONVERSATION_DISTRIBUTION_USER_IDS' => 'nullable|string|max:255',
         ];
     }
 }

@@ -482,6 +482,57 @@ stdout_logfile=/path-to-your-project/storage/logs/worker.log</pre>
                                 <p class="text-sm">بعدها من موقع Cloudflare، قم بتوجيه النفق (Service) إلى <code class="bg-gray-100 dark:bg-gray-600 px-1 rounded">http://localhost:8006</code> وسيعمل الرابط بشكل دائم وثابت!</p>
                             </div>
                         </section>
+
+                        <section class="mb-10">
+                            <h2 class="text-2xl font-semibold mb-4 border-b pb-2">13. تحديثات أخيرة: موافقة الطباعة والإرسال + مجلد طباعة مستقل لكل طابعة</h2>
+                            <p class="mb-4">ثلاث إضافات مترابطة، هدفها إعطاء المسؤول تحكماً كاملاً في أي طباعة/إرسال يحدث تلقائياً بلا مراجعة بشرية، مع إبقاء الوضع الحالي (تلقائي بالكامل) كافتراضي بلا أي تغيير في السلوك ما لم تُفعّلها بنفسك.</p>
+
+                            <div class="space-y-6">
+                                <div class="bg-gray-50 dark:bg-gray-700 p-5 rounded-lg border-r-4 border-purple-500">
+                                    <h3 class="text-lg font-bold mb-2 text-[#f53003]">1. وضع الطباعة لكل طابعة: تلقائي أو يتطلب موافقة</h3>
+                                    <p class="text-sm mb-2">من صفحة "الطابعات"، لكل طابعة عمود جديد "وضع الطباعة" بقيمتين:</p>
+                                    <ul class="list-disc list-inside text-sm space-y-1 mr-4">
+                                        <li><strong>تلقائي</strong> (الافتراضي، نفس السلوك القديم): يُطبع أي ملف مطابق فوراً بلا أي تدخل.</li>
+                                        <li><strong>يتطلب موافقة</strong>: أي طلب طباعة يُطابق هذه الطابعة (سواء عبر مرفق واتساب أو مجلد الطباعة المستقل، البند 3 أدناه) يُحجز بحالة "بانتظار الموافقة" في صفحة "سجل عمليات الطباعة"، ولا يُطبع إلا بعد موافقة صريحة.</li>
+                                    </ul>
+                                    <p class="text-sm mt-2">مفيد لطابعات تستهلك مستلزمات مكلفة (حبر ملون، ورق خاص) أو ذات صلاحية وصول حساسة تريد مراجعة كل طلب لها يدوياً.</p>
+                                </div>
+
+                                <div class="bg-gray-50 dark:bg-gray-700 p-5 rounded-lg border-r-4 border-orange-500">
+                                    <h3 class="text-lg font-bold mb-2 text-[#f53003]">2. الموافقة على طلبات الطباعة</h3>
+                                    <p class="text-sm mb-2">عند حجز طلب طباعة بانتظار الموافقة، يصل إشعار واتساب فوري لرقم <code class="bg-white dark:bg-gray-800 px-1">PRINTER_ALERT_PHONE</code> (نفس رقم تنبيهات صحة الطابعات) بتفاصيل الطلب (رقم المهمة، المصدر، اسم الملف، الطابعة). الموافقة تتم بأحد طريقتين:</p>
+                                    <ul class="list-disc list-inside text-sm space-y-1 mr-4">
+                                        <li>زرّي "موافقة" / "رفض" في صفحة "سجل عمليات الطباعة" أمام أي مهمة بحالة "بانتظار الموافقة".</li>
+                                        <li>الرد على رسالة الإشعار عبر واتساب من نفس رقم <code class="bg-white dark:bg-gray-800 px-1">PRINTER_ALERT_PHONE</code> بأحد النصوص التالية (النظام لا يدعم أزرار تفاعلية حالياً، فقط رد نصي عادي):
+                                            <ul class="list-disc list-inside mr-6 mt-1 space-y-1">
+                                                <li><code class="bg-white dark:bg-gray-800 px-1" dir="ltr">وافق طباعة &lt;رقم المهمة&gt;</code> — تنفّذ الطباعة فوراً.</li>
+                                                <li><code class="bg-white dark:bg-gray-800 px-1" dir="ltr">رفض طباعة &lt;رقم المهمة&gt;</code> — تُلغى دون طباعة.</li>
+                                                <li><code class="bg-white dark:bg-gray-800 px-1" dir="ltr">ارسل لي الملف طباعة &lt;رقم المهمة&gt;</code> — يصلك الملف نفسه عبر واتساب لمعاينته قبل اتخاذ القرار.</li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </div>
+
+                                <div class="bg-gray-50 dark:bg-gray-700 p-5 rounded-lg border-r-4 border-blue-500">
+                                    <h3 class="text-lg font-bold mb-2 text-[#f53003]">3. مجلد طباعة مستقل لكل طابعة (بلا أي علاقة بواتساب)</h3>
+                                    <p class="text-sm mb-2">بالإضافة لمجلد المراقبة الرئيسي (القسم 6، الذي يستخرج رقم جوال ويرسل الملف عبر واتساب)، توجد الآن مجلدات فرعية مخصصة للطباعة المحلية المباشرة فقط — بلا أي حاجة لرقم جوال أو إرسال واتساب إطلاقاً:</p>
+                                    <pre class="bg-gray-900 text-gray-100 p-3 rounded dir-ltr mb-2">C:\PrintMonitor\print\&lt;اسم الطابعة&gt;\</pre>
+                                    <p class="text-sm mb-2">تُنشأ هذه المجلدات تلقائياً لكل طابعة مفعّلة عند أول تشغيل لأمر <code class="bg-white dark:bg-gray-800 px-1">monitor:folder</code> (تجدها أيضاً موضّحة تحت اسم كل طابعة في صفحة "الطابعات"). أي ملف يوضع مباشرة في مجلد طابعة معيّنة يُطبع عليها تلقائياً أو ينتظر موافقة، حسب "وضع الطباعة" الخاص بها (البند 1 أعلاه) — بنفس آلية الموافقة والأوامر النصية في البند 2. لكل طابعة 4 مجلدات فرعية تُدار تلقائياً: الجذر (ضع الملف هنا)، <code class="bg-white dark:bg-gray-800 px-1">processing</code> (قيد المعالجة/الانتظار)، <code class="bg-white dark:bg-gray-800 px-1">archive</code> (طُبعت بنجاح)، <code class="bg-white dark:bg-gray-800 px-1">failed</code> (فشلت أو رُفضت).</p>
+                                </div>
+
+                                <div class="bg-gray-50 dark:bg-gray-700 p-5 rounded-lg border-r-4 border-green-500">
+                                    <h3 class="text-lg font-bold mb-2 text-[#f53003]">4. موافقة على إرسال واتساب من مجلد المراقبة الرئيسي</h3>
+                                    <p class="text-sm mb-2">بشكل مستقل تماماً عن موافقة الطباعة أعلاه، يمكن أيضاً فرض موافقة قبل إرسال أي ملف من مجلد المراقبة الرئيسي (<code class="bg-white dark:bg-gray-800 px-1">C:\PrintMonitor</code>) عبر واتساب — لا فقط الحالات منخفضة الثقة (القسم 4، البند 1) بل كل الملفات. يُفعَّل بضبط <code class="bg-white dark:bg-gray-800 px-1">MONITOR_FOLDER_REQUIRE_APPROVAL=true</code> في <code class="bg-white dark:bg-gray-800 px-1">.env</code> (الافتراضي <code class="bg-white dark:bg-gray-800 px-1">false</code> = إرسال تلقائي كالمعتاد).</p>
+                                    <p class="text-sm mb-2">عند تفعيله، يصل إشعار واتساب لنفس رقم <code class="bg-white dark:bg-gray-800 px-1">PRINTER_ALERT_PHONE</code>، والموافقة إما بزر من صفحة "متابعة الإرسال" أو برد نصي مشابه للبند 2 لكن بكلمة "ارسال" بدل "طباعة":</p>
+                                    <ul class="list-disc list-inside text-sm space-y-1 mr-4">
+                                        <li><code class="bg-white dark:bg-gray-800 px-1" dir="ltr">وافق ارسال &lt;رقم الرسالة&gt;</code></li>
+                                        <li><code class="bg-white dark:bg-gray-800 px-1" dir="ltr">رفض ارسال &lt;رقم الرسالة&gt;</code></li>
+                                        <li><code class="bg-white dark:bg-gray-800 px-1" dir="ltr">ارسل لي الملف ارسال &lt;رقم الرسالة&gt;</code> — لمعاينته أولاً</li>
+                                    </ul>
+                                    <p class="text-xs text-gray-500 mt-2">كلمة النوع ("طباعة" أو "ارسال") إلزامية دوماً في كل الأوامر أعلاه — لأن ترقيم مهام الطباعة ورسائل مجلد المراقبة مستقلان تماماً (كلاهما يبدأ من 1)، فبدون تحديد النوع يصعب تمييز أي جدول يقصده الرقم.</p>
+                                </div>
+                            </div>
+                        </section>
                     </div>
                 </div>
             </div>

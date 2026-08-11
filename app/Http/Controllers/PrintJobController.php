@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Jobs\ProcessPrintJob;
 use App\Models\PrintJob;
+use App\Services\PrintJobDispatcher;
 use Illuminate\Http\Request;
 
 class PrintJobController extends Controller
@@ -53,7 +54,7 @@ class PrintJobController extends Controller
             "Expires"             => "0"
         ];
 
-        $columns = ['رقم المهمة', 'رقم الجوال', 'اسم الملف', 'اسم الطابعة', 'الحالة', 'المحاولات', 'وقت الوصول', 'وقت الطباعة', 'المدة', 'رسالة الخطأ'];
+        $columns = ['رقم المهمة', 'رقم الجوال', 'اسم الملف', 'اسم الطابعة', 'الحالة', 'المحاولات', 'الصفحات', 'وقت الوصول', 'وقت الطباعة', 'المدة', 'رسالة الخطأ'];
 
         $callback = function() use($printJobs, $columns) {
             $file = fopen('php://output', 'w');
@@ -66,9 +67,11 @@ class PrintJobController extends Controller
             foreach ($printJobs as $job) {
                 $statusLabels = [
                     'pending' => 'قيد الانتظار',
+                    'awaiting_approval' => 'بانتظار الموافقة',
                     'printing' => 'جارٍ الطباعة',
                     'completed' => 'مكتملة',
                     'failed' => 'فشلت',
+                    'rejected' => 'مرفوضة',
                 ];
 
                 $row = [
@@ -78,6 +81,7 @@ class PrintJobController extends Controller
                     $job->printer?->name ?? '',
                     $statusLabels[$job->status] ?? $job->status,
                     $job->attempts,
+                    $job->pages ?? '',
                     $job->created_at ? $job->created_at->format('Y-m-d H:i:s') : '',
                     $job->printed_at ? $job->printed_at->format('Y-m-d H:i:s') : '',
                     $job->duration_for_humans ?? '',
@@ -104,5 +108,33 @@ class PrintJobController extends Controller
         dispatch(new ProcessPrintJob($printJob->id));
 
         return redirect()->back()->with('success', 'تمت إعادة جدولة مهمة الطباعة');
+    }
+
+    public function approve(PrintJob $printJob, PrintJobDispatcher $dispatcher)
+    {
+        if (!$dispatcher->approve($printJob)) {
+            return redirect()->back()->with('error', 'هذه المهمة ليست بانتظار الموافقة حالياً.');
+        }
+
+        return redirect()->back()->with('success', "تمت الموافقة، جارٍ طباعة \"{$printJob->file_name}\" الآن.");
+    }
+
+    public function reject(PrintJob $printJob, PrintJobDispatcher $dispatcher)
+    {
+        if (!$dispatcher->reject($printJob, 'تم الرفض من قبل ' . (auth()->user()->name ?? 'مستخدم') . ' من لوحة التحكم.')) {
+            return redirect()->back()->with('error', 'هذه المهمة ليست بانتظار الموافقة حالياً.');
+        }
+
+        return redirect()->back()->with('success', "تم رفض طباعة \"{$printJob->file_name}\".");
+    }
+
+    public function approveAll(Request $request, PrintJobDispatcher $dispatcher)
+    {
+        $printerId = $request->filled('printer_id') ? (int) $request->input('printer_id') : null;
+        $count = $dispatcher->approveAll($printerId);
+
+        return redirect()->back()->with($count > 0 ? 'success' : 'info', $count > 0
+            ? "تمت الموافقة على {$count} مهمة طباعة."
+            : 'لا توجد مهام بانتظار الموافقة حالياً.');
     }
 }

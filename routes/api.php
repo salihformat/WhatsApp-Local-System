@@ -22,6 +22,11 @@ Route::middleware([\App\Http\Middleware\VerifyWebhookToken::class])->group(funct
     Route::post('/webhook/status_update', [MessageController::class, 'updateStatus']); // لدعم المسار التلقائي
     Route::post('/webhook/ping', [MessageController::class, 'updateStatus']); // مسار اختبار الاتصال القديم
     Route::post('/webhook/incoming_message', [MessageController::class, 'incomingMessage']);
+    // [Fix] كان النظام المركزي يبني رابط كل حدث تلقائياً من اسمه (eventType)، وهذان الحدثان
+    // (تعديل/حذف رسالة عبر واتساب) لم يكن لهما مسار مطابق هنا إطلاقاً فيفشلان بخطأ 404 صامت —
+    // راجع WhatsAppMessaging (النظام المركزي): app/Jobs/ForwardWebhookToCompanyJob.php.
+    Route::post('/webhook/message_edited', [MessageController::class, 'messageEdited']);
+    Route::post('/webhook/message_deleted', [MessageController::class, 'messageDeleted']);
 });
 
 // مسارات محمية بتوكن API + Rate Limiting

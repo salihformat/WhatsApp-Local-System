@@ -19,12 +19,36 @@
                     {{ session('error') }}
                 </div>
             @endif
+            @if(session('info'))
+                <div class="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded relative">{{ session('info') }}</div>
+            @endif
+
+            <div class="flex justify-end">
+                <form action="{{ route('print-monitor.approve-all') }}" method="POST" onsubmit="return confirm('هل أنت متأكد من الموافقة على كل الملفات المعلّقة حالياً؟');">
+                    @csrf
+                    <button type="submit" class="text-green-700 hover:text-green-900 bg-green-50 hover:bg-green-100 px-4 py-2 rounded-md transition-colors border border-green-200 text-sm font-medium">
+                        موافقة على كل الملفات المعلّقة
+                    </button>
+                </form>
+            </div>
 
             @unless($folderExists)
                 <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
                     المجلد <code>{{ $folderPath }}</code> غير موجود حالياً — سيُنشأ تلقائياً عند أول تشغيل لأمر <code>monitor:folder</code>.
                 </div>
             @endunless
+
+            @if(config('app.monitor_folder_require_approval'))
+                <div class="bg-orange-50 border border-orange-300 text-orange-800 px-4 py-3 rounded relative text-sm">
+                    ⏸️ "موافقة قبل الإرسال" مفعّلة لكل ملفات هذا المجلد (<code>MONITOR_FOLDER_REQUIRE_APPROVAL=true</code>) — لن يُرسل أي ملف عبر واتساب تلقائياً، بل يصل طلب موافقة لرقم المسؤول ويظهر هنا بقسم "بانتظار المراجعة" أدناه.
+                    وافِق عبر الزر أدناه أو برد واتساب "وافق ارسال &lt;رقم الرسالة&gt;" / "رفض ارسال &lt;رقم الرسالة&gt;"
+                    (أو "ارسل لي الملف ارسال &lt;رقم الرسالة&gt;" لمعاينته أولاً).
+                </div>
+            @else
+                <div class="bg-gray-50 border border-gray-200 text-gray-600 px-4 py-3 rounded relative text-sm">
+                    الإرسال التلقائي مفعّل لهذا المجلد — تُرسل الملفات فور استخراج رقم جوال بثقة كافية. لتفعيل موافقة إلزامية على كل ملف قبل إرساله، اضبط <code>MONITOR_FOLDER_REQUIRE_APPROVAL=true</code> في <code>.env</code>.
+                </div>
+            @endif
 
             <!-- بطاقات ملخّص -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">

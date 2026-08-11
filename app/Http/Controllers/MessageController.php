@@ -9,6 +9,7 @@ use App\Models\PrintJob;
 use App\Jobs\SendMessageJob;
 use App\Jobs\ProcessPrintJob;
 use App\Services\FileTypeResolver;
+use App\Services\PrintJobDispatcher;
 use App\Services\PrintRuleEngine;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -416,6 +417,172 @@ class MessageController extends Controller
     }
 
     /**
+     * يعترض ردود واتساب من أي رقم مسؤول مُعدّ (printing.alert_phone_number، يدعم أكثر من رقم مفصولة
+     * بفواصل عبر AdminNotifier) بدل معالجتها كرسالة عادية واردة:
+     * - "وافق طباعة <رقم>" / "رفض طباعة <رقم>": لمهام طباعة بانتظار الموافقة (Printer::print_mode = approval)
+     * - "وافق ارسال <رقم>" / "رفض ارسال <رقم>": لملفات مجلد المراقبة بانتظار الموافقة قبل إرسالها عبر
+     *   واتساب (app.monitor_folder_require_approval)
+     * - "ارسل لي الملف طباعة <رقم>" / "ارسل لي الملف ارسال <رقم>": معاينة الملف الفعلي قبل اتخاذ القرار
+     * - "وافق الكل طباعة" / "وافق الكل ارسال": موافقة جماعية على كل الطلبات المعلّقة من نفس النوع
+     * كلمة النوع (طباعة/ارسال) إلزامية في الكل لتفادي التباس رقم المهمة بين الجدولين (كلاهما يبدأ
+     * ترقيمه من 1). يُعيد استجابة JSON إن كانت الرسالة أمراً صالحاً وتمت معالجته، أو null لمتابعة
+     * المسار الاعتيادي لأي رسالة أخرى (بما فيها رسائل عادية من رقم مسؤول لا تطابق أي نمط).
+     */
+    private function handleAdminCommand(string $senderPhone, string $messageBody)
+    {
+        if (!app(\App\Services\AdminNotifier::class)->isAdmin($senderPhone)) {
+            return null;
+        }
+
+        // الرد يذهب دوماً لنفس الرقم الذي أرسل الأمر (لا لكل أرقام المسؤولين) — لتفادي إزعاج بقية
+        // المسؤولين بتأكيد إجراء لم يقوموا به هم أنفسهم.
+        $replyTo = $this->formatPhoneNumber($senderPhone);
+        $body = trim($messageBody);
+
+        if (preg_match('/^\s*وافق\s+الكل\s+(طباعة|ارسال)\s*$/u', $body, $matches)) {
+            $type = $matches[1];
+            $count = $type === 'طباعة'
+                ? app(PrintJobDispatcher::class)->approveAll()
+                : app(\App\Services\MonitorFolderReviewService::class)->approveAllPending();
+
+            $this->replyToAdmin($replyTo, $count > 0
+                ? "✅ تمت الموافقة على {$count} طلب" . ($type === 'طباعة' ? ' طباعة' : ' إرسال') . " بانتظار الموافقة."
+                : 'لا توجد طلبات بانتظار الموافقة حالياً.');
+            return response()->json(['success' => true, 'handled' => 'admin_command']);
+        }
+
+        if (preg_match('/^\s*ارسل(?:\s+لي)?\s+الملف\s+(طباعة|ارسال)\s+(\d+)\s*$/u', $body, $matches)) {
+            [, $type, $id] = $matches;
+            $this->sendFileToAdmin($replyTo, $type, (int) $id);
+            return response()->json(['success' => true, 'handled' => 'admin_command']);
+        }
+
+        if (preg_match('/^\s*(وافق|رفض)\s+(طباعة|ارسال)\s+(\d+)\s*$/u', $body, $matches)) {
+            [, $action, $type, $id] = $matches;
+            $approve = $action === 'وافق';
+
+            $reply = $type === 'طباعة'
+                ? $this->handlePrintJobApproval((int) $id, $approve)
+                : $this->handleSendApproval((int) $id, $approve);
+
+            $this->replyToAdmin($replyTo, $reply);
+            return response()->json(['success' => true, 'handled' => 'admin_command']);
+        }
+
+        return null;
+    }
+
+    /**
+     * يرسل نسخة من الملف الفعلي المرتبط بطلب موافقة (طباعة أو إرسال) لمن طلب المعاينة، ليعاينه قبل
+     * أن يقرر الموافقة أو الرفض — بدل الاعتماد فقط على اسم الملف الظاهر في نص الإشعار.
+     */
+    private function sendFileToAdmin(string $replyTo, string $type, int $id): void
+    {
+        if ($type === 'طباعة') {
+            $printJob = PrintJob::find($id);
+            if (!$printJob) {
+                $this->replyToAdmin($replyTo, "⚠️ لم يتم العثور على مهمة طباعة برقم {$id}.");
+                return;
+            }
+            // بعد الموافقة تُستبدل file_path بمسار محلي على القرص (راجع ProcessPrintJob::ensureLocalFile)
+            // غير صالح كرابط لإرساله عبر واتساب — المعاينة مفيدة فقط قبل اتخاذ القرار.
+            if ($printJob->status !== 'awaiting_approval') {
+                $this->replyToAdmin($replyTo, "⚠️ مهمة الطباعة رقم {$id} لم تعد بانتظار الموافقة (حالتها الحالية: {$printJob->status})، تعذّرت معاينتها.");
+                return;
+            }
+            $fileName = $printJob->file_name;
+            $filePath = $printJob->file_path;
+            $fileType = $printJob->file_type;
+        } else {
+            $message = Message::find($id);
+            if (!$message) {
+                $this->replyToAdmin($replyTo, "⚠️ لم يتم العثور على رسالة برقم {$id}.");
+                return;
+            }
+            $fileName = $message->file_name;
+            $filePath = $message->file_path;
+            $fileType = $message->file_type;
+        }
+
+        if (empty($filePath)) {
+            $this->replyToAdmin($replyTo, "⚠️ لا يوجد ملف مرتبط بهذا الطلب.");
+            return;
+        }
+
+        try {
+            $preview = Message::create([
+                'phone_number' => $replyTo,
+                'file_name' => $fileName,
+                'file_path' => $filePath,
+                'file_type' => $fileType,
+                'message_type' => 'media',
+                'status' => 'pending',
+                'metadata' => ['source' => 'admin_file_preview'],
+            ]);
+
+            dispatch(new SendMessageJob($preview->id));
+        } catch (\Exception $e) {
+            Log::error('Failed to send file preview to admin', ['error' => $e->getMessage()]);
+            $this->replyToAdmin($replyTo, '⚠️ تعذّر إرسال الملف: ' . $e->getMessage());
+        }
+    }
+
+    private function handlePrintJobApproval(int $printJobId, bool $approve): string
+    {
+        $printJob = PrintJob::with(['printer', 'message'])->find($printJobId);
+        if (!$printJob) {
+            return "⚠️ لم يتم العثور على مهمة طباعة برقم {$printJobId}.";
+        }
+
+        $dispatcher = app(PrintJobDispatcher::class);
+        $ok = $approve
+            ? $dispatcher->approve($printJob)
+            : $dispatcher->reject($printJob, 'تم الرفض عبر رد واتساب من المسؤول.');
+
+        if (!$ok) {
+            return "⚠️ مهمة الطباعة رقم {$printJob->id} ليست بانتظار الموافقة حالياً (حالتها الحالية: {$printJob->status}).";
+        }
+
+        return $approve
+            ? "✅ تمت الموافقة، جارٍ طباعة \"{$printJob->file_name}\" الآن."
+            : "🚫 تم رفض طباعة \"{$printJob->file_name}\".";
+    }
+
+    private function handleSendApproval(int $messageId, bool $approve): string
+    {
+        $message = Message::find($messageId);
+        if (!$message) {
+            return "⚠️ لم يتم العثور على رسالة برقم {$messageId}.";
+        }
+
+        $review = app(\App\Services\MonitorFolderReviewService::class);
+        $result = $approve
+            ? $review->approve($message)
+            : $review->reject($message, 'رد واتساب من المسؤول');
+
+        return ($approve ? ($result['success'] ? '✅ ' : '⚠️ ') : ($result['success'] ? '🚫 ' : '⚠️ ')) . $result['message'];
+    }
+
+    /**
+     * رد نصي مباشر لرقم المسؤول (تأكيد تنفيذ أمر الموافقة/الرفض)، بمعزل عن أي محادثة/جهة اتصال عادية.
+     */
+    private function replyToAdmin(string $adminPhone, string $text): void
+    {
+        try {
+            $reply = Message::create([
+                'phone_number' => $adminPhone,
+                'message_text' => $text,
+                'message_type' => 'text',
+                'status' => 'pending',
+            ]);
+
+            dispatch(new SendMessageJob($reply->id));
+        } catch (\Exception $e) {
+            Log::error('Failed to send print approval confirmation reply to admin', ['error' => $e->getMessage()]);
+        }
+    }
+
+    /**
      * فحص القواعد وإرسال الرسالة الواردة للطباعة الآلية إن طابقت طابعة (نظام Smart Printing)
      */
     private function dispatchPrintJobIfMatched(Message $message): void
@@ -429,23 +596,7 @@ class MessageController extends Controller
             return;
         }
 
-        // [Fix 2026-08-06] عمود file_name غير قابل للـ NULL في قاعدة البيانات، بينما صور واتساب
-        // تصل دوماً بلا اسم ملف (راجع FileTypeResolver) — فيفشل الإدراج بخطأ قيد قاعدة بيانات.
-        // نولّد اسماً افتراضياً مقروءاً بالامتداد الصحيح بدل تمرير null.
-        $extension = FileTypeResolver::resolveExtension($message->file_name, $message->file_path, $message->file_type, 'pdf');
-        $fileName = $message->file_name ?: "ملف_{$message->id}.{$extension}";
-
-        $printJob = PrintJob::create([
-            'message_id' => $message->id,
-            'printer_id' => $printer->id,
-            'file_name' => $fileName,
-            'file_path' => $message->file_path,
-            'file_type' => $message->file_type,
-            'status' => 'pending',
-            'source' => 'whatsapp_incoming',
-        ]);
-
-        dispatch(new ProcessPrintJob($printJob->id));
+        $printJob = app(PrintJobDispatcher::class)->dispatch($message, $printer, 'whatsapp_incoming');
 
         Log::info("Print job dispatched for incoming message {$message->id}", [
             'printer' => $printer->name,
@@ -467,10 +618,14 @@ class MessageController extends Controller
         }
 
         try {
+            $ackText = $printJob->status === 'awaiting_approval'
+                ? "📥 تم استلام طلب طباعة ملفك \"{$sourceMessage->file_name}\"، بانتظار موافقة المسؤول قبل الطباعة."
+                : "📥 تم استلام طلب طباعة ملفك \"{$sourceMessage->file_name}\" وجاري تنفيذه الآن...";
+
             $ack = Message::create([
                 'conversation_id' => $sourceMessage->conversation_id,
                 'phone_number' => $sourceMessage->phone_number,
-                'message_text' => "📥 تم استلام طلب طباعة ملفك \"{$sourceMessage->file_name}\" وجاري تنفيذه الآن...",
+                'message_text' => $ackText,
                 'message_type' => 'text',
                 'status' => 'pending',
                 'metadata' => ['source' => 'print_status_reply', 'print_job_id' => $printJob->id],
@@ -621,6 +776,95 @@ class MessageController extends Controller
     }
 
     /**
+     * Webhook: العميل عدّل رسالة سبق إرسالها عبر واتساب (ميزة تعديل الرسائل في واتساب).
+     * ⚠️ محمي - يتطلب توكن صحيح
+     */
+    public function messageEdited(Request $request)
+    {
+        $data = $request->input('data') ?? $request->all();
+
+        $providerMessageId = $data['message_id'] ?? null;
+        $newBody = $data['new_body'] ?? null;
+
+        if (empty($providerMessageId) || $newBody === null) {
+            Log::info('MessageEdited webhook: ignored incomplete payload', ['data' => $data]);
+            return response()->json(['success' => true, 'message' => 'Ignored incomplete payload']);
+        }
+
+        $message = Message::where('central_message_id', $providerMessageId)
+            ->where('is_incoming', true)
+            ->first();
+
+        if (!$message) {
+            Log::info('MessageEdited webhook: original message not found locally, ignored', [
+                'provider_message_id' => $providerMessageId,
+            ]);
+            return response()->json(['success' => true, 'message' => 'Message not found locally']);
+        }
+
+        // نحتفظ بالنص الأصلي (قد يكون أكثر من تعديل واحد) للتدقيق، ونستبدل النص المعروض بالحالي.
+        $metadata = $message->metadata ?? [];
+        $metadata['edit_history'][] = [
+            'previous_text' => $message->message_text,
+            'edited_at' => now()->toDateTimeString(),
+        ];
+
+        $message->update([
+            'message_text' => $newBody,
+            'metadata' => $metadata,
+        ]);
+
+        Log::info("Message {$message->id} edited via webhook", ['provider_message_id' => $providerMessageId]);
+
+        return response()->json(['success' => true, 'message_id' => $message->id]);
+    }
+
+    /**
+     * Webhook: العميل حذف رسالة سبق إرسالها عبر واتساب (حذف من الطرفين). نستبدل المحتوى المعروض
+     * برسالة توضيحية (بنفس اتفاقية واتساب نفسها) بدل حذف السجل فعلياً، مع الاحتفاظ بالنص/الملف
+     * الأصليين في metadata للتدقيق عند الحاجة.
+     * ⚠️ محمي - يتطلب توكن صحيح
+     */
+    public function messageDeleted(Request $request)
+    {
+        $data = $request->input('data') ?? $request->all();
+
+        $providerMessageId = $data['message_id'] ?? null;
+
+        if (empty($providerMessageId)) {
+            Log::info('MessageDeleted webhook: ignored incomplete payload', ['data' => $data]);
+            return response()->json(['success' => true, 'message' => 'Ignored incomplete payload']);
+        }
+
+        $message = Message::where('central_message_id', $providerMessageId)
+            ->where('is_incoming', true)
+            ->first();
+
+        if (!$message) {
+            Log::info('MessageDeleted webhook: original message not found locally, ignored', [
+                'provider_message_id' => $providerMessageId,
+            ]);
+            return response()->json(['success' => true, 'message' => 'Message not found locally']);
+        }
+
+        $metadata = $message->metadata ?? [];
+        $metadata['deleted_by_sender'] = true;
+        $metadata['deleted_at'] = now()->toDateTimeString();
+        $metadata['original_text'] = $message->message_text;
+        $metadata['original_file_path'] = $message->file_path;
+
+        $message->update([
+            'message_text' => '🚫 تم حذف هذه الرسالة',
+            'file_path' => null,
+            'metadata' => $metadata,
+        ]);
+
+        Log::info("Message {$message->id} deleted via webhook", ['provider_message_id' => $providerMessageId]);
+
+        return response()->json(['success' => true, 'message_id' => $message->id]);
+    }
+
+    /**
      * استلام رسالة واردة من النظام المركزي
      */
     public function incomingMessage(Request $request)
@@ -641,6 +885,21 @@ class MessageController extends Controller
             return response()->json(['error' => 'Invalid data', 'details' => $validator->errors()], 400);
         }
 
+        // [Fix] لوحظ فعلياً أن النظام المركزي يُرسل أحياناً تحديثات حالة رسائل صادرة (تم التسليم/تمت
+        // القراءة) على مسار الرسائل الواردة incoming_message بدل مسار الحالة webhook/status المخصص —
+        // هذه الحمولة تحمل sender_phone (رقم العميل) وحقل status، لكن بلا أي محتوى فعلي (message_body
+        // فارغ ولا يوجد media_url)، فكانت تُنشئ رسالة واردة فارغة تظهر كفقاعة دردشة بلا محتوى في
+        // صفحة المحادثة. الحل: أي حمولة تحمل status صالحاً بلا محتوى فعلي تُعالَج كتحديث حالة على
+        // الرسالة المحلية المطابقة (نفس منطق updateStatus() أدناه تماماً) بدل إنشاء رسالة واردة جديدة.
+        $hasRealContent = !empty(trim((string) ($data['message_body'] ?? ''))) || !empty($data['media_url']);
+        if (!$hasRealContent && !empty($data['status']) && in_array($data['status'], ['pending', 'processing', 'sent', 'delivered', 'read', 'failed', 'no_whatsapp'], true)) {
+            Log::info('Incoming webhook payload looks like a status update (no content) — routing to updateStatus() instead of creating an empty message.', [
+                'status' => $data['status'],
+                'local_message_id' => $data['local_message_id'] ?? $data['message_id'] ?? null,
+            ]);
+            return $this->updateStatus($request);
+        }
+
         // منع تكرار الرسالة الواردة إن أعاد النظام المركزي إرسال نفس الـ webhook (شائع عند عدم
         // استلامه 200 في الوقت المناسب) — بدون هذا الفحص، كل إعادة إرسال تُنشئ رسالة مكررة جديدة.
         $providerMessageId = $data['message_id'] ?? null;
@@ -658,6 +917,11 @@ class MessageController extends Controller
         }
 
         $senderPhone = $data['sender_phone'];
+
+        if ($response = $this->handleAdminCommand($senderPhone, $data['message_body'] ?? '')) {
+            return $response;
+        }
+
         $messageType = isset($data['message_type']) && in_array($data['message_type'], ['text', 'chat']) ? 'text' : 'media';
 
         // Find associated contact and user
@@ -673,6 +937,26 @@ class MessageController extends Controller
                 'last_message_at' => now(),
             ]
         );
+
+        // تعيين تلقائي فقط للمحادثات الجديدة فعلياً — لا نُعيد توزيع محادثة مستمرة موجودة أصلاً
+        // حتى تبقى نفس الموظف يتابعها (استمرارية الخدمة للعميل نفسه بدل نقلها بين الموظفين).
+        if ($conversation->wasRecentlyCreated) {
+            $assignedTo = app(\App\Services\ConversationDistributionService::class)->resolveAssignee();
+            if ($assignedTo) {
+                $conversation->update(['assigned_to' => $assignedTo]);
+                $conversation->activities()->create([
+                    'type' => 'assigned',
+                    'description' => 'تم التعيين تلقائياً حسب إعداد توزيع المحادثات',
+                    'user_id' => null,
+                    'properties' => ['assigned_to' => $assignedTo, 'mode' => config('app.conversation_distribution_mode')],
+                ]);
+            }
+        }
+
+        // يُلتقط هنا (قبل تقييم قواعد الأتمتة أدناه) لمقارنته لاحقاً — قاعدة أتمتة قد تُعيد تعيين
+        // المحادثة (assign_user) فتُلغي تعيين التوزيع التلقائي أعلاه؛ نريد تنبيه المُعيَّن النهائي
+        // فقط، لا كليهما.
+        $assignedToBeforeAutomation = $conversation->assigned_to;
 
         $message = Message::create([
             'conversation_id' => $conversation->id,
@@ -704,6 +988,17 @@ class MessageController extends Controller
             app(\App\Services\AutomationRuleEngine::class)->evaluate($message, $conversation);
         } catch (\Exception $e) {
             Log::error('AutomationRuleEngine dispatch failed', ['error' => $e->getMessage()]);
+        }
+
+        // تنبيه الموظف المُعيَّن نهائياً (بعد قواعد الأتمتة، قد تكون غيّرت التعيين) بوصول رسالة عميل
+        // جديدة لمحادثته — يتضمن الإشعار نص الرسالة نفسها. لا يُرسَل شيء إن لم يتغيّر التعيين إطلاقاً
+        // (محادثة مستمرة بلا أي تعيين جديد في هذا الطلب).
+        $conversation->refresh();
+        if ($conversation->assigned_to && $conversation->assigned_to !== $assignedToBeforeAutomation) {
+            $assignee = \App\Models\User::find($conversation->assigned_to);
+            if ($assignee) {
+                $assignee->notify(new \App\Notifications\ConversationAssigned($conversation, $message));
+            }
         }
 
         Log::info("Incoming message received from: {$senderPhone}", [

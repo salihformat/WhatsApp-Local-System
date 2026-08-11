@@ -6,6 +6,8 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use App\Models\Message;
 use App\Models\SystemHealthLog;
+use App\Services\AdminNotifier;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
@@ -93,8 +95,9 @@ class MonitorSystem extends Command
 
         // عدد المهام المتراكمة في طابور Laravel (queue jobs لم تُعالَج بعد) — مؤشر حاسم
         // اكتُشفت أهميته فعلياً بعد رصد تراكم 825 مهمة بسبب توقف عامل الطابور لفترة طويلة
+        $queueBacklogThreshold = (int) config('app.health_alert_queue_backlog_threshold', 50);
         $queueBacklogCount = DB::table('jobs')->count();
-        if ($queueBacklogCount > 50) {
+        if ($queueBacklogCount > $queueBacklogThreshold) {
             $this->warn("   ⚠️ تراكم كبير في الطابور: {$queueBacklogCount} مهمة بانتظار المعالجة");
         }
 
@@ -115,6 +118,50 @@ class MonitorSystem extends Command
             'checked_at' => now(),
         ]);
 
+        $this->maybeAlertAdmin($queueBacklogCount, $queueBacklogThreshold, $oldPendingMessages);
+
         $this->newLine();
+    }
+
+    /**
+     * ينبّه المسؤول عبر واتساب عند مؤشرات تعطل حقيقية (تراكم كبير في الطابور و/أو رسائل معلّقة منذ
+     * أكثر من 10 دقائق) — أشيع سبب فعلي رُصد له هو توقف عامل الطابور (Queue Worker) بصمت. يُرسَل
+     * تنبيه واحد فقط ثم يلتزم بفترة تهدئة (health_alert_cooldown_minutes) قبل تكراره ما دامت المشكلة
+     * مستمرة (بدل تنبيه كل 10 دقائق طوال فترة التعطل)، ويُرسَل إشعار تعافٍ منفصل بمجرد زوال المشكلة.
+     */
+    private function maybeAlertAdmin(int $queueBacklogCount, int $queueBacklogThreshold, int $oldPendingMessages): void
+    {
+        $isUnhealthy = $queueBacklogCount > $queueBacklogThreshold || $oldPendingMessages > 0;
+        $wasActive = Cache::get('system_health_alert_active', false);
+
+        if ($isUnhealthy) {
+            $cooldown = (int) config('app.health_alert_cooldown_minutes', 60);
+            if ($cooldown <= 0) {
+                return;
+            }
+
+            $lastSentAt = Cache::get('system_health_alert_last_sent_at');
+            if ($lastSentAt && now()->diffInMinutes($lastSentAt) < $cooldown) {
+                return;
+            }
+
+            $text = "🚨 تنبيه صحة النظام\n"
+                . ($queueBacklogCount > $queueBacklogThreshold ? "تراكم في طابور المعالجة: {$queueBacklogCount} مهمة بانتظار المعالجة (الحد المسموح: {$queueBacklogThreshold})\n" : '')
+                . ($oldPendingMessages > 0 ? "{$oldPendingMessages} رسالة معلّقة منذ أكثر من 10 دقائق بلا إرسال\n" : '')
+                . "قد يشير هذا لتوقف عامل الطابور (Queue Worker) بصمت — تحقق من لوحة التحكم وأعد تشغيله إن لزم.";
+
+            app(AdminNotifier::class)->notify($text, ['source' => 'system_health_alert']);
+
+            Cache::put('system_health_alert_active', true, now()->addDay());
+            Cache::put('system_health_alert_last_sent_at', now(), now()->addDay());
+        } elseif ($wasActive) {
+            app(AdminNotifier::class)->notify(
+                '✅ عادت صحة النظام لوضعها الطبيعي (طابور المعالجة والرسائل المعلّقة).',
+                ['source' => 'system_health_recovered']
+            );
+
+            Cache::forget('system_health_alert_active');
+            Cache::forget('system_health_alert_last_sent_at');
+        }
     }
 }

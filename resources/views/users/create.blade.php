@@ -26,6 +26,14 @@
                             <x-input-error :messages="$errors->get('email')" class="mt-2" />
                         </div>
 
+                        <!-- Phone Number -->
+                        <div class="mb-4">
+                            <x-input-label for="phone_number" :value="__('رقم الواتساب (اختياري)')" />
+                            <x-text-input id="phone_number" class="block mt-1 w-full" type="text" name="phone_number" :value="old('phone_number')" placeholder="966501234567" dir="ltr" />
+                            <p class="text-xs text-gray-400 mt-1">إن أُدخل، يصل هذا المستخدم إشعار واتساب فعلي (بالإضافة لجرس الإشعارات) عند تعيين محادثة له.</p>
+                            <x-input-error :messages="$errors->get('phone_number')" class="mt-2" />
+                        </div>
+
                         <!-- Password -->
                         <div class="mb-4">
                             <x-input-label for="password" :value="__('كلمة المرور')" />

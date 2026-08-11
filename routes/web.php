@@ -15,6 +15,11 @@ Route::middleware(['auth'])->group(function () {
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
+    // Notifications - جرس الإشعارات في الشريط العلوي
+    Route::get('/notifications', [\App\Http\Controllers\NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/{id}/read', [\App\Http\Controllers\NotificationController::class, 'markAsRead'])->name('notifications.read');
+    Route::post('/notifications/read-all', [\App\Http\Controllers\NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
+
     // Messages
     Route::resource('messages', MessageController::class)->except(['edit', 'update']);
 
@@ -110,6 +115,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/dashboard/restart-queue', [DashboardController::class, 'restartQueue'])->name('dashboard.restart-queue');
 
         Route::resource('users', UserController::class);
+        Route::post('/users/{user}/toggle-availability', [UserController::class, 'toggleAvailability'])->name('users.toggle-availability');
 
         // Settings
         Route::get('/settings', [\App\Http\Controllers\SettingController::class, 'index'])->name('settings.index');
@@ -142,6 +148,7 @@ Route::middleware(['auth'])->group(function () {
 
         // متابعة مجلد المراقبة PrintMonitor
         Route::get('/print-monitor', [\App\Http\Controllers\PrintMonitorController::class, 'index'])->name('print-monitor.index');
+        Route::post('/print-monitor/approve-all', [\App\Http\Controllers\PrintMonitorController::class, 'approveAll'])->name('print-monitor.approve-all');
         Route::post('/print-monitor/{message}/approve', [\App\Http\Controllers\PrintMonitorController::class, 'approve'])->name('print-monitor.approve');
         Route::post('/print-monitor/{message}/reject', [\App\Http\Controllers\PrintMonitorController::class, 'reject'])->name('print-monitor.reject');
 
@@ -157,7 +164,10 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/print-rules/{printRule}', [\App\Http\Controllers\PrintRuleController::class, 'destroy'])->name('print-rules.destroy');
 
         Route::get('/print-jobs', [\App\Http\Controllers\PrintJobController::class, 'index'])->name('print-jobs.index');
+        Route::post('/print-jobs/approve-all', [\App\Http\Controllers\PrintJobController::class, 'approveAll'])->name('print-jobs.approve-all');
         Route::post('/print-jobs/{printJob}/retry', [\App\Http\Controllers\PrintJobController::class, 'retry'])->name('print-jobs.retry');
+        Route::post('/print-jobs/{printJob}/approve', [\App\Http\Controllers\PrintJobController::class, 'approve'])->name('print-jobs.approve');
+        Route::post('/print-jobs/{printJob}/reject', [\App\Http\Controllers\PrintJobController::class, 'reject'])->name('print-jobs.reject');
     });
 });
 

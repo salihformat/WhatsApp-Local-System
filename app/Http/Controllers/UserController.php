@@ -31,6 +31,7 @@ class UserController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
+            'phone_number' => ['nullable', 'string', 'max:20'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'role' => ['required', 'string', 'in:admin,supervisor,agent'],
         ]);
@@ -38,6 +39,7 @@ class UserController extends Controller
         User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
+            'phone_number' => $this->normalizePhoneNumber($validated['phone_number'] ?? null),
             'password' => Hash::make($validated['password']),
             'role' => $validated['role'],
             'is_admin' => $validated['role'] === 'admin',
@@ -62,12 +64,14 @@ class UserController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
+            'phone_number' => ['nullable', 'string', 'max:20'],
             'password' => ['nullable', 'string', 'min:8', 'confirmed'],
             'role' => ['required', 'string', 'in:admin,supervisor,agent'],
         ]);
 
         $user->name = $validated['name'];
         $user->email = $validated['email'];
+        $user->phone_number = $this->normalizePhoneNumber($validated['phone_number'] ?? null);
 
         $passwordChanged = !empty($validated['password']);
         if ($passwordChanged) {
@@ -89,6 +93,48 @@ class UserController extends Controller
 
         return redirect()->route('users.index')
             ->with('success', 'تم تحديث المستخدم بنجاح');
+    }
+
+    /**
+     * تبديل حالة "متاح لاستلام محادثات جديدة" لهذا المستخدم — يستثنيه فوراً من التوزيع التلقائي
+     * (راجع ConversationDistributionService) بلا حاجة لحذفه من قائمة "مستخدمين محددين" بالإعدادات
+     * أو تعديل دوره، مفيد لإجازة/انشغال مؤقت.
+     */
+    public function toggleAvailability(User $user)
+    {
+        $user->update(['is_available_for_assignment' => !$user->is_available_for_assignment]);
+
+        activity('users')
+            ->causedBy(auth()->user())
+            ->performedOn($user)
+            ->log($user->is_available_for_assignment
+                ? "تم تفعيل استلام المحادثات التلقائي للمستخدم: {$user->name}"
+                : "تم إيقاف استلام المحادثات التلقائي للمستخدم: {$user->name}");
+
+        return redirect()->back()->with('success', $user->is_available_for_assignment
+            ? "{$user->name} أصبح متاحاً لاستلام محادثات جديدة."
+            : "{$user->name} لن يستلم محادثات جديدة تلقائياً حتى تُفعّله مجدداً.");
+    }
+
+    /**
+     * توحيد صيغة رقم واتساب الموظف إلى الصيغة الدولية (966...) — نفس منطق التطبيع المستخدم في
+     * باقي النظام (MessageController/AdminNotifier)، حتى يُقارَن بصيغة موحّدة عند الإرسال لاحقاً.
+     */
+    private function normalizePhoneNumber(?string $phoneNumber): ?string
+    {
+        if (empty($phoneNumber)) {
+            return null;
+        }
+
+        $phoneNumber = preg_replace('/[^0-9]/', '', $phoneNumber);
+
+        if (substr($phoneNumber, 0, 1) === '0') {
+            $phoneNumber = '966' . substr($phoneNumber, 1);
+        } elseif (strlen($phoneNumber) === 9) {
+            $phoneNumber = '966' . $phoneNumber;
+        }
+
+        return $phoneNumber ?: null;
     }
 
     public function destroy(User $user)

@@ -42,11 +42,13 @@ class PrinterController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'windows_printer_name' => ['required', 'string', 'max:255'],
             'type' => ['required', 'string', 'in:document,thermal'],
+            'print_mode' => ['nullable', 'string', 'in:auto,approval'],
             'is_default' => ['nullable', 'boolean'],
             'supports_status_check' => ['nullable', 'boolean'],
             'notes' => ['nullable', 'string'],
         ]);
 
+        $validated['print_mode'] = $validated['print_mode'] ?? 'auto';
         $validated['is_default'] = $request->boolean('is_default');
         $validated['supports_status_check'] = $request->boolean('supports_status_check');
 
@@ -65,12 +67,17 @@ class PrinterController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'windows_printer_name' => ['required', 'string', 'max:255'],
             'type' => ['required', 'string', 'in:document,thermal'],
+            'print_mode' => ['nullable', 'string', 'in:auto,approval'],
             'is_default' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
             'supports_status_check' => ['nullable', 'boolean'],
             'notes' => ['nullable', 'string'],
         ]);
 
+        // [ملاحظة] بخلاف store()، لا نفرض 'auto' هنا إن غاب print_mode من الطلب — بعض نماذج التحديث
+        // الجزئية في الواجهة (تبديل الافتراضية/التفعيل...) لا ترسله، فنُبقي القيمة الحالية بدل تصفير
+        // وضع الموافقة المضبوط مسبقاً بالخطأ. العمود غير قابل لـ NULL، فلا يجوز تركه فارغاً أيضاً.
+        $validated['print_mode'] = $request->filled('print_mode') ? $validated['print_mode'] : $printer->print_mode;
         $validated['is_default'] = $request->boolean('is_default');
         $validated['is_active'] = $request->boolean('is_active');
         $validated['supports_status_check'] = $request->boolean('supports_status_check');

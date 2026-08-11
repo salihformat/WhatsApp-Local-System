@@ -14,6 +14,21 @@
             @if(session('error'))
                 <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">{{ session('error') }}</div>
             @endif
+            @if(session('info'))
+                <div class="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded relative">{{ session('info') }}</div>
+            @endif
+
+            <div class="flex justify-end">
+                <form action="{{ route('print-jobs.approve-all') }}" method="POST" onsubmit="return confirm('هل أنت متأكد من الموافقة على كل مهام الطباعة المعلّقة حالياً؟');">
+                    @csrf
+                    @if(request('printer_id'))
+                        <input type="hidden" name="printer_id" value="{{ request('printer_id') }}">
+                    @endif
+                    <button type="submit" class="text-green-700 hover:text-green-900 bg-green-50 hover:bg-green-100 px-4 py-2 rounded-md transition-colors border border-green-200 text-sm font-medium">
+                        موافقة على كل الطلبات المعلّقة{{ request('printer_id') ? ' (لهذه الطابعة فقط)' : '' }}
+                    </button>
+                </form>
+            </div>
 
             <!-- Filters Section -->
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
@@ -22,7 +37,7 @@
                         <label class="block text-sm font-medium text-gray-700 mb-1">تصفية حسب الحالة</label>
                         <select name="status" class="w-full rounded-md border-gray-300 shadow-sm text-sm">
                             <option value="">الكل</option>
-                            @foreach(['pending' => 'قيد الانتظار', 'printing' => 'جارٍ الطباعة', 'completed' => 'مكتملة', 'failed' => 'فشلت'] as $value => $label)
+                            @foreach(['pending' => 'قيد الانتظار', 'awaiting_approval' => 'بانتظار الموافقة', 'printing' => 'جارٍ الطباعة', 'completed' => 'مكتملة', 'failed' => 'فشلت', 'rejected' => 'مرفوضة'] as $value => $label)
                                 <option value="{{ $value }}" {{ request('status') === $value ? 'selected' : '' }}>{{ $label }}</option>
                             @endforeach
                         </select>
@@ -75,6 +90,7 @@
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الطابعة</th>
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الحالة</th>
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المحاولات</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الصفحات</th>
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">وقت الوصول</th>
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">وقت الاكتمال</th>
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المدة</th>
@@ -87,13 +103,15 @@
                             @php
                                 $statusColors = [
                                     'pending' => 'bg-gray-100 text-gray-700 border border-gray-200',
+                                    'awaiting_approval' => 'bg-orange-50 text-orange-700 border border-orange-200',
                                     'printing' => 'bg-blue-50 text-blue-700 border border-blue-200',
                                     'completed' => 'bg-green-50 text-green-700 border border-green-200',
                                     'failed' => 'bg-red-50 text-red-700 border border-red-200',
+                                    'rejected' => 'bg-red-50 text-red-700 border border-red-200',
                                 ];
                                 $statusLabels = [
-                                    'pending' => 'قيد الانتظار', 'printing' => 'جارٍ الطباعة',
-                                    'completed' => 'مكتملة', 'failed' => 'فشلت',
+                                    'pending' => 'قيد الانتظار', 'awaiting_approval' => 'بانتظار الموافقة', 'printing' => 'جارٍ الطباعة',
+                                    'completed' => 'مكتملة', 'failed' => 'فشلت', 'rejected' => 'مرفوضة',
                                 ];
                             @endphp
                             <tr class="hover:bg-gray-50 transition-colors">
@@ -107,6 +125,7 @@
                                     </span>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 text-center">{{ $job->attempts }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 text-center">{{ $job->pages ?? '—' }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" title="{{ $job->created_at?->diffForHumans() }}">
                                     {{ $job->created_at?->format('Y-m-d') }}<br>
                                     <span class="text-xs text-gray-400">{{ $job->created_at?->format('H:i:s') }}</span>
@@ -121,18 +140,28 @@
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $job->duration_for_humans ?? '—' }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-500 max-w-xs truncate" title="{{ $job->error_message }}">{{ $job->error_message ?? '—' }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-1 space-x-reverse">
                                     @if($job->status === 'failed')
                                         <form action="{{ route('print-jobs.retry', $job) }}" method="POST" class="inline">
                                             @csrf
                                             <button type="submit" class="text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-3 py-1 rounded transition-colors border border-indigo-100">إعادة المحاولة</button>
                                         </form>
                                     @endif
+                                    @if($job->status === 'awaiting_approval')
+                                        <form action="{{ route('print-jobs.approve', $job) }}" method="POST" class="inline">
+                                            @csrf
+                                            <button type="submit" class="text-green-700 hover:text-green-900 bg-green-50 hover:bg-green-100 px-3 py-1 rounded transition-colors border border-green-200">موافقة</button>
+                                        </form>
+                                        <form action="{{ route('print-jobs.reject', $job) }}" method="POST" class="inline" onsubmit="return confirm('هل أنت متأكد من رفض هذه المهمة؟');">
+                                            @csrf
+                                            <button type="submit" class="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 px-3 py-1 rounded transition-colors border border-red-100">رفض</button>
+                                        </form>
+                                    @endif
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="11" class="px-6 py-8 text-center text-gray-500">
+                                <td colspan="12" class="px-6 py-8 text-center text-gray-500">
                                     <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                     </svg>

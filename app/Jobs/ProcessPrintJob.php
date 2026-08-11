@@ -6,6 +6,7 @@ use App\Models\Message;
 use App\Models\PrintJob;
 use App\Services\FileTypeResolver;
 use App\Services\OfficeToPdfConverter;
+use App\Services\PrintFolderManager;
 use App\Services\PrintService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -15,6 +16,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Smalot\PdfParser\Parser as PdfParser;
 use Throwable;
 
 class ProcessPrintJob implements ShouldQueue
@@ -55,14 +57,22 @@ class ProcessPrintJob implements ShouldQueue
             $this->ensureLocalFile($job, $officeConverter);
             $printService->print($job);
 
-            $job->update(['status' => 'completed', 'printed_at' => now(), 'error_message' => null]);
+            $pages = $this->countPages($job->file_path);
+
+            $job->update(['status' => 'completed', 'printed_at' => now(), 'error_message' => null, 'pages' => $pages]);
+
+            if ($pages && $job->printer) {
+                $job->printer->increment('pages_printed', $pages);
+            }
 
             Log::info("Print job {$job->id} completed successfully", [
                 'printer' => $job->printer?->name,
                 'file' => $job->file_name,
+                'pages' => $pages,
             ]);
 
             $this->notifySender($job, true);
+            app(PrintFolderManager::class)->moveToArchive($job);
         } catch (Throwable $e) {
             Log::error("Print job {$job->id} failed", ['error' => $e->getMessage()]);
 
@@ -94,6 +104,7 @@ class ProcessPrintJob implements ShouldQueue
 
         $this->notifySender($job, false);
         $this->notifyOwner($job, $exception->getMessage());
+        app(PrintFolderManager::class)->moveToFailed($job);
     }
 
     /**
@@ -161,29 +172,13 @@ class ProcessPrintJob implements ShouldQueue
             return;
         }
 
-        $ownerPhone = config('printing.alert_phone_number');
-        if (empty($ownerPhone)) {
-            return;
-        }
-
-        $customerPhone = $job->message->phone_number ?? 'غير معروف';
+        $customerPhone = $job->message->phone_number ?? 'غير معروف (مصدره مجلد الطباعة المحلي)';
         $text = "⚠️ فشلت طباعة طلب من العميل {$customerPhone}\n"
             . "الملف: {$job->file_name}\n"
             . "الطابعة: " . ($job->printer->name ?? 'غير محددة') . "\n"
             . "الخطأ: {$rawError}";
 
-        try {
-            $message = Message::create([
-                'phone_number' => $ownerPhone,
-                'message_text' => $text,
-                'message_type' => 'text',
-                'status' => 'pending',
-            ]);
-
-            dispatch(new SendMessageJob($message->id));
-        } catch (Throwable $e) {
-            Log::error("PrintJob {$job->id}: failed to dispatch owner failure alert", ['error' => $e->getMessage()]);
-        }
+        app(\App\Services\AdminNotifier::class)->notify($text, ['source' => 'print_job_failure_alert', 'print_job_id' => $job->id]);
     }
 
     /**
@@ -228,45 +223,57 @@ class ProcessPrintJob implements ShouldQueue
     }
 
     /**
-     * الملفات الواردة عبر واتساب تُخزَّن كرابط بعيد من النظام المركزي (media_url)،
-     * يجب تنزيلها محلياً أولاً لأن أدوات الطباعة (SumatraPDF) تتطلب مساراً محلياً فعلياً.
+     * الملفات الواردة عبر واتساب تُخزَّن كرابط بعيد من النظام المركزي (media_url) أو كمسار عام نسبي
+     * (/storage/...، لملفات مجلد المراقبة القديم)، ويجب إحضارها محلياً كنسخة عمل خاصة بنا أولاً لأن
+     * أدوات الطباعة (SumatraPDF) تتطلب مساراً محلياً فعلياً. [Fix 2026-08-10] ملفات "مجلد الطباعة"
+     * الجديد (print_folder) تصل بمسار محلي فعلي جاهز من البداية (source_file_path) — سابقاً كان أي
+     * مسار محلي موجود فعلياً على القرص يُعتبر "جاهزاً" ويتخطى هذه الدالة بالكامل، فيتفادى تحويل
+     * ملفات الأوفيس وتحجيم الصور القياسي بالخطأ. الحل: نأخذ نسخة عمل مؤقتة دوماً (سواء التنزيل من
+     * رابط بعيد أو نسخ ملف محلي جاهز)، ونُطبّق خطوات التحويل/التحجيم عليها بشكل موحّد بلا استثناء —
+     * كما يحمي الملف الأصلي المؤرشف في مجلد الطباعة من التعديل المباشر (تحجيم الصور يُعدّل في مكانه).
      */
     private function ensureLocalFile(PrintJob $job, OfficeToPdfConverter $officeConverter): void
     {
-        if (file_exists($job->file_path)) {
-            return;
+        $sourcePath = $this->resolveExistingLocalPath($job->file_path);
+
+        if ($sourcePath !== null) {
+            $extension = strtolower(pathinfo($sourcePath, PATHINFO_EXTENSION))
+                ?: FileTypeResolver::resolveExtension($job->file_name, $job->file_path, $job->file_type, 'pdf');
+            $safeFileName = 'print_job_' . $job->id . '.' . $extension;
+            $relativePath = trim(config('printing.download_path'), '/') . '/' . $safeFileName;
+            Storage::disk('local')->put($relativePath, file_get_contents($sourcePath));
+        } else {
+            if (!filter_var($job->file_path, FILTER_VALIDATE_URL)) {
+                throw new \Exception("مسار الملف غير صالح ولا يمكن الوصول إليه: {$job->file_path}");
+            }
+
+            // decode_content=false يمنع Guzzle/cURL من محاولة فك أي ترميز مذكور في Content-Encoding
+            // تلقائياً. بعض الروابط (مثل تخزين S3 لدى المركزي) تُرسل قيمة Content-Encoding غير قياسية
+            // (لوحظ فعلياً القيمة "base64" رغم أن المحتوى بالفعل بيانات ثنائية خام غير مُرمَّزة)، فيفشل
+            // cURL بخطأ "Unrecognized content encoding type" لأنه لا يعرف كيف يفك هذا الترميز — بينما
+            // نحن أصلاً لا نحتاج أي فك ترميز، فقط البايتات كما هي.
+            $response = Http::timeout(60)
+                ->withOptions(['decode_content' => false])
+                ->get($job->file_path);
+            if (!$response->successful()) {
+                throw new \Exception("فشل تنزيل الملف من الرابط البعيد (HTTP {$response->status()})");
+            }
+
+            // اسم ملف آمن بأحرف ASCII فقط (بدل استخدام اسم الملف الأصلي كما وصل من واتساب، والذي غالباً
+            // ما يحتوي أحرفاً عربية). لوحظ فعلياً أن تمرير مسار بأحرف عربية لعملية SumatraPDF الخارجية
+            // (عبر Symfony Process على Windows) يتسبب بتعليقها حتى انتهاء المهلة (60 ثانية) بصمت، على
+            // الأرجح بسبب سوء تحويل ترميز سطر الأوامر لغير ASCII في هذه البيئة تحديداً.
+            //
+            // [Fix 2026-08-06] $job->file_name فارغ دائماً لصور واتساب، وكان يؤدي سابقاً لافتراض ".pdf"
+            // دوماً حتى للصور الحقيقية — فيُحفظ محتوى JPEG ثنائي باسم ملف ".pdf" فيفشل عند فتحه لاحقاً.
+            // FileTypeResolver يلجأ للرابط البعيد الأصلي (قبل استبداله أدناه بالمسار المحلي) ثم لنوع
+            // MIME (file_type) قبل الرجوع أخيراً لـ'pdf' كافتراض.
+            $extension = FileTypeResolver::resolveExtension($job->file_name, $job->file_path, $job->file_type, 'pdf');
+            $safeFileName = 'print_job_' . $job->id . '.' . $extension;
+
+            $relativePath = trim(config('printing.download_path'), '/') . '/' . $safeFileName;
+            Storage::disk('local')->put($relativePath, $response->body());
         }
-
-        if (!filter_var($job->file_path, FILTER_VALIDATE_URL)) {
-            throw new \Exception("مسار الملف غير صالح ولا يمكن الوصول إليه: {$job->file_path}");
-        }
-
-        // decode_content=false يمنع Guzzle/cURL من محاولة فك أي ترميز مذكور في Content-Encoding
-        // تلقائياً. بعض الروابط (مثل تخزين S3 لدى المركزي) تُرسل قيمة Content-Encoding غير قياسية
-        // (لوحظ فعلياً القيمة "base64" رغم أن المحتوى بالفعل بيانات ثنائية خام غير مُرمَّزة)، فيفشل
-        // cURL بخطأ "Unrecognized content encoding type" لأنه لا يعرف كيف يفك هذا الترميز — بينما
-        // نحن أصلاً لا نحتاج أي فك ترميز، فقط البايتات كما هي.
-        $response = Http::timeout(60)
-            ->withOptions(['decode_content' => false])
-            ->get($job->file_path);
-        if (!$response->successful()) {
-            throw new \Exception("فشل تنزيل الملف من الرابط البعيد (HTTP {$response->status()})");
-        }
-
-        // اسم ملف آمن بأحرف ASCII فقط (بدل استخدام اسم الملف الأصلي كما وصل من واتساب، والذي غالباً
-        // ما يحتوي أحرفاً عربية). لوحظ فعلياً أن تمرير مسار بأحرف عربية لعملية SumatraPDF الخارجية
-        // (عبر Symfony Process على Windows) يتسبب بتعليقها حتى انتهاء المهلة (60 ثانية) بصمت، على
-        // الأرجح بسبب سوء تحويل ترميز سطر الأوامر لغير ASCII في هذه البيئة تحديداً.
-        //
-        // [Fix 2026-08-06] $job->file_name فارغ دائماً لصور واتساب، وكان يؤدي سابقاً لافتراض ".pdf"
-        // دوماً حتى للصور الحقيقية — فيُحفظ محتوى JPEG ثنائي باسم ملف ".pdf" فيفشل عند فتحه لاحقاً.
-        // FileTypeResolver يلجأ للرابط البعيد الأصلي (قبل استبداله أدناه بالمسار المحلي) ثم لنوع
-        // MIME (file_type) قبل الرجوع أخيراً لـ'pdf' كافتراض.
-        $extension = FileTypeResolver::resolveExtension($job->file_name, $job->file_path, $job->file_type, 'pdf');
-        $safeFileName = 'print_job_' . $job->id . '.' . $extension;
-
-        $relativePath = trim(config('printing.download_path'), '/') . '/' . $safeFileName;
-        Storage::disk('local')->put($relativePath, $response->body());
 
         $localPath = Storage::disk('local')->path($relativePath);
 
@@ -293,6 +300,56 @@ class ProcessPrintJob implements ShouldQueue
         }
 
         $job->update(['file_path' => $localPath]);
+    }
+
+    /**
+     * عدد صفحات الملف النهائي الجاهز للطباعة (بعد أي تحويل أوفيس/تحجيم صورة) — تقدير تقريبي لتخطيط
+     * استهلاك الحبر/الورق (راجع Printer::pages_printed)، وليس عداداً رسمياً دقيقاً. الصور دوماً صفحة
+     * واحدة (تُوضع مسبقاً داخل صفحة قياسية كاملة عبر fitImageToStandardPage). فشل حساب صفحات PDF
+     * (ملف تالف مثلاً) لا يُفشل المهمة نفسها — الطباعة نجحت فعلاً، فقط لا يُحتسب لها عدد صفحات.
+     */
+    private function countPages(string $localPath): ?int
+    {
+        $extension = strtolower(pathinfo($localPath, PATHINFO_EXTENSION));
+
+        if (in_array($extension, ['jpg', 'jpeg', 'png', 'gif'], true)) {
+            return 1;
+        }
+
+        if ($extension !== 'pdf') {
+            return null;
+        }
+
+        try {
+            return count((new PdfParser())->parseFile($localPath)->getPages());
+        } catch (Throwable $e) {
+            Log::warning("ProcessPrintJob: failed to count PDF pages for '{$localPath}'", ['error' => $e->getMessage()]);
+            return null;
+        }
+    }
+
+    /**
+     * يحدد المسار المحلي الفعلي للملف إن كان أصلاً على القرص (بلا حاجة لتنزيله من رابط بعيد):
+     * إما مساراً مطلقاً موجوداً فعلاً (ملفات مجلد الطباعة الجديد)، أو مساراً عاماً نسبياً بصيغة
+     * "/storage/..." (ملفات مجلد المراقبة المُرسَلة عبر واتساب، file_path على Message مُخزَّن بهذه
+     * الصيغة لبناء رابط عام لا كمسار قرص). يُعيد null إن لم يكن الملف موجوداً محلياً بأي من الشكلين.
+     */
+    private function resolveExistingLocalPath(string $filePath): ?string
+    {
+        if (file_exists($filePath)) {
+            return $filePath;
+        }
+
+        if (str_starts_with($filePath, '/storage/')) {
+            $relative = ltrim(substr($filePath, strlen('/storage/')), '/');
+            $publicPath = Storage::disk('public')->path($relative);
+
+            if (file_exists($publicPath)) {
+                return $publicPath;
+            }
+        }
+
+        return null;
     }
 
     /**

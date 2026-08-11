@@ -1,0 +1,158 @@
+<?php
+
+namespace App\Services;
+
+use App\Jobs\SendMessageJob;
+use App\Models\Message;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
+
+/**
+ * منطق الموافقة/الرفض على ملف محجوز بحالة review_pending من مجلد المراقبة (سواء بسبب استخراج رقم
+ * جوال منخفض الثقة، أو بسبب تفعيل "موافقة قبل الإرسال" العامة لكل الملفات). مستخدَم من صفحة متابعة
+ * الإرسال (زر في لوحة التحكم) ومن أمر واتساب نصي "وافق ارسال <رقم>"/"رفض ارسال <رقم>" من المسؤول،
+ * لذا استُخرج هنا كخدمة مشتركة بدل تكرار منطق نقل الملفات بين مسارين.
+ */
+class MonitorFolderReviewService
+{
+    public function __construct(private AdminNotifier $adminNotifier)
+    {
+    }
+
+    /**
+     * @return array{success: bool, message: string}
+     */
+    public function approve(Message $message): array
+    {
+        if ($message->status !== 'review_pending') {
+            return ['success' => false, 'message' => 'هذا الملف ليس بانتظار المراجعة حالياً.'];
+        }
+
+        $folderPath = config('app.monitor_folder_path', 'C:/PrintMonitor');
+        $reviewFile = $this->locatePhysicalFile($folderPath . '/review', $message);
+
+        if (!$reviewFile) {
+            return ['success' => false, 'message' => 'تعذّر العثور على الملف الفعلي في مجلد المراجعة.'];
+        }
+
+        $processingPath = $folderPath . '/processing';
+        if (!File::exists($processingPath)) {
+            File::makeDirectory($processingPath, 0755, true);
+        }
+
+        try {
+            $targetPath = $processingPath . '/' . basename($reviewFile);
+            if (File::exists($targetPath)) {
+                File::delete($reviewFile);
+            } else {
+                File::move($reviewFile, $targetPath);
+            }
+
+            $message->update(['status' => 'pending']);
+            dispatch(new SendMessageJob($message->id));
+
+            Log::info('MonitorFolder: manual review approved', ['message_id' => $message->id, 'phone' => $message->phone_number]);
+
+            return ['success' => true, 'message' => "تمت الموافقة، سيُرسل الملف إلى {$message->phone_number} الآن."];
+        } catch (\Exception $e) {
+            Log::error('MonitorFolder: failed to approve reviewed file: ' . $e->getMessage());
+            return ['success' => false, 'message' => 'فشلت الموافقة: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * @return array{success: bool, message: string}
+     */
+    public function reject(Message $message, ?string $actorLabel = null): array
+    {
+        if ($message->status !== 'review_pending') {
+            return ['success' => false, 'message' => 'هذا الملف ليس بانتظار المراجعة حالياً.'];
+        }
+
+        $folderPath = config('app.monitor_folder_path', 'C:/PrintMonitor');
+        $reviewFile = $this->locatePhysicalFile($folderPath . '/review', $message);
+
+        $failedPath = $folderPath . '/failed';
+        if (!File::exists($failedPath)) {
+            File::makeDirectory($failedPath, 0755, true);
+        }
+
+        try {
+            if ($reviewFile) {
+                $targetPath = $failedPath . '/' . basename($reviewFile);
+                if (File::exists($targetPath)) {
+                    File::delete($reviewFile);
+                } else {
+                    File::move($reviewFile, $targetPath);
+                }
+            }
+
+            $message->update([
+                'status' => 'failed',
+                'error_message' => 'تم الرفض يدوياً من قبل ' . ($actorLabel ?: 'مستخدم') . '.',
+            ]);
+
+            Log::info('MonitorFolder: manual review rejected', ['message_id' => $message->id, 'phone' => $message->phone_number]);
+
+            return ['success' => true, 'message' => 'تم رفض الملف ونقله لمجلد "فشلت".'];
+        } catch (\Exception $e) {
+            Log::error('MonitorFolder: failed to reject reviewed file: ' . $e->getMessage());
+            return ['success' => false, 'message' => 'فشل الرفض: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * الموافقة على كل الملفات الحالية بانتظار المراجعة دفعة واحدة (زر "موافقة على الكل" أو أمر
+     * واتساب "وافق الكل ارسال"). يُعيد عدد الملفات التي تمت الموافقة عليها فعلياً.
+     */
+    public function approveAllPending(): int
+    {
+        $count = 0;
+        foreach (Message::where('status', 'review_pending')->get() as $message) {
+            if ($this->approve($message)['success']) {
+                $count++;
+            }
+        }
+
+        return $count;
+    }
+
+    /**
+     * إبلاغ المسؤول (أو المسؤولين) عبر واتساب بملف بانتظار موافقته قبل إرساله، مع تعليمات الرد
+     * النصي البسيط للموافقة/الرفض. عامة (public) لإعادة استخدامها من أمر التذكير التلقائي.
+     */
+    public function notifyAdminForApproval(Message $message, bool $isReminder = false): void
+    {
+        $prefix = $isReminder ? "⏰ تذكير — لا يزال بانتظار موافقتك:\n\n" : '';
+
+        $text = $prefix . "📨 ملف بانتظار موافقتك قبل الإرسال عبر واتساب\n"
+            . "رقم الرسالة: {$message->id}\n"
+            . "إلى: {$message->phone_number}\n"
+            . "الملف: {$message->file_name}\n\n"
+            . "للموافقة أرسل: وافق ارسال {$message->id}\n"
+            . "للرفض أرسل: رفض ارسال {$message->id}\n"
+            . "لمعاينة الملف أولاً أرسل: ارسل لي الملف ارسال {$message->id}";
+
+        $this->adminNotifier->notify($text, ['source' => 'monitor_send_approval_request', 'reviewed_message_id' => $message->id]);
+    }
+
+    /**
+     * البحث عن الملف الفعلي المطابق لرسالة بانتظار المراجعة داخل مجلد معيّن، عبر source_filename أولاً
+     * ثم file_name كخيار احتياطي (نفس أسلوب المطابقة المستخدم في SendMessageJob::moveFolderFile).
+     */
+    private function locatePhysicalFile(string $dir, Message $message): ?string
+    {
+        if (!File::exists($dir)) {
+            return null;
+        }
+
+        foreach (File::files($dir) as $file) {
+            $fn = $file->getFilename();
+            if ($fn === $message->source_filename || $fn === $message->file_name) {
+                return $file->getPathname();
+            }
+        }
+
+        return null;
+    }
+}

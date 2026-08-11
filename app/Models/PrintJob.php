@@ -11,17 +11,22 @@ class PrintJob extends Model
         'printer_id',
         'file_name',
         'file_path',
+        'source_file_path',
         'file_type',
         'status',
         'attempts',
         'error_message',
         'source',
         'printed_at',
+        'reminder_sent_at',
+        'pages',
     ];
 
     protected $casts = [
         'attempts' => 'integer',
         'printed_at' => 'datetime',
+        'reminder_sent_at' => 'datetime',
+        'pages' => 'integer',
     ];
 
     public function message()
