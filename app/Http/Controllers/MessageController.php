@@ -479,20 +479,18 @@ class MessageController extends Controller
     private function sendFileToAdmin(string $replyTo, string $type, int $id): void
     {
         if ($type === 'طباعة') {
-            $printJob = PrintJob::find($id);
+            $printJob = PrintJob::with('message')->find($id);
             if (!$printJob) {
                 $this->replyToAdmin($replyTo, "⚠️ لم يتم العثور على مهمة طباعة برقم {$id}.");
                 return;
             }
-            // بعد الموافقة تُستبدل file_path بمسار محلي على القرص (راجع ProcessPrintJob::ensureLocalFile)
-            // غير صالح كرابط لإرساله عبر واتساب — المعاينة مفيدة فقط قبل اتخاذ القرار.
-            if ($printJob->status !== 'awaiting_approval') {
-                $this->replyToAdmin($replyTo, "⚠️ مهمة الطباعة رقم {$id} لم تعد بانتظار الموافقة (حالتها الحالية: {$printJob->status})، تعذّرت معاينتها.");
+
+            $previewFile = $this->resolvePrintJobPreviewFile($printJob);
+            if (!$previewFile) {
+                $this->replyToAdmin($replyTo, "⚠️ تعذّر العثور على نسخة صالحة من ملف مهمة الطباعة رقم {$id} لمعاينتها (حالتها الحالية: {$printJob->statusLabel()}).");
                 return;
             }
-            $fileName = $printJob->file_name;
-            $filePath = $printJob->file_path;
-            $fileType = $printJob->file_type;
+            [$fileName, $filePath, $fileType] = $previewFile;
         } else {
             $message = Message::find($id);
             if (!$message) {
@@ -527,6 +525,65 @@ class MessageController extends Controller
         }
     }
 
+    /**
+     * يحدد أفضل نسخة صالحة من ملف مهمة طباعة يمكن إرسالها عبر واتساب للمعاينة، بصرف النظر عن حالة
+     * المهمة — معاينة "ماذا طُبع فعلياً" بعد الاكتمال لا تقل فائدة عن المعاينة قبل الموافقة (تدقيق/
+     * نزاع مع عميل)، والمنع السابق كان قيداً تقنياً بحتاً (file_path يُستبدل بمسار قرص محلي بعد
+     * التنزيل، راجع ProcessPrintJob::ensureLocalFile) وليس قراراً مقصوداً. لذا نبحث عن نسخة صالحة
+     * بديلة بدل رفض المعاينة كلياً بعد اكتمال المهمة:
+     * 1) بانتظار الموافقة: file_path نفسه لا يزال الرابط/المسار الأصلي كما وصل.
+     * 2) مصدرها مرفق واتساب وارد: رابط الرسالة الأصلية (Message::file_path) يبقى كما هو للأبد،
+     *    بصرف النظر عمّا فعله ProcessPrintJob بنسخة العمل الخاصة بمهمة الطباعة.
+     * 3) مصدرها مجلد الطباعة المستقل (بلا رسالة واتساب): الملف الأصلي محلي فقط على القرص
+     *    (source_file_path، يبقى محدَّثاً بعد الأرشفة — راجع PrintFolderManager)، فيُرفع مؤقتاً
+     *    لمساحة التخزين العامة ليحصل على رابط يصل عبره واتساب.
+     *
+     * @return array{0: string, 1: string, 2: ?string}|null [file_name, file_path_or_url, file_type]
+     */
+    private function resolvePrintJobPreviewFile(PrintJob $printJob): ?array
+    {
+        if ($printJob->status === 'awaiting_approval' && !empty($printJob->file_path)) {
+            return [$printJob->file_name, $printJob->file_path, $printJob->file_type];
+        }
+
+        if ($printJob->message && !empty($printJob->message->file_path)) {
+            return [$printJob->file_name, $printJob->message->file_path, $printJob->message->file_type];
+        }
+
+        if (!empty($printJob->source_file_path) && file_exists($printJob->source_file_path)) {
+            $publicUrl = $this->publishLocalFileForPreview($printJob->source_file_path);
+            if ($publicUrl) {
+                return [$printJob->file_name, $publicUrl, $printJob->file_type];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * ينسخ ملفاً محلياً (خارج مساحة storage/app/public الأصلية) إلى مساحة التخزين العامة مؤقتاً،
+     * ليحصل على رابط "/storage/..." يستطيع واتساب الوصول إليه فعلياً — مطلوب فقط لملفات مجلد
+     * الطباعة المستقل التي لا يوجد لها أي رابط بعيد أصلاً (بخلاف مرفقات واتساب الواردة).
+     */
+    private function publishLocalFileForPreview(string $localPath): ?string
+    {
+        try {
+            $extension = pathinfo($localPath, PATHINFO_EXTENSION);
+            $safeName = 'preview_' . uniqid() . ($extension ? ".{$extension}" : '');
+            $relativePath = 'previews/' . $safeName;
+
+            Storage::disk('public')->put($relativePath, file_get_contents($localPath));
+
+            return '/storage/' . $relativePath;
+        } catch (\Exception $e) {
+            Log::error('Failed to publish local print-folder file for admin preview', [
+                'path' => $localPath,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
     private function handlePrintJobApproval(int $printJobId, bool $approve): string
     {
         $printJob = PrintJob::with(['printer', 'message'])->find($printJobId);
@@ -540,7 +597,7 @@ class MessageController extends Controller
             : $dispatcher->reject($printJob, 'تم الرفض عبر رد واتساب من المسؤول.');
 
         if (!$ok) {
-            return "⚠️ مهمة الطباعة رقم {$printJob->id} ليست بانتظار الموافقة حالياً (حالتها الحالية: {$printJob->status}).";
+            return "⚠️ مهمة الطباعة رقم {$printJob->id} ليست بانتظار الموافقة حالياً (حالتها الحالية: {$printJob->statusLabel()}).";
         }
 
         return $approve

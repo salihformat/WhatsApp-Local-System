@@ -65,21 +65,12 @@ class PrintJobController extends Controller
             fputcsv($file, $columns);
 
             foreach ($printJobs as $job) {
-                $statusLabels = [
-                    'pending' => 'قيد الانتظار',
-                    'awaiting_approval' => 'بانتظار الموافقة',
-                    'printing' => 'جارٍ الطباعة',
-                    'completed' => 'مكتملة',
-                    'failed' => 'فشلت',
-                    'rejected' => 'مرفوضة',
-                ];
-
                 $row = [
                     $job->id,
                     $job->message?->phone_number ?? '',
                     $job->file_name,
                     $job->printer?->name ?? '',
-                    $statusLabels[$job->status] ?? $job->status,
+                    $job->statusLabel(),
                     $job->attempts,
                     $job->pages ?? '',
                     $job->created_at ? $job->created_at->format('Y-m-d H:i:s') : '',

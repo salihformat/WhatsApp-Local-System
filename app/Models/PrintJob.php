@@ -45,6 +45,27 @@ class PrintJob extends Model
     }
 
     /**
+     * التسميات العربية لكل حالات مهمة الطباعة — نقطة مرجعية واحدة تُستخدم في الواجهة، تصدير CSV،
+     * وردود واتساب (بدل تكرار نفس القائمة في كل مكان يعرض الحالة، كما كان الحال سابقاً).
+     */
+    public static function statusLabels(): array
+    {
+        return [
+            'pending' => 'قيد الانتظار',
+            'awaiting_approval' => 'بانتظار الموافقة',
+            'printing' => 'جارٍ الطباعة',
+            'completed' => 'مكتملة',
+            'failed' => 'فشلت',
+            'rejected' => 'مرفوضة',
+        ];
+    }
+
+    public function statusLabel(): string
+    {
+        return self::statusLabels()[$this->status] ?? $this->status;
+    }
+
+    /**
      * المدة بين وصول طلب الطباعة (created_at) واكتماله فعلياً (printed_at)، بصيغة مقروءة —
      * لمقارنة أداء الطباعة بمرور الوقت واكتشاف أي تباطؤ غير طبيعي (طابعة بطيئة/شبكة/ملفات كبيرة).
      */

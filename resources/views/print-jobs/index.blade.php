@@ -109,10 +109,6 @@
                                     'failed' => 'bg-red-50 text-red-700 border border-red-200',
                                     'rejected' => 'bg-red-50 text-red-700 border border-red-200',
                                 ];
-                                $statusLabels = [
-                                    'pending' => 'قيد الانتظار', 'awaiting_approval' => 'بانتظار الموافقة', 'printing' => 'جارٍ الطباعة',
-                                    'completed' => 'مكتملة', 'failed' => 'فشلت', 'rejected' => 'مرفوضة',
-                                ];
                             @endphp
                             <tr class="hover:bg-gray-50 transition-colors">
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{{ $job->id }}</td>
@@ -121,7 +117,7 @@
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $job->printer?->name ?? '—' }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <span class="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full {{ $statusColors[$job->status] ?? '' }}">
-                                        {{ $statusLabels[$job->status] ?? $job->status }}
+                                        {{ $job->statusLabel() }}
                                     </span>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 text-center">{{ $job->attempts }}</td>

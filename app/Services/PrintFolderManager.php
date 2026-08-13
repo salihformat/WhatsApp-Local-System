@@ -86,6 +86,10 @@ class PrintFolderManager
             } else {
                 File::move($printJob->source_file_path, $target);
             }
+
+            // [Fix] كان العمود يبقى مشيراً للمسار القديم في processing/ رغم أن الملف انتقل فعلياً —
+            // يُكسر أي استخدام لاحق له (مثل معاينة الملف بعد اكتمال الطباعة) لأن الملف لم يعد هناك.
+            $printJob->update(['source_file_path' => $target]);
         } catch (\Exception $e) {
             Log::error("PrintFolderManager: failed to move source file for PrintJob {$printJob->id} to {$targetFolder}: " . $e->getMessage());
         }

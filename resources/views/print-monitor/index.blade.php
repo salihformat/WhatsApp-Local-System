@@ -23,10 +23,17 @@
                 <div class="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded relative">{{ session('info') }}</div>
             @endif
 
+            @php
+                $hasReviewFiles = count($folders['review']['files'] ?? []) > 0;
+            @endphp
             <div class="flex justify-end">
-                <form action="{{ route('print-monitor.approve-all') }}" method="POST" onsubmit="return confirm('هل أنت متأكد من الموافقة على كل الملفات المعلّقة حالياً؟');">
+                <form action="{{ route('print-monitor.approve-all') }}" method="POST" onsubmit="confirmAction(event, 'هل أنت متأكد من الموافقة على كل الملفات المعلّقة حالياً؟', 'موافقة');">
                     @csrf
-                    <button type="submit" class="text-green-700 hover:text-green-900 bg-green-50 hover:bg-green-100 px-4 py-2 rounded-md transition-colors border border-green-200 text-sm font-medium">
+                    <button type="submit" 
+                        class="px-4 py-2 rounded-md transition-colors border text-sm font-medium 
+                            {{ $hasReviewFiles ? 'text-green-700 hover:text-green-900 bg-green-50 hover:bg-green-100 border-green-200' : 'text-gray-400 bg-gray-100 border-gray-200 cursor-not-allowed opacity-75' }}"
+                        {{ !$hasReviewFiles ? 'disabled' : '' }}
+                        title="{{ !$hasReviewFiles ? 'لا توجد ملفات بانتظار المراجعة حالياً' : '' }}">
                         موافقة على كل الملفات المعلّقة
                     </button>
                 </form>
@@ -140,11 +147,11 @@
                                         <td class="px-6 py-3 whitespace-nowrap text-sm">
                                             @if($file['message_id'])
                                                 <div class="flex gap-2">
-                                                    <form action="{{ route('print-monitor.approve', $file['message_id']) }}" method="POST" onsubmit="return confirm('سيتم إرسال الملف فعلياً إلى {{ $file['phone_number'] }}. متابعة؟');">
+                                                    <form action="{{ route('print-monitor.approve', $file['message_id']) }}" method="POST" onsubmit="confirmAction(event, 'سيتم إرسال الملف فعلياً إلى {{ $file['phone_number'] }}. متابعة؟', 'موافقة');">
                                                         @csrf
                                                         <button type="submit" class="px-3 py-1 rounded-md bg-green-600 text-white text-xs font-medium hover:bg-green-700">موافقة وإرسال</button>
                                                     </form>
-                                                    <form action="{{ route('print-monitor.reject', $file['message_id']) }}" method="POST" onsubmit="return confirm('سيتم رفض هذا الملف ونقله لمجلد فشلت بدون إرسال. متابعة؟');">
+                                                    <form action="{{ route('print-monitor.reject', $file['message_id']) }}" method="POST" onsubmit="confirmAction(event, 'سيتم رفض هذا الملف ونقله لمجلد فشلت بدون إرسال. متابعة؟', 'رفض', '#dc2626');">
                                                         @csrf
                                                         <button type="submit" class="px-3 py-1 rounded-md bg-red-600 text-white text-xs font-medium hover:bg-red-700">رفض</button>
                                                     </form>
@@ -210,3 +217,27 @@
         </div>
     </div>
 </x-app-layout>
+
+@push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+    function confirmAction(event, message, confirmText = 'موافق', confirmColor = '#16a34a') {
+        event.preventDefault();
+        let form = event.target;
+        Swal.fire({
+            title: 'هل أنت متأكد؟',
+            text: message,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: confirmColor,
+            cancelButtonColor: '#6b7280',
+            confirmButtonText: confirmText,
+            cancelButtonText: 'إلغاء'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                form.submit();
+            }
+        });
+    }
+</script>
+@endpush
