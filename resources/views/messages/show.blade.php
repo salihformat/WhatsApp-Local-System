@@ -148,7 +148,16 @@
                             
                             <!-- Status Badge Header with Explicit Clear Styling -->
                             <div id="status-badge-container">
-                                @if($message->status === 'read')
+                                @if($message->is_incoming)
+                                    {{-- [Fix] الرسائل الواردة تُخزَّن دائماً بحالة "received" (لا علاقة لها بحالات
+                                    التسليم/القراءة الخاصة بالرسائل الصادرة) — بدون هذا الفرع كانت تسقط في
+                                    الفرع الأخير (@else) وتظهر بشكل خاطئ كـ"فشلت" رغم استلامها بنجاح تماماً.
+                                    نفس التسمية والألوان المستخدمة في صفحة قائمة الرسائل (messages/index) لتناسق الواجهة. --}}
+                                    <span style="background-color: #eef2ff; color: #4338ca; border: 1px solid #6366f1;" class="px-4 py-2 inline-flex items-center gap-2 font-black rounded-xl text-sm shadow-md">
+                                        <span style="width: 10px; height: 10px; background-color: #6366f1; border-radius: 50%;"></span>
+                                        {{ __('مستلمة') }}
+                                    </span>
+                                @elseif($message->status === 'read')
                                     <span style="background-color: #dbeafe; color: #1e40af; border: 1px solid #3b82f6;" class="px-4 py-2 inline-flex items-center gap-2 font-black rounded-xl text-sm shadow-md">
                                         <span style="width: 10px; height: 10px; background-color: #2563eb; border-radius: 50%;"></span>
                                         {{ __('تم القراءة') }}
@@ -217,16 +226,20 @@
                                 </div>
                             @endif
 
-                            <!-- Check Live Status Action -->
-                            <div class="pt-4 border-t border-gray-100 flex justify-between items-center">
-                                <span class="text-xs text-gray-500 font-semibold">{{ __('هل ترغب بالتحقق من حالة تسليم الرسالة الآن؟') }}</span>
-                                <button onclick="checkLiveStatus({{ $message->id }})" id="check-status-btn" class="px-4 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-bold text-xs rounded-xl transition-colors flex items-center gap-2 shadow-sm">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                                    </svg>
-                                    <span id="check-status-text">{{ __('تحديث الحالة المباشرة') }}</span>
-                                </button>
-                            </div>
+                            @unless($message->is_incoming)
+                                {{-- التحقق من حالة التسليم/القراءة له معنى فقط للرسائل الصادرة (التي أرسلها
+                                النظام) — لا يوجد "تسليم" أو "قراءة" لرسالة وصلت أصلاً من العميل. --}}
+                                <!-- Check Live Status Action -->
+                                <div class="pt-4 border-t border-gray-100 flex justify-between items-center">
+                                    <span class="text-xs text-gray-500 font-semibold">{{ __('هل ترغب بالتحقق من حالة تسليم الرسالة الآن؟') }}</span>
+                                    <button onclick="checkLiveStatus({{ $message->id }})" id="check-status-btn" class="px-4 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-bold text-xs rounded-xl transition-colors flex items-center gap-2 shadow-sm">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                        </svg>
+                                        <span id="check-status-text">{{ __('تحديث الحالة المباشرة') }}</span>
+                                    </button>
+                                </div>
+                            @endunless
 
                         </div>
                     </div>
