@@ -50,6 +50,9 @@ class UpdateSettingRequest extends FormRequest
             'PHONE_MATCH_MODE' => 'nullable|in:partial,exact',
             'ENABLE_UNLABELED_PHONE_FALLBACK' => 'nullable|in:true,false',
             'PHONE_REVIEW_REQUIRED_SOURCES' => 'nullable|string|max:500',
+            'DUPLICATE_DETECTION_ENABLED' => 'nullable|in:true,false',
+            'DUPLICATE_DETECTION_WINDOW_MINUTES' => 'nullable|integer|min:1|max:10080',
+            'LEARNED_TRUST_THRESHOLD' => 'nullable|integer|min:0|max:20',
 
             // الطباعة الذكية
             'PRINTING_ENABLED' => 'nullable|in:true,false',
@@ -61,6 +64,7 @@ class UpdateSettingRequest extends FormRequest
             'PRINTING_REPLY_STATUS_TO_SENDER' => 'nullable|in:true,false',
             'PRINTING_REPLY_ACK_ON_RECEIPT' => 'nullable|in:true,false',
             'PRINTING_NOTIFY_OWNER_ON_JOB_FAILURE' => 'nullable|in:true,false',
+            'PRINT_EXTRACTION_METHOD' => 'nullable|in:ocr,popup,filename',
 
             // توزيع المحادثات
             'CONVERSATION_DISTRIBUTION_MODE' => 'nullable|in:manual,specific,all',

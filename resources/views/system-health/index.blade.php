@@ -73,7 +73,84 @@
                 </div>
 
                 <div class="text-xs text-gray-400 mt-4">آخر فحص: {{ $latest->checked_at->diffForHumans() }} ({{ $latest->checked_at->format('Y-m-d H:i:s') }})</div>
+            @endif
 
+            <!-- صحة الطباعة والمراجعة اليدوية (بيانات حيّة) -->
+            <div class="bg-white rounded-lg shadow-sm p-6">
+                <h3 class="text-sm font-bold text-gray-700 mb-4">صحة الطباعة والمراجعة اليدوية</h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                    <div class="bg-gray-50 rounded-lg p-4 border-r-4 {{ $printHealth['unhealthy_count'] > 0 ? 'border-red-500' : 'border-green-500' }}">
+                        <div class="text-xs text-gray-500 mb-1">طابعات بها مشكلة</div>
+                        <div class="text-lg font-bold {{ $printHealth['unhealthy_count'] > 0 ? 'text-red-700' : 'text-gray-800' }}">{{ $printHealth['unhealthy_count'] }} من {{ $printHealth['printers']->count() }}</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4 border-r-4 {{ $printHealth['awaiting_approval_count'] > 0 ? 'border-orange-500' : 'border-green-500' }}">
+                        <div class="text-xs text-gray-500 mb-1">طباعة بانتظار موافقة</div>
+                        <div class="text-lg font-bold {{ $printHealth['awaiting_approval_count'] > 0 ? 'text-orange-700' : 'text-gray-800' }}">{{ $printHealth['awaiting_approval_count'] }}</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4 border-r-4 {{ $printHealth['print_failed_today'] > 0 ? 'border-red-500' : 'border-green-500' }}">
+                        <div class="text-xs text-gray-500 mb-1">طباعة فاشلة اليوم</div>
+                        <div class="text-lg font-bold {{ $printHealth['print_failed_today'] > 0 ? 'text-red-700' : 'text-gray-800' }}">{{ $printHealth['print_failed_today'] }}</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4 border-r-4 {{ $sendReview['review_pending_count'] > 0 ? 'border-orange-500' : 'border-green-500' }} flex flex-col justify-between">
+                        <div>
+                            <div class="text-xs text-gray-500 mb-1">إرسال بانتظار مراجعة يدوية</div>
+                            <div class="text-lg font-bold {{ $sendReview['review_pending_count'] > 0 ? 'text-orange-700' : 'text-gray-800' }}">{{ $sendReview['review_pending_count'] }}</div>
+                        </div>
+                        @if($sendReview['review_pending_count'] > 0)
+                            <a href="{{ route('print-monitor.index') }}" class="text-xs text-indigo-600 hover:underline mt-2 inline-block">مراجعة الآن ←</a>
+                        @endif
+                    </div>
+                </div>
+
+                @if($printHealth['printers']->isNotEmpty())
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-sm">
+                            <thead>
+                                <tr class="text-right text-xs text-gray-500">
+                                    <th class="py-2 pl-4">الطابعة</th>
+                                    <th class="py-2 pl-4">الحالة</th>
+                                    <th class="py-2 pl-4">الاحتياطية</th>
+                                    <th class="py-2">آخر فحص</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                @foreach($printHealth['printers'] as $printer)
+                                    <tr>
+                                        <td class="py-2 pl-4 font-medium">{{ $printer->name }}</td>
+                                        <td class="py-2 pl-4">
+                                            @if(!$printer->last_checked_at)
+                                                <span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-500">لم تُفحص بعد</span>
+                                            @elseif($printer->last_status_healthy)
+                                                <span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700">سليمة</span>
+                                            @else
+                                                <span class="px-2 py-1 text-xs rounded-full bg-red-100 text-red-700" title="{{ $printer->last_status_detail }}">{{ $printer->last_status_detail }}</span>
+                                            @endif
+                                        </td>
+                                        <td class="py-2 pl-4 text-gray-500">
+                                            @if($printer->fallbackPrinter)
+                                                {{ $printer->fallbackPrinter->name }}
+                                                @if(!$printer->last_status_healthy && $printer->last_checked_at)
+                                                    <span class="text-xs text-indigo-600">(مُفعَّلة الآن)</span>
+                                                @endif
+                                            @else
+                                                <span class="text-gray-300">—</span>
+                                            @endif
+                                        </td>
+                                        <td class="py-2 text-gray-400 text-xs">{{ $printer->last_checked_at?->diffForHumans() ?? '—' }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @else
+                    <p class="text-sm text-gray-500">لا توجد طابعات مفعّلة.</p>
+                @endif
+                <div class="mt-3">
+                    <a href="{{ route('printers.index') }}" class="text-xs text-indigo-600 hover:underline">إدارة الطابعات ←</a>
+                </div>
+            </div>
+
+            @if($latest)
                 <!-- رسم بياني -->
                 <div class="bg-white rounded-lg shadow-sm p-6 mt-6">
                     <h3 class="text-sm font-bold text-gray-700 mb-4">اتجاه آخر {{ $chartData['labels']->count() }} فحصاً</h3>

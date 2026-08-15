@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Storage;
 use App\Models\Contact;
 use App\Models\Message;
 use App\Models\Printer;
+use App\Models\Setting;
 use App\Jobs\SendMessageJob;
 use App\Services\PrintFolderManager;
 use App\Services\PrintJobDispatcher;
@@ -172,22 +173,32 @@ class MonitorFolderCommand extends Command
             $extractedFromFilename = false;
             $trace = $this->newExtractionTrace();
 
-            if (!empty($matches)) {
-                $phoneNumber = $matches[0];
-                $extractedFromFilename = true;
-                $trace['source'] = 'filename';
-            } elseif ($extension === 'pdf' && ($extractedFromContent = $this->extractPhoneFromPdfContent($fullPath, $filename, $trace))) {
-                $phoneNumber = $extractedFromContent;
-            } elseif ($extension === 'docx' && ($extractedFromContent = $this->extractPhoneFromDocxContent($fullPath, $filename, $trace))) {
-                $phoneNumber = $extractedFromContent;
-            } elseif (in_array($extension, ['jpg', 'jpeg', 'png']) && ($extractedFromContent = $this->extractPhoneFromImageContent($fullPath, $filename, $trace))) {
-                $phoneNumber = $extractedFromContent;
+            $extractionMethod = Setting::get('PRINT_EXTRACTION_METHOD', 'ocr');
+
+            if ($extractionMethod === 'popup') {
+                $this->info("Prompting user for WhatsApp number via popup for file: {$filename}");
+                $phoneNumber = $this->promptUserForNumber($filename);
+                if ($phoneNumber) {
+                    $trace['source'] = 'popup';
+                }
             } else {
-                $fallbackPhone = env('MONITOR_FALLBACK_PHONE');
-                if (!empty($fallbackPhone)) {
-                    $phoneNumber = $fallbackPhone;
-                    $trace['source'] = 'env_fallback';
-                    $this->info("No phone number found in filename '{$filename}'. Using fallback phone: {$phoneNumber}");
+                if (!empty($matches)) {
+                    $phoneNumber = $matches[0];
+                    $extractedFromFilename = true;
+                    $trace['source'] = 'filename';
+                } elseif ($extractionMethod !== 'filename' && $extension === 'pdf' && ($extractedFromContent = $this->extractPhoneFromPdfContent($fullPath, $filename, $trace))) {
+                    $phoneNumber = $extractedFromContent;
+                } elseif ($extractionMethod !== 'filename' && $extension === 'docx' && ($extractedFromContent = $this->extractPhoneFromDocxContent($fullPath, $filename, $trace))) {
+                    $phoneNumber = $extractedFromContent;
+                } elseif ($extractionMethod !== 'filename' && in_array($extension, ['jpg', 'jpeg', 'png']) && ($extractedFromContent = $this->extractPhoneFromImageContent($fullPath, $filename, $trace))) {
+                    $phoneNumber = $extractedFromContent;
+                } else {
+                    $fallbackPhone = env('MONITOR_FALLBACK_PHONE');
+                    if (!empty($fallbackPhone)) {
+                        $phoneNumber = $fallbackPhone;
+                        $trace['source'] = 'env_fallback';
+                        $this->info("No phone number found in filename '{$filename}'. Using fallback phone: {$phoneNumber}");
+                    }
                 }
             }
 
@@ -195,9 +206,9 @@ class MonitorFolderCommand extends Command
             if (empty($trace['source'])) {
                 $trace['source'] = 'none';
             }
-            $this->recordExtractionTrace($filename, $extension, $trace);
 
             if (!$phoneNumber) {
+                $this->recordExtractionTrace($filename, $extension, $trace);
                 $this->warn("No phone number found in filename: {$filename} and no fallback phone is configured. Moving to failed folder.");
                 try {
                     $targetFailed = $failedPath . '/' . $filename;
@@ -212,14 +223,41 @@ class MonitorFolderCommand extends Command
                 continue;
             }
 
+            // [كشف التكرار] نفس محتوى الملف (بصرف النظر عن اسمه) أُرسل مسبقاً لنفس الرقم خلال نافذة
+            // زمنية قريبة؟ يحدث فعلياً عند سحب نفس الفاتورة للطباعة مرتين بالخطأ، أو إعادة نسخ نفس
+            // الملف بالخطأ لمجلد المراقبة. نُحجزه للمراجعة اليدوية بدل إرساله تلقائياً مرة ثانية —
+            // قابل للتعطيل بالكامل عبر DUPLICATE_DETECTION_ENABLED=false.
+            $fileHash = $this->computeFileHash($fullPath);
+            $duplicateOf = $this->findRecentDuplicate($fileHash, $phoneNumber);
+            if ($duplicateOf) {
+                $this->warn("Holding '{$filename}' for manual review: duplicate of message #{$duplicateOf->id} sent to the same number recently.");
+                $this->holdForManualReview($filename, $extension, $fullPath, $reviewPath, $phoneNumber, $extractedFromFilename, $trace['source'], $fileHash, "⚠️ هذا الملف مطابق تماماً (نفس المحتوى) لملف أُرسل مسبقاً لنفس الرقم (رسالة #{$duplicateOf->id}، " . $duplicateOf->created_at->diffForHumans() . "). تأكد أن هذا ليس إرسالاً مكرراً بالخطأ قبل الموافقة.");
+                continue;
+            }
+
             // مطابقات مصدرها "احتياطي بلا تسمية" أو "طبقة نص تالفة" أو "رقم احتياطي عام" أقل موثوقية
             // من التسمية الصريحة أو رقم الملف المطابق لجهة اتصال — تُحجز للمراجعة اليدوية بدلاً من
             // الإرسال التلقائي، لتفادي تكرار حادثة إرسال ملف لرقم غير صحيح (قابلة للتخصيص من الإعدادات).
             $reviewRequiredSources = $this->getConfiguredList('PHONE_REVIEW_REQUIRED_SOURCES', ['unlabeled_fallback', 'corrupted_fallback', 'env_fallback']);
-            $requiresApproval = config('app.monitor_folder_require_approval') || in_array($trace['source'], $reviewRequiredSources, true);
+            $globalApprovalRequired = config('app.monitor_folder_require_approval');
+            $lowConfidenceSource = in_array($trace['source'], $reviewRequiredSources, true);
+
+            // [التعلّم من التصحيح اليدوي] إن وافق المسؤول سابقاً على نفس الرقم من نفس مصدر الاستخراج
+            // منخفض الثقة عدة مرات (بلا أي رفض)، لم يعد هناك داعٍ لمقاطعته بمراجعة يدوية في كل مرة —
+            // نتخطاها تلقائياً هنا (لا يُطبَّق على "موافقة إلزامية لكل الملفات" العامة، فتلك سياسة صريحة
+            // غير مرتبطة بمستوى الثقة). راجع isLearnedTrusted() وتسجيل القرارات في MonitorFolderReviewService.
+            $learnedTrusted = $lowConfidenceSource && $this->isLearnedTrusted($phoneNumber, $trace['source']);
+            if ($learnedTrusted) {
+                $trace['learned_trusted'] = true;
+                $this->info("Skipping manual review for '{$filename}': phone {$phoneNumber} previously confirmed correct for source '{$trace['source']}' (learned trust).");
+            }
+
+            $this->recordExtractionTrace($filename, $extension, $trace);
+
+            $requiresApproval = $globalApprovalRequired || ($lowConfidenceSource && !$learnedTrusted);
             if ($requiresApproval) {
-                $this->warn("Holding '{$filename}' for manual review before sending via WhatsApp (phone: {$phoneNumber}, reason: " . (config('app.monitor_folder_require_approval') ? 'approval required for all files' : "low-confidence source '{$trace['source']}'") . ').');
-                $this->holdForManualReview($filename, $extension, $fullPath, $reviewPath, $phoneNumber, $extractedFromFilename);
+                $this->warn("Holding '{$filename}' for manual review before sending via WhatsApp (phone: {$phoneNumber}, reason: " . ($globalApprovalRequired ? 'approval required for all files' : "low-confidence source '{$trace['source']}'") . ').');
+                $this->holdForManualReview($filename, $extension, $fullPath, $reviewPath, $phoneNumber, $extractedFromFilename, $trace['source'], $fileHash);
                 continue;
             }
 
@@ -277,8 +315,10 @@ class MonitorFolderCommand extends Command
                     'source_filename' => $filename,
                     'file_path' => $fileUrl,
                     'file_type' => $this->getMimeTypeByExtension($extension),
+                    'file_hash' => $fileHash,
                     'message_type' => 'media',
                     'status' => 'pending',
+                    'metadata' => $learnedTrusted ? ['review_source' => $trace['source'], 'auto_approved_via' => 'learned_trust'] : null,
                     'created_at' => now()
                 ]);
 
@@ -450,22 +490,25 @@ class MonitorFolderCommand extends Command
      * بانتظار موافقته قبل إرساله، مع تعليمات الرد النصي البسيط للموافقة/الرفض — النظام لا يدعم أزرار
      * تفاعلية حتى الآن (راجع MessageController::handleAdminCommand لمعالجة الرد).
      */
-    protected function notifyAdminForSendApproval(Message $message): void
+    protected function notifyAdminForSendApproval(Message $message, ?string $customNotice = null): void
     {
         if (empty(app(\App\Services\AdminNotifier::class)->phones())) {
             Log::warning("MonitorFolder: message {$message->id} needs send approval but no printing.alert_phone_number configured — it will remain stuck until approved manually from /print-monitor.");
             return;
         }
 
-        app(\App\Services\MonitorFolderReviewService::class)->notifyAdminForApproval($message);
+        app(\App\Services\MonitorFolderReviewService::class)->notifyAdminForApproval($message, false, $customNotice);
     }
 
     /**
      * حجز ملف مع رقم جوال مستخرج من مصدر منخفض الثقة (احتياطي بلا تسمية / نص تالف / رقم احتياطي عام)
      * للمراجعة اليدوية بدلاً من إرساله تلقائياً. يُنشئ سجل رسالة بحالة review_pending دون إرساله فعلياً،
      * وينقل الملف لمجلد review بدلاً من processing حتى تتم الموافقة أو الرفض من صفحة متابعة الإرسال.
+     * $extractionSource و$fileHash يُحفظان في metadata الرسالة: الأول يُستخدم لاحقاً عند الموافقة/الرفض
+     * لتسجيل "التعلّم من التصحيح اليدوي" (راجع MonitorFolderReviewService)، والثاني لعرضه في واجهة
+     * المراجعة عند الاشتباه بتكرار. $customNotice نص تحذير إضافي اختياري (يُستخدم لتنبيه التكرار).
      */
-    protected function holdForManualReview(string $filename, string $extension, string $fullPath, string $reviewPath, string $phoneNumber, bool $extractedFromFilename): void
+    protected function holdForManualReview(string $filename, string $extension, string $fullPath, string $reviewPath, string $phoneNumber, bool $extractedFromFilename, ?string $extractionSource = null, ?string $fileHash = null, ?string $customNotice = null): void
     {
         try {
             $cleanFilename = $filename;
@@ -494,8 +537,10 @@ class MonitorFolderCommand extends Command
                 'source_filename' => $filename,
                 'file_path' => $fileUrl,
                 'file_type' => $this->getMimeTypeByExtension($extension),
+                'file_hash' => $fileHash,
                 'message_type' => 'media',
                 'status' => 'review_pending',
+                'metadata' => ['review_source' => $extractionSource],
                 'created_at' => now(),
             ]);
 
@@ -514,7 +559,7 @@ class MonitorFolderCommand extends Command
 
             $this->warn("⏸️ File held for manual review: {$filename} (phone: {$phoneNumber})");
 
-            $this->notifyAdminForSendApproval($message);
+            $this->notifyAdminForSendApproval($message, $customNotice);
         } catch (\Exception $e) {
             $this->error("Failed to hold file {$filename} for review: " . $e->getMessage());
             Log::error("PrintMonitor Error (holdForManualReview): " . $e->getMessage());
@@ -1056,6 +1101,81 @@ class MonitorFolderCommand extends Command
     }
 
     /**
+     * MD5 لمحتوى الملف الفعلي (وليس اسمه) — أساس كشف التكرار في findRecentDuplicate(). يُعيد null
+     * بصمت عند تعذّر القراءة بدل إفشال معالجة الملف كاملة بسبب هذا الفحص الإضافي فقط.
+     */
+    protected function computeFileHash(string $fullPath): ?string
+    {
+        try {
+            $hash = @md5_file($fullPath);
+            return $hash ?: null;
+        } catch (\Throwable $e) {
+            Log::warning("MonitorFolder: failed to compute file hash for '{$fullPath}': " . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * [كشف التكرار] هل نفس محتوى الملف أُرسل (أو قيد الإرسال/المراجعة) لنفس الرقم خلال نافذة زمنية
+     * قريبة؟ نستثني الرسائل الفاشلة نهائياً (status=failed) من الاعتبار — فشل الإرسال السابق ليس
+     * سبباً لمنع إعادة محاولة إرسال نفس الملف. قابل للتعطيل بالكامل عبر DUPLICATE_DETECTION_ENABLED.
+     */
+    protected function findRecentDuplicate(?string $fileHash, string $phoneNumber): ?Message
+    {
+        if (!$fileHash) {
+            return null;
+        }
+
+        $enabled = filter_var(setting('DUPLICATE_DETECTION_ENABLED', env('DUPLICATE_DETECTION_ENABLED', true)), FILTER_VALIDATE_BOOLEAN);
+        if (!$enabled) {
+            return null;
+        }
+
+        $windowMinutes = (int) setting('DUPLICATE_DETECTION_WINDOW_MINUTES', env('DUPLICATE_DETECTION_WINDOW_MINUTES', 60));
+        if ($windowMinutes <= 0) {
+            return null;
+        }
+
+        return Message::where('file_hash', $fileHash)
+            ->where('phone_number', $this->formatPhoneNumber($phoneNumber))
+            ->where('created_at', '>=', now()->subMinutes($windowMinutes))
+            ->whereNotIn('status', ['failed', 'no_whatsapp'])
+            ->orderByDesc('created_at')
+            ->first();
+    }
+
+    /**
+     * [التعلّم من التصحيح اليدوي] هل وافق المسؤول سابقاً على نفس الرقم من نفس مصدر الاستخراج
+     * منخفض الثقة عدد مرات كافٍ (LEARNED_TRUST_THRESHOLD، افتراضياً مرتان) بلا أي رفض واحد؟ أي رفض
+     * سابق واحد يُسقط الثقة نهائياً حتى لو تكررت الموافقات بعده — الحذر هنا أولوية على الراحة.
+     */
+    protected function isLearnedTrusted(string $phoneNumber, string $source): bool
+    {
+        $formattedPhone = $this->formatPhoneNumber($phoneNumber);
+
+        $rejections = \App\Models\ExtractionCorrection::where('phone_number', $formattedPhone)
+            ->where('source', $source)
+            ->where('decision', 'rejected')
+            ->exists();
+
+        if ($rejections) {
+            return false;
+        }
+
+        $threshold = (int) setting('LEARNED_TRUST_THRESHOLD', env('LEARNED_TRUST_THRESHOLD', 2));
+        if ($threshold <= 0) {
+            return false;
+        }
+
+        $approvals = \App\Models\ExtractionCorrection::where('phone_number', $formattedPhone)
+            ->where('source', $source)
+            ->where('decision', 'approved')
+            ->count();
+
+        return $approvals >= $threshold;
+    }
+
+    /**
      * تحويل قائمة كلمات دلالة إلى نمط regex بديل (OR)، مع دعم وضعي المطابقة الجزئية والكاملة
      * عبر PHONE_MATCH_MODE=partial|exact (الكامل يفرض حدود كلمة \b حول كل كلمة دلالة).
      */
@@ -1110,6 +1230,7 @@ class MonitorFolderCommand extends Command
                 'final_phone' => $trace['final_phone'] ?? null,
                 'rtl_corrected' => $trace['rtl_corrected'] ?? false,
                 'pdf_ocr_used' => $trace['pdf_ocr_used'] ?? false,
+                'learned_trusted' => $trace['learned_trusted'] ?? false,
             ]);
         } catch (\Exception $e) {
             Log::warning("MonitorFolder: Failed to record extraction trace for '{$filename}': " . $e->getMessage());
@@ -1135,5 +1256,27 @@ class MonitorFolderCommand extends Command
             'gif' => 'image/gif',
         ];
         return $mimes[strtolower($extension)] ?? 'application/octet-stream';
+    }
+    /**
+     * يعرض نافذة منبثقة (Popup) عبر PowerShell لطلب الرقم من المستخدم
+     */
+    protected function promptUserForNumber(string $filename): ?string
+    {
+        $safeFilename = addslashes($filename);
+        $psCommand = "powershell -Command \"Add-Type -AssemblyName Microsoft.VisualBasic; \$num = [Microsoft.VisualBasic.Interaction]::InputBox('الرجاء إدخال رقم الواتساب لإرسال الفاتورة / الملف: {$safeFilename}', 'طابعة الواتساب الافتراضية', ''); Write-Output \$num\"";
+        
+        $output = shell_exec($psCommand);
+        
+        if ($output) {
+            $number = trim($output);
+            // Basic validation for phone number (digits only, length >= 9)
+            if (preg_match('/^[0-9]{9,20}$/', $number)) {
+                return $number;
+            } else if (!empty($number)) {
+                $this->warn("User entered an invalid phone number format: {$number}");
+            }
+        }
+        
+        return null;
     }
 }

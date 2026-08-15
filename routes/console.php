@@ -58,3 +58,6 @@ Schedule::command('printing:send-approval-reminders')->everyTenMinutes()->withou
 
 // نسخ احتياطي يومي لقاعدة البيانات (mysqldump مضغوط)، مع حذف النسخ الأقدم من backup_retention_days
 Schedule::command('backup:database')->dailyAt('03:00')->withoutOverlapping();
+
+// تنظيف الملفات اليتيمة في مجلد failed (نجحت رسالتها لاحقاً عبر إعادة محاولة تلقائية فتُنقل لـarchive)
+Schedule::command('printmonitor:cleanup-orphans')->hourly()->withoutOverlapping();

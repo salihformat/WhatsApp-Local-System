@@ -35,6 +35,7 @@ class Printer extends Model
         'last_status_detail',
         'last_checked_at',
         'pages_printed',
+        'fallback_printer_id',
     ];
 
     protected $casts = [
@@ -45,6 +46,20 @@ class Printer extends Model
         'last_checked_at' => 'datetime',
         'pages_printed' => 'integer',
     ];
+
+    public function fallbackPrinter()
+    {
+        return $this->belongsTo(Printer::class, 'fallback_printer_id');
+    }
+
+    /**
+     * سليمة إن لم تُفحص بعد بعد (بلا خطأ) أو كان آخر فحص فعلي سليماً — الطابعات الجديدة غير المفحوصة
+     * لا يجب اعتبارها "معطّلة" وتحويل مهامها فوراً لطابعة احتياطية عشوائياً.
+     */
+    public function isHealthy(): bool
+    {
+        return $this->last_checked_at === null || $this->last_status_healthy;
+    }
 
     public function rules()
     {

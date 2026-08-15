@@ -21,11 +21,13 @@ class ExtractionTrace extends Model
         'final_phone',
         'rtl_corrected',
         'pdf_ocr_used',
+        'learned_trusted',
     ];
 
     protected $casts = [
         'excluded' => 'array',
         'rtl_corrected' => 'boolean',
         'pdf_ocr_used' => 'boolean',
+        'learned_trusted' => 'boolean',
     ];
 }

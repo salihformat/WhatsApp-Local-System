@@ -169,6 +169,9 @@
                                         <td colspan="{{ $colCount }}" class="px-6 py-3 bg-indigo-50/50 text-xs text-gray-700">
                                             <div class="space-y-1">
                                                 <div><span class="font-semibold">آلية الاستخراج:</span> {{ $file['trace']['source_label'] }}</div>
+                                                @if($file['trace']['learned_trusted'])
+                                                    <div class="text-green-700">✅ تم تخطي المراجعة اليدوية تلقائياً — رقم موثوق بالتعلّم من موافقات سابقة على نفس الرقم من نفس المصدر.</div>
+                                                @endif
                                                 @if($file['trace']['rtl_corrected'])
                                                     <div class="text-amber-700">⚠ تم تصحيح انعكاس ترتيب الأحرف العربية في النص قبل المطابقة (مشكلة معروفة في استخراج بعض ملفات PDF).</div>
                                                 @endif

@@ -45,6 +45,7 @@ class PrinterController extends Controller
             'print_mode' => ['nullable', 'string', 'in:auto,approval'],
             'is_default' => ['nullable', 'boolean'],
             'supports_status_check' => ['nullable', 'boolean'],
+            'fallback_printer_id' => ['nullable', 'integer', 'exists:printers,id'],
             'notes' => ['nullable', 'string'],
         ]);
 
@@ -71,6 +72,14 @@ class PrinterController extends Controller
             'is_default' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
             'supports_status_check' => ['nullable', 'boolean'],
+            'fallback_printer_id' => [
+                'nullable', 'integer', 'exists:printers,id',
+                function ($attribute, $value, $fail) use ($printer) {
+                    if ((int) $value === $printer->id) {
+                        $fail('لا يمكن أن تكون الطابعة احتياطية لنفسها.');
+                    }
+                },
+            ],
             'notes' => ['nullable', 'string'],
         ]);
 

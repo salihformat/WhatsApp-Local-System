@@ -36,6 +36,7 @@ class Message extends Model
         'file_type',
         'file_size',
         'file_path',
+        'file_hash',
         'message_type',
         'status',
         'central_message_id',

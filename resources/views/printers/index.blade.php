@@ -94,6 +94,9 @@
                     محددة (رقم جوال/كلمة مفتاحية/نوع ملف). بدون تعيين طابعة افتراضية، أي ملف لا يُطابق قاعدة صريحة يبقى بلا طباعة إطلاقاً. يمكن تعيين طابعة واحدة فقط كافتراضية في نفس الوقت — تفعيلها لطابعة يُلغيها تلقائياً من أي طابعة أخرى.
                 </p>
                 <p class="text-xs text-gray-500 mt-2">
+                    <strong>تحويل تلقائي عند التعطل:</strong> عيّن لكل طابعة "طابعة احتياطية" من العمود المخصص في الجدول أدناه — إن أظهر آخر فحص دوري (كل 10 دقائق) أن الطابعة الأصلية غير سليمة (نفاد ورق/حبر/غير متصلة)، تُحوَّل مهام الطباعة الجديدة تلقائياً للاحتياطية (بشرط أن تكون هي نفسها سليمة ومفعّلة)، مع تنبيه واتساب للمسؤول بالتحويل. لا يعيد النظام محاولة الطابعة الأصلية تلقائياً بعد عودتها — كل مهمة جديدة تُقيَّم من جديد وقت وصولها.
+                </p>
+                <p class="text-xs text-gray-500 mt-2">
                     <strong>طباعة محلية مباشرة (بلا واتساب):</strong> ضع أي ملف داخل
                     <code>{{ rtrim(config('app.monitor_folder_path'), '/\\') }}\print\&lt;اسم الطابعة&gt;\</code>
                     وسيُطبع تلقائياً (أو ينتظر موافقة) حسب "وضع الطباعة" أعلاه لتلك الطابعة — المسار الدقيق لكل طابعة موضّح تحت اسمها في الجدول أدناه، ويُنشأ تلقائياً عند أول تشغيل لأمر <code>monitor:folder</code>.
@@ -113,6 +116,7 @@
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">مفعّلة</th>
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">تأكيد الطباعة للعميل</th>
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">حالة الطابعة</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase" title="عند تعطّل هذه الطابعة (حسب آخر فحص دوري)، تُحوَّل مهام الطباعة الجديدة تلقائياً لهذه الطابعة الاحتياطية">احتياطية عند التعطل 🛈</th>
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">عدد مهام الطباعة</th>
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase" title="إجمالي الصفحات المطبوعة فعلياً — تقدير تقريبي لتخطيط استهلاك الحبر/الورق">الصفحات المطبوعة 🛈</th>
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">إجراءات</th>
@@ -199,6 +203,25 @@
                                         <div class="text-xs text-gray-400 mt-1">{{ $printer->last_checked_at->diffForHumans() }}</div>
                                     @endif
                                 </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <form action="{{ route('printers.update', $printer) }}" method="POST" class="inline-flex items-center gap-1">
+                                        @csrf @method('PUT')
+                                        <input type="hidden" name="name" value="{{ $printer->name }}">
+                                        <input type="hidden" name="windows_printer_name" value="{{ $printer->windows_printer_name }}">
+                                        <input type="hidden" name="type" value="{{ $printer->type }}">
+                                        <input type="hidden" name="is_default" value="{{ $printer->is_default ? 1 : 0 }}">
+                                        <input type="hidden" name="is_active" value="{{ $printer->is_active ? 1 : 0 }}">
+                                        <input type="hidden" name="supports_status_check" value="{{ $printer->supports_status_check ? 1 : 0 }}">
+                                        <select name="fallback_printer_id" onchange="this.form.submit()" class="text-xs rounded-md border-gray-300 shadow-sm" title="الطابعة التي تُستخدم تلقائياً لأي مهمة طباعة جديدة موجّهة لهذه الطابعة إن كانت غير سليمة حسب آخر فحص دوري">
+                                            <option value="">بلا تحويل تلقائي</option>
+                                            @foreach($printers as $other)
+                                                @if($other->id !== $printer->id)
+                                                    <option value="{{ $other->id }}" {{ $printer->fallback_printer_id === $other->id ? 'selected' : '' }}>{{ $other->name }}</option>
+                                                @endif
+                                            @endforeach
+                                        </select>
+                                    </form>
+                                </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-gray-500">{{ $printer->print_jobs_count }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-gray-500">{{ number_format($printer->pages_printed) }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap space-x-2 space-x-reverse">
@@ -233,7 +256,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="11" class="px-6 py-4 text-center text-gray-500">لا توجد طابعات مضافة بعد</td>
+                                <td colspan="12" class="px-6 py-4 text-center text-gray-500">لا توجد طابعات مضافة بعد</td>
                             </tr>
                         @endforelse
                     </tbody>

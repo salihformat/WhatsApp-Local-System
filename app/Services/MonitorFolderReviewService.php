@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Jobs\SendMessageJob;
+use App\Models\ExtractionCorrection;
 use App\Models\Message;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
@@ -51,6 +52,8 @@ class MonitorFolderReviewService
             $message->update(['status' => 'pending']);
             dispatch(new SendMessageJob($message->id));
 
+            $this->recordCorrection($message, 'approved');
+
             Log::info('MonitorFolder: manual review approved', ['message_id' => $message->id, 'phone' => $message->phone_number]);
 
             return ['success' => true, 'message' => "تمت الموافقة، سيُرسل الملف إلى {$message->phone_number} الآن."];
@@ -92,6 +95,8 @@ class MonitorFolderReviewService
                 'error_message' => 'تم الرفض يدوياً من قبل ' . ($actorLabel ?: 'مستخدم') . '.',
             ]);
 
+            $this->recordCorrection($message, 'rejected');
+
             Log::info('MonitorFolder: manual review rejected', ['message_id' => $message->id, 'phone' => $message->phone_number]);
 
             return ['success' => true, 'message' => 'تم رفض الملف ونقله لمجلد "فشلت".'];
@@ -120,12 +125,14 @@ class MonitorFolderReviewService
     /**
      * إبلاغ المسؤول (أو المسؤولين) عبر واتساب بملف بانتظار موافقته قبل إرساله، مع تعليمات الرد
      * النصي البسيط للموافقة/الرفض. عامة (public) لإعادة استخدامها من أمر التذكير التلقائي.
+     * $customNotice نص تحذير إضافي اختياري يُدرَج أعلى الرسالة (يُستخدم حالياً لتنبيه اشتباه التكرار).
      */
-    public function notifyAdminForApproval(Message $message, bool $isReminder = false): void
+    public function notifyAdminForApproval(Message $message, bool $isReminder = false, ?string $customNotice = null): void
     {
         $prefix = $isReminder ? "⏰ تذكير — لا يزال بانتظار موافقتك:\n\n" : '';
+        $notice = $customNotice ? $customNotice . "\n\n" : '';
 
-        $text = $prefix . "📨 ملف بانتظار موافقتك قبل الإرسال عبر واتساب\n"
+        $text = $prefix . $notice . "📨 ملف بانتظار موافقتك قبل الإرسال عبر واتساب\n"
             . "رقم الرسالة: {$message->id}\n"
             . "إلى: {$message->phone_number}\n"
             . "الملف: {$message->file_name}\n\n"
@@ -134,6 +141,32 @@ class MonitorFolderReviewService
             . "لمعاينة الملف أولاً أرسل: ارسل لي الملف ارسال {$message->id}";
 
         $this->adminNotifier->notify($text, ['source' => 'monitor_send_approval_request', 'reviewed_message_id' => $message->id]);
+    }
+
+    /**
+     * تسجيل قرار المراجعة اليدوية (موافقة/رفض) كتصحيح، فقط للرسائل التي حُجزت فعلياً بسبب استخراج
+     * منخفض الثقة (وليس بسبب "موافقة إلزامية لكل الملفات" العامة التي لا علاقة لها بمستوى الثقة —
+     * راجع MonitorFolderCommand::$globalApprovalRequired). المصدر يُقرأ من metadata['review_source']
+     * الذي حفظه MonitorFolderCommand::holdForManualReview وقت الحجز.
+     */
+    private function recordCorrection(Message $message, string $decision): void
+    {
+        $source = $message->metadata['review_source'] ?? null;
+        if (!$source) {
+            return;
+        }
+
+        try {
+            ExtractionCorrection::create([
+                'phone_number' => $message->phone_number,
+                'source' => $source,
+                'decision' => $decision,
+                'message_id' => $message->id,
+                'source_filename' => $message->source_filename,
+            ]);
+        } catch (\Exception $e) {
+            Log::warning('MonitorFolderReviewService: failed to record extraction correction: ' . $e->getMessage());
+        }
     }
 
     /**

@@ -256,6 +256,19 @@
                                 <p class="text-xs text-gray-500 mb-4">تُستخدم هذه الإعدادات عندما لا يحتوي اسم الملف على رقم جوال، فيبحث النظام داخل محتوى الملف نفسه.</p>
 
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div class="mb-4 md:col-span-2">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">آلية استخراج الرقم (PRINT_EXTRACTION_METHOD)</label>
+                                        @php $extractionMethod = old('PRINT_EXTRACTION_METHOD', $settings['PRINT_EXTRACTION_METHOD'] ?? 'ocr'); @endphp
+                                        <select name="PRINT_EXTRACTION_METHOD" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                            <option value="ocr" @selected($extractionMethod === 'ocr')>قراءة الرقم آلياً من محتوى الملف (الافتراضي الذكي)</option>
+                                            <option value="popup" @selected($extractionMethod === 'popup')>نافذة منبثقة (طلب إدخال الرقم يدوياً عند كل ملف)</option>
+                                            <option value="filename" @selected($extractionMethod === 'filename')>استخراج من اسم الملف فقط (لا يبحث داخل الملف)</option>
+                                        </select>
+                                        <p class="text-xs text-gray-400 mt-1">
+                                            "النافذة المنبثقة" ممتازة وتعمل بكفاءة إذا كنت تُشغل المراقبة بشكل تفاعلي، ولكنها قد لا تظهر إذا كان الخادم يعمل كخدمة مخفية في الويندوز (Session 0).
+                                        </p>
+                                    </div>
+
                                     <div class="mb-4">
                                         <label class="block text-sm font-medium text-gray-700 mb-1">كلمات البحث عن رقم الجوال (PHONE_EXTRACTION_LABELS) <span class="text-xs text-gray-500">مفصولة بفاصلة</span></label>
                                         <textarea name="PHONE_EXTRACTION_LABELS" rows="2" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="رقم الجوال,الجوال,جوال,phone,mobile">{{ old('PHONE_EXTRACTION_LABELS', $settings['PHONE_EXTRACTION_LABELS'] ?? '') }}</textarea>
@@ -301,6 +314,31 @@
                                             القيم الممكنة: <code dir="ltr">filename, label, file_number, unlabeled_fallback, corrupted_fallback, env_fallback</code>.
                                             اتركه فارغاً للإرسال التلقائي دائماً (بدون مراجعة).
                                         </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- كشف التكرار والتعلّم من التصحيح اليدوي -->
+                            <div class="bg-gray-50 p-6 rounded-lg shadow-sm border border-gray-100 md:col-span-2">
+                                <h3 class="text-lg font-bold mb-4 text-indigo-700 border-b pb-2">كشف التكرار والتعلّم من التصحيح اليدوي</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div class="mb-4">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">كشف التكرار (DUPLICATE_DETECTION_ENABLED)</label>
+                                        @php $dupEnabled = old('DUPLICATE_DETECTION_ENABLED', $settings['DUPLICATE_DETECTION_ENABLED'] ?? 'true'); @endphp
+                                        <select name="DUPLICATE_DETECTION_ENABLED" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                            <option value="true" @selected($dupEnabled === 'true')>مفعّل</option>
+                                            <option value="false" @selected($dupEnabled === 'false')>معطّل</option>
+                                        </select>
+                                        <p class="text-xs text-gray-400 mt-1">يحجز للمراجعة اليدوية أي ملف بنفس محتوى ملف سبق إرساله لنفس الرقم مؤخراً، بدل إرساله تلقائياً مرة ثانية.</p>
+                                    </div>
+                                    <div class="mb-4">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">نافذة كشف التكرار بالدقائق (DUPLICATE_DETECTION_WINDOW_MINUTES)</label>
+                                        <input type="number" min="1" name="DUPLICATE_DETECTION_WINDOW_MINUTES" value="{{ old('DUPLICATE_DETECTION_WINDOW_MINUTES', $settings['DUPLICATE_DETECTION_WINDOW_MINUTES'] ?? '60') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                    </div>
+                                    <div class="mb-4">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">حد الثقة المكتسبة (LEARNED_TRUST_THRESHOLD)</label>
+                                        <input type="number" min="0" name="LEARNED_TRUST_THRESHOLD" value="{{ old('LEARNED_TRUST_THRESHOLD', $settings['LEARNED_TRUST_THRESHOLD'] ?? '2') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                        <p class="text-xs text-gray-400 mt-1">عدد مرات الموافقة اليدوية على نفس الرقم من نفس المصدر منخفض الثقة قبل تخطي المراجعة تلقائياً في المرات القادمة. رفض واحد يُسقط الثقة فوراً. 0 يعطّل الميزة.</p>
                                     </div>
                                 </div>
                             </div>

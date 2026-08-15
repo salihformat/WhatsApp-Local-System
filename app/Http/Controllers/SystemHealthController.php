@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Message;
+use App\Models\PrintJob;
+use App\Models\Printer;
 use App\Models\SystemHealthLog;
 
 class SystemHealthController extends Controller
@@ -28,7 +31,24 @@ class SystemHealthController extends Controller
             // Table might not exist or error
         }
 
-        return view('system-health.index', compact('latest', 'chartData', 'history', 'failedJobs'));
+        // [لوحة صحة الإرسال الموحدة] بخلاف بيانات SystemHealthLog أعلاه (تاريخية، تُسجَّل كل 10 دقائق
+        // عبر monitor:system)، هذه بيانات حيّة (لحظة التحميل) عن الطابعات ومهام الطباعة والمراجعة
+        // اليدوية — تُكمّل صورة "صحة الإرسال" لتشمل مسار الطباعة أيضاً، وليس فقط رسائل واتساب.
+        $printers = Printer::active()->with('fallbackPrinter')->get();
+        $unhealthyPrinters = $printers->filter(fn (Printer $p) => $p->last_checked_at && !$p->last_status_healthy);
+
+        $printHealth = [
+            'printers' => $printers,
+            'unhealthy_count' => $unhealthyPrinters->count(),
+            'awaiting_approval_count' => PrintJob::where('status', 'awaiting_approval')->count(),
+            'print_failed_today' => PrintJob::where('status', 'failed')->whereDate('updated_at', today())->count(),
+        ];
+
+        $sendReview = [
+            'review_pending_count' => Message::where('status', 'review_pending')->count(),
+        ];
+
+        return view('system-health.index', compact('latest', 'chartData', 'history', 'failedJobs', 'printHealth', 'sendReview'));
     }
 
     public function restartQueue()

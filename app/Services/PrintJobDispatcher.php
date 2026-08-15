@@ -6,6 +6,7 @@ use App\Jobs\ProcessPrintJob;
 use App\Models\Message;
 use App\Models\PrintJob;
 use App\Models\Printer;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -21,6 +22,8 @@ class PrintJobDispatcher
 
     public function dispatch(Message $message, Printer $printer, string $source): PrintJob
     {
+        $printer = $this->resolveHealthyPrinter($printer);
+
         $extension = FileTypeResolver::resolveExtension($message->file_name, $message->file_path, $message->file_type, 'pdf');
         $fileName = $message->file_name ?: "ملف_{$message->id}.{$extension}";
 
@@ -51,6 +54,8 @@ class PrintJobDispatcher
      */
     public function dispatchFromFile(string $processingPath, string $fileName, ?string $fileType, Printer $printer, string $source): PrintJob
     {
+        $printer = $this->resolveHealthyPrinter($printer);
+
         $printJob = PrintJob::create([
             'message_id' => null,
             'printer_id' => $printer->id,
@@ -69,6 +74,40 @@ class PrintJobDispatcher
         }
 
         return $printJob;
+    }
+
+    /**
+     * [تحويل تلقائي عند التعطل] إن كانت الطابعة المطلوبة غير سليمة حسب آخر فحص دوري (monitor:printers،
+     * راجع Printer::isHealthy()) ولها طابعة احتياطية مُعرَّفة (fallback_printer_id) وهي بدورها سليمة
+     * ومفعّلة، نحوّل المهمة إليها تلقائياً بدل تعليقها بانتظار تدخل يدوي — مع تنبيه المسؤول بالتحويل
+     * حتى يتابع إصلاح الطابعة الأصلية. لا سلسلة تحويل متعددة القفزات عمداً (خطوة واحدة فقط) لتفادي
+     * أي احتمال لولب لا نهائي في حال أُعدّت طابعتان كل منهما احتياطية للأخرى بالخطأ.
+     */
+    private function resolveHealthyPrinter(Printer $printer): Printer
+    {
+        if ($printer->isHealthy()) {
+            return $printer;
+        }
+
+        $fallback = $printer->fallbackPrinter;
+        if (!$fallback || !$fallback->is_active || !$fallback->isHealthy()) {
+            return $printer;
+        }
+
+        Log::warning("PrintJobDispatcher: printer '{$printer->name}' is unhealthy ({$printer->last_status_detail}) — failing over to backup printer '{$fallback->name}'.");
+
+        // تنبيه واحد فقط لكل ساعة لنفس زوج الطابعتين، بدل رسالة واتساب مستقلة لكل ملف يصل أثناء
+        // استمرار العطل (قد تكون عشرات الملفات في نفس الساعة من مجلد مراقبة نشط).
+        $cooldownKey = "printer_failover_alert_{$printer->id}_{$fallback->id}";
+        if (!Cache::has($cooldownKey)) {
+            $this->adminNotifier->notify(
+                "🔄 تحويل تلقائي للطباعة\nالطابعة \"{$printer->name}\" غير سليمة حالياً ({$printer->last_status_detail}) — تم تحويل مهام الطباعة الجديدة تلقائياً للطابعة الاحتياطية \"{$fallback->name}\".\nيرجى متابعة إصلاح الطابعة الأصلية.",
+                ['source' => 'printer_failover', 'printer_id' => $printer->id, 'fallback_printer_id' => $fallback->id]
+            );
+            Cache::put($cooldownKey, true, now()->addHour());
+        }
+
+        return $fallback;
     }
 
     /**

@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\File;
 use App\Models\Message;
 use App\Models\ExtractionTrace;
 use App\Services\MonitorFolderReviewService;
+use App\Services\PrintMonitorFileMatcher;
 
 /**
  * صفحة متابعة مجلد المراقبة C:\PrintMonitor: أي الملفات وصلت، أُرسلت بنجاح (archive)،
@@ -13,6 +14,10 @@ use App\Services\MonitorFolderReviewService;
  */
 class PrintMonitorController extends Controller
 {
+    public function __construct(private PrintMonitorFileMatcher $matcher)
+    {
+    }
+
     public function index()
     {
         $folderPath = config('app.monitor_folder_path', 'C:/PrintMonitor');
@@ -57,7 +62,7 @@ class PrintMonitorController extends Controller
                 continue;
             }
 
-            $message = $this->findMessageForFile($filename, $folderKey);
+            $message = $this->matcher->findMessageForFile($filename, $folderKey);
             $trace = $this->findTraceForFile($filename);
 
             $list[] = [
@@ -77,6 +82,7 @@ class PrintMonitorController extends Controller
                     'excluded' => $trace->excluded ?? [],
                     'rtl_corrected' => (bool) $trace->rtl_corrected,
                     'pdf_ocr_used' => (bool) $trace->pdf_ocr_used,
+                    'learned_trusted' => (bool) $trace->learned_trusted,
                 ] : null,
             ];
         }
@@ -85,46 +91,6 @@ class PrintMonitorController extends Controller
         usort($list, fn ($a, $b) => $b['modified_at'] <=> $a['modified_at']);
 
         return array_slice($list, 0, 100);
-    }
-
-    /**
-     * حالات الرسالة المتوقعة لكل مجلد فعلي على القرص — تُستخدم لفكّ التلبّس عندما يُعاد إرسال نفس اسم
-     * الملف أكثر من مرة عبر الزمن (مثلاً نفس الفاتورة تُطبع كل شهر بنفس الاسم)، فيصبح هناك أكثر من
-     * سجل Message بنفس source_filename/file_name. بدون هذا الفلتر، findMessageForFile كانت تختار
-     * الأحدث إنشاءً بصرف النظر عن حالته — فقد يظهر ملف في مجلد "فشلت" لكن السجل المطابق له فعلياً
-     * (الأحدث) هو محاولة لاحقة نجحت، فيظهر سبب الفشل فارغاً رغم وجوده في سجل قديم.
-     */
-    private const FOLDER_EXPECTED_STATUSES = [
-        'archive' => ['sent', 'delivered', 'read'],
-        'failed' => ['failed', 'no_whatsapp'],
-        'processing' => ['processing', 'pending'],
-        'review' => ['review_pending'],
-    ];
-
-    /**
-     * مطابقة اسم ملف فعلي على القرص مع سجل الرسالة المقابل له، للحصول على رقم الجوال المُرسَل إليه
-     * وسبب الفشل إن وُجد. المطابقة تتم عبر source_filename (اسم الملف الأصلي وقت المسح) أولاً،
-     * ثم file_name (الاسم بعد التنظيف) كخيار احتياطي للسجلات القديمة قبل إضافة العمود. نُقيّد
-     * البحث بالحالة المتوقعة لهذا المجلد (راجع FOLDER_EXPECTED_STATUSES) حتى لا نلتقط سجلاً من
-     * محاولة إرسال أخرى لنفس اسم الملف بحالة مختلفة.
-     */
-    private function findMessageForFile(string $filename, ?string $folderKey = null): ?Message
-    {
-        $base = fn () => Message::where(function ($q) use ($filename) {
-            $q->where('source_filename', $filename)->orWhere('file_name', $filename);
-        });
-
-        $expectedStatuses = self::FOLDER_EXPECTED_STATUSES[$folderKey] ?? null;
-        if ($expectedStatuses) {
-            $match = $base()->whereIn('status', $expectedStatuses)->orderByDesc('created_at')->first();
-            if ($match) {
-                return $match;
-            }
-        }
-
-        // احتياط: لا يوجد فلتر لهذا المجلد، أو لم يُطابق أي سجل الحالة المتوقعة (سجلات قديمة قبل هذا
-        // الفلتر مثلاً) — نرجع للمطابقة غير المقيّدة بدل عدم إظهار أي شيء إطلاقاً.
-        return $base()->orderByDesc('created_at')->first();
     }
 
     /**
