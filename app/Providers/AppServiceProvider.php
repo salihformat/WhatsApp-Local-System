@@ -66,6 +66,10 @@ class AppServiceProvider extends ServiceProvider
             if (isset($s['RETRY_DELAY_MINUTES'])) config(['app.retry_delay_minutes' => (int) $s['RETRY_DELAY_MINUTES']]);
             if (isset($s['CENTRAL_API_COMPANY_ID'])) config(['app.company_id' => $s['CENTRAL_API_COMPANY_ID']]);
             if (isset($s['CENTRAL_API_TOKEN'])) config(['app.central_api_token' => $s['CENTRAL_API_TOKEN']]);
+            // توكن مستقل للتحقق من طلبات الويب هوك الواردة من النظام المركزي — منفصل عمداً عن
+            // CENTRAL_API_TOKEN الصادر أعلاه (راجع VerifyWebhookToken وتعليق ترحيلة
+            // add_central_webhook_token_setting لشرح كامل لسبب الفصل).
+            if (isset($s['CENTRAL_WEBHOOK_TOKEN'])) config(['app.central_webhook_token' => $s['CENTRAL_WEBHOOK_TOKEN']]);
             if (isset($s['MONITOR_FOLDER_REQUIRE_APPROVAL'])) config(['app.monitor_folder_require_approval' => filter_var($s['MONITOR_FOLDER_REQUIRE_APPROVAL'], FILTER_VALIDATE_BOOLEAN)]);
             if (isset($s['HEALTH_ALERT_QUEUE_BACKLOG_THRESHOLD'])) config(['app.health_alert_queue_backlog_threshold' => (int) $s['HEALTH_ALERT_QUEUE_BACKLOG_THRESHOLD']]);
             if (isset($s['HEALTH_ALERT_COOLDOWN_MINUTES'])) config(['app.health_alert_cooldown_minutes' => (int) $s['HEALTH_ALERT_COOLDOWN_MINUTES']]);

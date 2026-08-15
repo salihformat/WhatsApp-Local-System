@@ -23,6 +23,7 @@ class UpdateSettingRequest extends FormRequest
             // الاتصال بالنظام المركزي
             'CENTRAL_API_COMPANY_ID' => 'nullable|integer',
             'CENTRAL_API_TOKEN' => 'nullable|string|max:255',
+            'CENTRAL_WEBHOOK_TOKEN' => 'nullable|string|max:255',
             'CENTRAL_API_RETRY_ATTEMPTS' => 'nullable|integer|min:1|max:20',
             'CENTRAL_API_RETRY_DELAY' => 'nullable|integer|min:1|max:120',
 

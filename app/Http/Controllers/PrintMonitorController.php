@@ -31,7 +31,7 @@ class PrintMonitorController extends Controller
             $data[$key] = [
                 'label' => $folder['label'],
                 'exists' => File::exists($folder['path']),
-                'files' => $this->listFiles($folder['path'], $folder['root_only'] ?? false),
+                'files' => $this->listFiles($folder['path'], $key, $folder['root_only'] ?? false),
             ];
         }
 
@@ -42,7 +42,7 @@ class PrintMonitorController extends Controller
         ]);
     }
 
-    private function listFiles(string $path, bool $rootOnly = false): array
+    private function listFiles(string $path, string $folderKey, bool $rootOnly = false): array
     {
         if (!File::exists($path)) {
             return [];
@@ -57,7 +57,7 @@ class PrintMonitorController extends Controller
                 continue;
             }
 
-            $message = $this->findMessageForFile($filename);
+            $message = $this->findMessageForFile($filename, $folderKey);
             $trace = $this->findTraceForFile($filename);
 
             $list[] = [
@@ -88,16 +88,43 @@ class PrintMonitorController extends Controller
     }
 
     /**
+     * حالات الرسالة المتوقعة لكل مجلد فعلي على القرص — تُستخدم لفكّ التلبّس عندما يُعاد إرسال نفس اسم
+     * الملف أكثر من مرة عبر الزمن (مثلاً نفس الفاتورة تُطبع كل شهر بنفس الاسم)، فيصبح هناك أكثر من
+     * سجل Message بنفس source_filename/file_name. بدون هذا الفلتر، findMessageForFile كانت تختار
+     * الأحدث إنشاءً بصرف النظر عن حالته — فقد يظهر ملف في مجلد "فشلت" لكن السجل المطابق له فعلياً
+     * (الأحدث) هو محاولة لاحقة نجحت، فيظهر سبب الفشل فارغاً رغم وجوده في سجل قديم.
+     */
+    private const FOLDER_EXPECTED_STATUSES = [
+        'archive' => ['sent', 'delivered', 'read'],
+        'failed' => ['failed', 'no_whatsapp'],
+        'processing' => ['processing', 'pending'],
+        'review' => ['review_pending'],
+    ];
+
+    /**
      * مطابقة اسم ملف فعلي على القرص مع سجل الرسالة المقابل له، للحصول على رقم الجوال المُرسَل إليه
      * وسبب الفشل إن وُجد. المطابقة تتم عبر source_filename (اسم الملف الأصلي وقت المسح) أولاً،
-     * ثم file_name (الاسم بعد التنظيف) كخيار احتياطي للسجلات القديمة قبل إضافة العمود.
+     * ثم file_name (الاسم بعد التنظيف) كخيار احتياطي للسجلات القديمة قبل إضافة العمود. نُقيّد
+     * البحث بالحالة المتوقعة لهذا المجلد (راجع FOLDER_EXPECTED_STATUSES) حتى لا نلتقط سجلاً من
+     * محاولة إرسال أخرى لنفس اسم الملف بحالة مختلفة.
      */
-    private function findMessageForFile(string $filename): ?Message
+    private function findMessageForFile(string $filename, ?string $folderKey = null): ?Message
     {
-        return Message::where('source_filename', $filename)
-            ->orWhere('file_name', $filename)
-            ->orderByDesc('created_at')
-            ->first();
+        $base = fn () => Message::where(function ($q) use ($filename) {
+            $q->where('source_filename', $filename)->orWhere('file_name', $filename);
+        });
+
+        $expectedStatuses = self::FOLDER_EXPECTED_STATUSES[$folderKey] ?? null;
+        if ($expectedStatuses) {
+            $match = $base()->whereIn('status', $expectedStatuses)->orderByDesc('created_at')->first();
+            if ($match) {
+                return $match;
+            }
+        }
+
+        // احتياط: لا يوجد فلتر لهذا المجلد، أو لم يُطابق أي سجل الحالة المتوقعة (سجلات قديمة قبل هذا
+        // الفلتر مثلاً) — نرجع للمطابقة غير المقيّدة بدل عدم إظهار أي شيء إطلاقاً.
+        return $base()->orderByDesc('created_at')->first();
     }
 
     /**

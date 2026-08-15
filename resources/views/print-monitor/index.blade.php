@@ -126,6 +126,8 @@
                                                 {{ $file['error_message'] }}
                                             @elseif($key === 'failed' && empty($file['phone_number']))
                                                 لم يتم العثور على رقم جوال في اسم الملف أو محتواه
+                                            @elseif($key === 'failed' && $file['status'] && !in_array($file['status'], ['failed', 'no_whatsapp']))
+                                                <span class="text-gray-400">نسخة قديمة من الملف — آخر محاولة إرسال بنفس الاسم نجحت لاحقاً (الحالة الحالية: {{ $file['status'] }}). يمكن حذف هذا الملف بأمان.</span>
                                             @elseif($file['status'] === 'pending' || $file['status'] === 'processing')
                                                 <span class="text-gray-400">قيد الإرسال…</span>
                                             @else

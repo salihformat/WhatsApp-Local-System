@@ -389,27 +389,21 @@ class SendMessageJob implements ShouldQueue
         }
 
         $monitorFolder = config('app.monitor_folder_path', 'C:/PrintMonitor');
-        $processingFile = $monitorFolder . '/processing/' . $message->file_name;
-        
-        if (!\Illuminate\Support\Facades\File::exists($processingFile)) {
-            // Search processing folder for files containing clean filename
-            $processingDir = $monitorFolder . '/processing';
-            if (\Illuminate\Support\Facades\File::exists($processingDir)) {
-                $allFiles = \Illuminate\Support\Facades\File::files($processingDir);
-                foreach ($allFiles as $f) {
-                    $fn = $f->getFilename();
-                    if ($fn === $message->file_name || str_contains($fn, $message->file_name)) {
-                        $processingFile = $f->getPathname();
-                        // Update message object file_name so it retains original name for target folder
-                        $message->file_name = $fn;
-                        break;
-                    }
-                }
+        $sourceFile = $this->locateFolderFile($monitorFolder . '/processing', $message);
+
+        // رسائل بحالة "failed" تُعاد جدولتها تلقائياً لاحقاً (retry) — إن نجحت هذه المحاولة اللاحقة،
+        // يكون الملف الفعلي قد بقي في مجلد failed منذ المحاولة الفاشلة الأولى (ولم يُعد أبداً لمجلد
+        // processing)، فلن نجده هناك. نبحث عنه أيضاً في failed كمصدر احتياطي فقط عند النجاح، بدل ترك
+        // نسخة يتيمة في "فشلت" لا يقابلها أي سجل رسالة بحالة failed فعلياً (تُربك صفحة /print-monitor).
+        if (!$sourceFile && $success) {
+            $sourceFile = $this->locateFolderFile($monitorFolder . '/failed', $message);
+            if ($sourceFile) {
+                Log::info("Found stale copy of '{$message->file_name}' in failed/ from an earlier attempt; relocating to archive now that a retry succeeded.");
             }
         }
 
-        if (!\Illuminate\Support\Facades\File::exists($processingFile)) {
-            Log::warning("Could not find file '{$message->file_name}' in processing folder to move.");
+        if (!$sourceFile) {
+            Log::warning("Could not find file '{$message->file_name}' in processing (or failed) folder to move.");
             return;
         }
 
@@ -435,15 +429,49 @@ class SendMessageJob implements ShouldQueue
             $uniqueName = $baseName . '_' . $counter . $extension;
             $targetFile = $targetPath . '/' . $uniqueName;
             Log::info("File {$message->file_name} already exists in {$targetFolder}. Renaming archived copy to {$uniqueName}");
+            // يجب حفظ الاسم الجديد فعلياً في قاعدة البيانات، وإلا يبقى السجل يشير إلى الاسم القديم
+            // بينما الملف الفعلي على القرص بات باسم مختلف — فتفشل أي مطابقة لاحقة بين الملف وسجله
+            // (مثلاً في صفحة /print-monitor عند عرض سبب الفشل).
             $message->file_name = $uniqueName;
+            $message->save();
         }
 
         try {
-            \Illuminate\Support\Facades\File::move($processingFile, $targetFile);
-            Log::info("Moved file {$message->file_name} from processing to {$targetFolder}.");
+            \Illuminate\Support\Facades\File::move($sourceFile, $targetFile);
+            Log::info("Moved file {$message->file_name} to {$targetFolder}.");
         } catch (\Exception $e) {
             Log::error("Failed to move file {$message->file_name} to {$targetFolder}: " . $e->getMessage());
         }
+    }
+
+    /**
+     * يبحث عن ملف $message->file_name داخل مجلد مُعطى: مطابقة تامة أولاً، ثم أي ملف يحتوي الاسم
+     * كجزء منه (احتياطاً لاختلافات تسبقه، مثل طابع زمني). عند العثور عبر المطابقة الجزئية، يُحدَّث
+     * ويُحفَظ $message->file_name فوراً بالاسم الفعلي على القرص لإبقاء قاعدة البيانات متوافقة معه.
+     */
+    private function locateFolderFile(string $dir, $message): ?string
+    {
+        $exactPath = $dir . '/' . $message->file_name;
+        if (\Illuminate\Support\Facades\File::exists($exactPath)) {
+            return $exactPath;
+        }
+
+        if (!\Illuminate\Support\Facades\File::exists($dir)) {
+            return null;
+        }
+
+        foreach (\Illuminate\Support\Facades\File::files($dir) as $f) {
+            $fn = $f->getFilename();
+            if ($fn === $message->file_name || str_contains($fn, $message->file_name)) {
+                if ($fn !== $message->file_name) {
+                    $message->file_name = $fn;
+                    $message->save();
+                }
+                return $f->getPathname();
+            }
+        }
+
+        return null;
     }
 
     /**

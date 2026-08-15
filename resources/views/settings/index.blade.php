@@ -67,8 +67,17 @@
                                 </div>
 
                                 <div class="mb-4">
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">رمز المصادقة (CENTRAL_API_TOKEN)</label>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">رمز المصادقة الصادر (CENTRAL_API_TOKEN)</label>
                                     <input type="text" name="CENTRAL_API_TOKEN" value="{{ old('CENTRAL_API_TOKEN', $settings['CENTRAL_API_TOKEN'] ?? '') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                    <p class="text-xs text-gray-500 mt-1">يستخدمه هذا النظام كـ Bearer عند استدعاء API النظام المركزي (إرسال الرسائل، مزامنة الحالة). يطابق "التوكن السري" الظاهر في صفحة الشركة بالنظام المركزي.</p>
+                                </div>
+
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">رمز التحقق من الويب هوك الوارد (CENTRAL_WEBHOOK_TOKEN)</label>
+                                    <input type="text" name="CENTRAL_WEBHOOK_TOKEN" value="{{ old('CENTRAL_WEBHOOK_TOKEN', $settings['CENTRAL_WEBHOOK_TOKEN'] ?? '') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="اتركه فارغاً لاستخدام CENTRAL_API_TOKEN مؤقتاً (غير مُوصى به)">
+                                    <p class="text-xs text-gray-500 mt-1">
+                                        <strong>أفضل ممارسة:</strong> توكن مستقل تماماً عن الأعلى — يتحقق به هذا النظام أن أي طلب ويب هوك واصل فعلاً من النظام المركزي، وليس نفس التوكن المستخدم للاتصال الصادر. يجب أن يطابق قيمة "التوكن" الخاصة بنقطة الويب هوك المرتبطة بهذا النظام تحديداً في صفحة "الأنظمة الخارجية المرتبطة" بالنظام المركزي (وليس التوكن السري العام للشركة). اتركه فارغاً فقط للتوافق المؤقت مع الإعداد القديم.
+                                    </p>
                                 </div>
 
                                 <div class="mb-4">
