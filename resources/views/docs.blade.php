@@ -507,10 +507,12 @@ stdout_logfile=/path-to-your-project/storage/logs/worker.log</pre>
                                             <ul class="list-disc list-inside mr-6 mt-1 space-y-1">
                                                 <li><code class="bg-white dark:bg-gray-800 px-1" dir="ltr">وافق طباعة &lt;رقم المهمة&gt;</code> — تنفّذ الطباعة فوراً.</li>
                                                 <li><code class="bg-white dark:bg-gray-800 px-1" dir="ltr">رفض طباعة &lt;رقم المهمة&gt;</code> — تُلغى دون طباعة.</li>
-                                                <li><code class="bg-white dark:bg-gray-800 px-1" dir="ltr">ارسل لي الملف طباعة &lt;رقم المهمة&gt;</code> — يصلك الملف نفسه عبر واتساب لمعاينته قبل اتخاذ القرار.</li>
+                                                <li><code class="bg-white dark:bg-gray-800 px-1" dir="ltr">ارسل لي الملف طباعة &lt;رقم المهمة&gt;</code> — يصلك الملف نفسه عبر واتساب لمعاينته قبل اتخاذ القرار (يعمل أيضاً بعد اكتمال الطباعة، ليس فقط قبل الموافقة).</li>
+                                                <li><code class="bg-white dark:bg-gray-800 px-1" dir="ltr">وافق الكل طباعة</code> — يوافق دفعة واحدة على كل مهام الطباعة المعلّقة حالياً (زر مطابق أيضاً في صفحة سجل عمليات الطباعة).</li>
                                             </ul>
                                         </li>
                                     </ul>
+                                    <p class="text-xs text-gray-500 mt-2"><code class="bg-white dark:bg-gray-800 px-1">PRINTER_ALERT_PHONE</code> يدعم أكثر من رقم مسؤول مفصولة بفواصل (مثال: <code class="bg-white dark:bg-gray-800 px-1" dir="ltr">966501111111,966502222222</code>) — كل رقم يستلم كل التنبيهات، وأي منهم يمكنه الرد بأوامر الموافقة.</p>
                                 </div>
 
                                 <div class="bg-gray-50 dark:bg-gray-700 p-5 rounded-lg border-r-4 border-blue-500">
@@ -531,6 +533,76 @@ stdout_logfile=/path-to-your-project/storage/logs/worker.log</pre>
                                     </ul>
                                     <p class="text-xs text-gray-500 mt-2">كلمة النوع ("طباعة" أو "ارسال") إلزامية دوماً في كل الأوامر أعلاه — لأن ترقيم مهام الطباعة ورسائل مجلد المراقبة مستقلان تماماً (كلاهما يبدأ من 1)، فبدون تحديد النوع يصعب تمييز أي جدول يقصده الرقم.</p>
                                 </div>
+                            </div>
+                        </section>
+
+                        <section class="mb-10">
+                            <h2 class="text-2xl font-semibold mb-4 border-b pb-2">14. توزيع المحادثات على الموظفين + تنبيه التعيين</h2>
+                            <p class="mb-4">إعداد ديناميكي (من صفحة "الإعدادات") يتحكم في كيفية تعيين موظف لكل محادثة واتساب جديدة تصل — بلا أي تعيين تلقائي افتراضياً (نفس السلوك القديم) ما لم تُفعّله بنفسك.</p>
+
+                            <div class="space-y-6">
+                                <div class="bg-gray-50 dark:bg-gray-700 p-5 rounded-lg border-r-4 border-indigo-500">
+                                    <h3 class="text-lg font-bold mb-2 text-[#f53003]">1. وضع التعيين (CONVERSATION_DISTRIBUTION_MODE)</h3>
+                                    <ul class="list-disc list-inside text-sm space-y-1 mr-4">
+                                        <li><strong>يدوي</strong> (الافتراضي): بلا تعيين تلقائي — يُعيَّن الموظف يدوياً من صفحة المحادثة، أو تلقائياً فقط عبر قاعدة أتمتة محددة (صفحة "الأتمتة") إن وُجدت.</li>
+                                        <li><strong>تلقائي لمستخدمين محددين</strong>: توزيع عادل بين قائمة موظفين تحددها من صفحة الإعدادات (اختيار بمربعات تحديد).</li>
+                                        <li><strong>تلقائي لكل الموظفين</strong>: نفس التوزيع العادل، لكن بين كل مستخدمي الدور "agent" المتاحين للتعيين (بلا حاجة لتحديد قائمة).</li>
+                                    </ul>
+                                    <p class="text-sm mt-2">"العدالة" هنا تعني: تذهب كل محادثة جديدة لمن لديه حالياً <strong>أقل عدد محادثات مفتوحة</strong> من المجموعة المؤهّلة — توازن حمل حقيقي، وليس تناوباً دورياً أعمى لا يراعي تراكم محادثات موظف معيّن (إجازة/بطء). التعيين يحدث فقط للمحادثات الجديدة فعلياً — لا يُعاد توزيع محادثة مستمرة، فيبقى نفس الموظف يتابع نفس العميل. قواعد الأتمتة (تعيين حسب رقم/كلمة مفتاحية) تبقى تعمل بعد هذا التوزيع ويمكنها إلغاءه لحالات محددة.</p>
+                                </div>
+
+                                <div class="bg-gray-50 dark:bg-gray-700 p-5 rounded-lg border-r-4 border-teal-500">
+                                    <h3 class="text-lg font-bold mb-2 text-[#f53003]">2. إتاحة/استثناء موظف من التوزيع التلقائي</h3>
+                                    <p class="text-sm">من صفحة "المستخدمين"، عمود "التوزيع التلقائي" لكل موظف — تبديل سريع بضغطة واحدة لاستثناء موظف مؤقتاً (إجازة/انشغال) من دورة التوزيع بلا حذفه من القائمة المحددة في الإعدادات أو تعديل دوره.</p>
+                                </div>
+
+                                <div class="bg-gray-50 dark:bg-gray-700 p-5 rounded-lg border-r-4 border-pink-500">
+                                    <h3 class="text-lg font-bold mb-2 text-[#f53003]">3. تنبيه الموظف عند تعيين محادثة له</h3>
+                                    <p class="text-sm mb-2">عند تعيين محادثة لموظف (تلقائياً أو يدوياً)، يصله تنبيهان (يتضمنان اسم/رقم العميل وآخر رسالة منه):</p>
+                                    <ul class="list-disc list-inside text-sm space-y-1 mr-4">
+                                        <li><strong>جرس الإشعارات</strong> في الشريط العلوي — عدّاد للإشعارات غير المقروءة، بقائمة منسدلة، مع استطلاع دوري كل 20 ثانية (لا يحتاج تحديث الصفحة). يمكن أيضاً تفعيل تنبيهات المتصفح (Desktop Notification) من نفس القائمة.</li>
+                                        <li><strong>رسالة واتساب فعلية</strong> — تصل فقط إن كان للموظف رقم واتساب مسجَّل (حقل اختياري جديد في صفحة تعديل المستخدم). بلا رقم، يبقى إشعار الجرس وحده كافياً.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="mb-10">
+                            <h2 class="text-2xl font-semibold mb-4 border-b pb-2">15. الصيانة الذاتية للنظام (تذكيرات، تنبيهات صحة، نسخ احتياطي)</h2>
+                            <p class="mb-4">مجموعة أوامر مجدولة تلقائياً (راجع <code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">routes/console.php</code>) هدفها تقليل الحاجة للمراقبة اليدوية اليومية للنظام.</p>
+
+                            <div class="space-y-6">
+                                <div class="bg-gray-50 dark:bg-gray-700 p-5 rounded-lg border-r-4 border-amber-500">
+                                    <h3 class="text-lg font-bold mb-2 text-[#f53003]">تذكير تلقائي بطلبات الموافقة المعلّقة</h3>
+                                    <p class="text-sm">الأمر <code class="bg-white dark:bg-gray-800 px-1">printing:send-approval-reminders</code> (كل 10 دقائق) يُرسل تذكير واتساب لأي طلب موافقة (طباعة أو إرسال) لا يزال معلّقاً بعد <code class="bg-white dark:bg-gray-800 px-1">PRINTING_APPROVAL_REMINDER_AFTER_MINUTES</code> دقيقة (افتراضي 20)، ثم يكرره كل <code class="bg-white dark:bg-gray-800 px-1">PRINTING_APPROVAL_REMINDER_REPEAT_MINUTES</code> دقيقة (افتراضي 30) ما دام معلّقاً. اضبط القيمة الثانية على 0 لتعطيل التذكير كلياً.</p>
+                                </div>
+
+                                <div class="bg-gray-50 dark:bg-gray-700 p-5 rounded-lg border-r-4 border-red-500">
+                                    <h3 class="text-lg font-bold mb-2 text-[#f53003]">تنبيه واتساب عند تعطل معالجة الطابور</h3>
+                                    <p class="text-sm">أمر <code class="bg-white dark:bg-gray-800 px-1">monitor:system</code> الموجود أصلاً (كل 10 دقائق) يرسل الآن أيضاً تنبيه واتساب فوري لرقم <code class="bg-white dark:bg-gray-800 px-1">PRINTER_ALERT_PHONE</code> عند تراكم كبير في طابور المعالجة (فوق <code class="bg-white dark:bg-gray-800 px-1">HEALTH_ALERT_QUEUE_BACKLOG_THRESHOLD</code>، افتراضي 50) أو رسائل معلّقة منذ أكثر من 10 دقائق — مؤشر شائع لتوقف Queue Worker بصمت. تنبيه واحد فقط ثم فترة تهدئة (<code class="bg-white dark:bg-gray-800 px-1">HEALTH_ALERT_COOLDOWN_MINUTES</code>، افتراضي 60 دقيقة) قبل تكراره، مع إشعار تعافٍ منفصل بمجرد زوال المشكلة.</p>
+                                </div>
+
+                                <div class="bg-gray-50 dark:bg-gray-700 p-5 rounded-lg border-r-4 border-emerald-500">
+                                    <h3 class="text-lg font-bold mb-2 text-[#f53003]">نسخ احتياطي يومي تلقائي لقاعدة البيانات</h3>
+                                    <p class="text-sm">الأمر <code class="bg-white dark:bg-gray-800 px-1">backup:database</code> (يومياً الساعة 3 فجراً) ينشئ نسخة mysqldump مضغوطة (gzip) في <code class="bg-white dark:bg-gray-800 px-1">storage/app/backups</code>، ويحذف تلقائياً أي نسخة أقدم من <code class="bg-white dark:bg-gray-800 px-1">BACKUP_RETENTION_DAYS</code> يوماً (افتراضي 14). يتطلب ضبط <code class="bg-white dark:bg-gray-800 px-1">MYSQLDUMP_PATH</code> في <code class="bg-white dark:bg-gray-800 px-1">.env</code> (الافتراضي يطابق مسار XAMPP القياسي). يرسل تنبيه واتساب لصاحب المنشأة عند فشل النسخ الاحتياطي.</p>
+                                </div>
+
+                                <div class="bg-gray-50 dark:bg-gray-700 p-5 rounded-lg border-r-4 border-cyan-500">
+                                    <h3 class="text-lg font-bold mb-2 text-[#f53003]">تتبع عدد الصفحات المطبوعة</h3>
+                                    <p class="text-sm">كل مهمة طباعة تُحتسَب صفحاتها فعلياً (من ملف PDF النهائي، أو صفحة واحدة لكل صورة) وتُجمَّع في عمود "الصفحات المطبوعة" لكل طابعة (صفحة "الطابعات") — تقدير تقريبي مفيد لتخطيط استهلاك الحبر/الورق، وليس عداداً رسمياً دقيقاً.</p>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="mb-10">
+                            <h2 class="text-2xl font-semibold mb-4 border-b pb-2">16. تعديل وحذف رسائل واتساب (Message Edited / Deleted)</h2>
+                            <p class="mb-4">عندما يعدّل أو يحذف عميل رسالة سبق إرسالها عبر واتساب (ميزتا واتساب المعروفتان)، ينعكس ذلك تلقائياً في محادثته بالنظام المحلي، بدل أن تبقى النسخة القديمة معروضة كأن شيئاً لم يحدث.</p>
+                            <div class="bg-gray-50 dark:bg-gray-700 p-5 rounded-lg">
+                                <ul class="list-disc list-inside text-sm space-y-1 mr-4">
+                                    <li><strong>تعديل:</strong> يُستبدَل نص الرسالة المعروض بالنص الجديد، مع الاحتفاظ بالنص السابق (وأي تعديلات سابقة) في سجل داخلي للتدقيق عند الحاجة.</li>
+                                    <li><strong>حذف:</strong> يُستبدَل المحتوى بعبارة "🚫 تم حذف هذه الرسالة" (نفس اتفاقية واتساب نفسها) بدل حذف السجل فعلياً — يبقى النص/الملف الأصليان محفوظين داخلياً.</li>
+                                </ul>
+                                <p class="text-xs text-gray-500 mt-2">تتطلب هذه الميزة أن يكون النظام المركزي قد فعّل هذين الحدثين ضمن إعدادات الويب هوك الخاصة بشركتك (صفحة "الأنظمة الخارجية المرتبطة" في النظام المركزي) — راجع مطوّر النظام المركزي إن لم تلاحظ هذا السلوك فعلياً رغم تعديل/حذف رسالة حقيقية.</p>
                             </div>
                         </section>
                     </div>

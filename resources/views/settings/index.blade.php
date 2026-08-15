@@ -30,6 +30,32 @@
                         @csrf
                         
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+
+                            <!-- System Info Settings -->
+                            <div class="bg-gray-50 p-6 rounded-lg shadow-sm border border-gray-100">
+                                <h3 class="text-lg font-bold mb-4 text-indigo-700 border-b pb-2">معلومات النظام والجهاز (System Info)</h3>
+
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">اسم النظام المحلي (LOCAL_SYSTEM_NAME)</label>
+                                    <input type="text" name="LOCAL_SYSTEM_NAME" value="{{ old('LOCAL_SYSTEM_NAME', $settings['LOCAL_SYSTEM_NAME'] ?? '') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="فرع الرياض">
+                                    <p class="text-xs text-gray-400 mt-1">الاسم المميز لهذا النظام المحلي (يظهر في التنبيهات والتقارير).</p>
+                                </div>
+
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">اسم الجهاز (DEVICE_NAME)</label>
+                                    <input type="text" name="DEVICE_NAME" value="{{ old('DEVICE_NAME', $settings['DEVICE_NAME'] ?? '') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                </div>
+
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">الموقع (LOCATION)</label>
+                                    <input type="text" name="LOCATION" value="{{ old('LOCATION', $settings['LOCATION'] ?? '') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                </div>
+
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">نوع الباقة (PLAN_TYPE)</label>
+                                    <input type="text" name="PLAN_TYPE" value="{{ old('PLAN_TYPE', $settings['PLAN_TYPE'] ?? '') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                </div>
+                            </div>
                             
                             <!-- Central API Settings -->
                             <div class="bg-gray-50 p-6 rounded-lg shadow-sm border border-gray-100">
@@ -37,22 +63,22 @@
                                 
                                 <div class="mb-4">
                                     <label class="block text-sm font-medium text-gray-700 mb-1">معرف الشركة (CENTRAL_API_COMPANY_ID)</label>
-                                    <input type="text" name="CENTRAL_API_COMPANY_ID" value="{{ old('CENTRAL_API_COMPANY_ID', env('CENTRAL_API_COMPANY_ID')) }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                    <input type="text" name="CENTRAL_API_COMPANY_ID" value="{{ old('CENTRAL_API_COMPANY_ID', $settings['CENTRAL_API_COMPANY_ID'] ?? '') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                 </div>
 
                                 <div class="mb-4">
                                     <label class="block text-sm font-medium text-gray-700 mb-1">رمز المصادقة (CENTRAL_API_TOKEN)</label>
-                                    <input type="text" name="CENTRAL_API_TOKEN" value="{{ old('CENTRAL_API_TOKEN', env('CENTRAL_API_TOKEN')) }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                    <input type="text" name="CENTRAL_API_TOKEN" value="{{ old('CENTRAL_API_TOKEN', $settings['CENTRAL_API_TOKEN'] ?? '') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                 </div>
 
                                 <div class="mb-4">
                                     <label class="block text-sm font-medium text-gray-700 mb-1">محاولات إعادة الاتصال (CENTRAL_API_RETRY_ATTEMPTS)</label>
-                                    <input type="number" name="CENTRAL_API_RETRY_ATTEMPTS" value="{{ old('CENTRAL_API_RETRY_ATTEMPTS', env('CENTRAL_API_RETRY_ATTEMPTS')) }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                    <input type="number" name="CENTRAL_API_RETRY_ATTEMPTS" value="{{ old('CENTRAL_API_RETRY_ATTEMPTS', $settings['CENTRAL_API_RETRY_ATTEMPTS'] ?? '3') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                 </div>
 
                                 <div class="mb-4">
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">تأخير إعادة الاتصال (CENTRAL_API_RETRY_DELAY)</label>
-                                    <input type="number" name="CENTRAL_API_RETRY_DELAY" value="{{ old('CENTRAL_API_RETRY_DELAY', env('CENTRAL_API_RETRY_DELAY')) }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">تأخير إعادة الاتصال بالثواني (CENTRAL_API_RETRY_DELAY)</label>
+                                    <input type="number" name="CENTRAL_API_RETRY_DELAY" value="{{ old('CENTRAL_API_RETRY_DELAY', $settings['CENTRAL_API_RETRY_DELAY'] ?? '5') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                 </div>
                             </div>
 
@@ -62,52 +88,123 @@
                                 
                                 <div class="mb-4">
                                     <label class="block text-sm font-medium text-gray-700 mb-1">الحد الأقصى لمحاولات إعادة الإرسال (MAX_RETRY_ATTEMPTS)</label>
-                                    <input type="number" name="MAX_RETRY_ATTEMPTS" value="{{ old('MAX_RETRY_ATTEMPTS', env('MAX_RETRY_ATTEMPTS')) }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                    <input type="number" name="MAX_RETRY_ATTEMPTS" value="{{ old('MAX_RETRY_ATTEMPTS', $settings['MAX_RETRY_ATTEMPTS'] ?? '3') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                 </div>
 
                                 <div class="mb-4">
                                     <label class="block text-sm font-medium text-gray-700 mb-1">تأخير إعادة الإرسال بالدقائق (RETRY_DELAY_MINUTES)</label>
-                                    <input type="number" name="RETRY_DELAY_MINUTES" value="{{ old('RETRY_DELAY_MINUTES', env('RETRY_DELAY_MINUTES')) }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                    <input type="number" name="RETRY_DELAY_MINUTES" value="{{ old('RETRY_DELAY_MINUTES', $settings['RETRY_DELAY_MINUTES'] ?? '5') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                </div>
+                            </div>
+
+                            <!-- Alert & Monitoring Settings -->
+                            <div class="bg-gray-50 p-6 rounded-lg shadow-sm border border-gray-100">
+                                <h3 class="text-lg font-bold mb-4 text-indigo-700 border-b pb-2">التنبيهات والمراقبة (Alerts & Monitoring)</h3>
+
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">رقم جوال المسؤول (PRINTER_ALERT_PHONE)</label>
+                                    <input type="text" name="PRINTER_ALERT_PHONE" value="{{ old('PRINTER_ALERT_PHONE', $settings['PRINTER_ALERT_PHONE'] ?? '') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="966500000000" dir="ltr">
+                                    <p class="text-xs text-gray-400 mt-1">رقم (أو أرقام مفصولة بفواصل) جوال المسؤول الذي تصله كل التنبيهات: تعطل الطابعات، طلبات الموافقة، وتنبيهات صحة النظام. اتركه فارغاً لتعطيل التنبيهات.</p>
+                                </div>
+
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">نص الرسالة الافتراضي (MONITORING_MESSAGE_TEXT)</label>
+                                    <textarea name="MONITORING_MESSAGE_TEXT" rows="2" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">{{ old('MONITORING_MESSAGE_TEXT', $settings['MONITORING_MESSAGE_TEXT'] ?? '') }}</textarea>
+                                </div>
+
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">طلب موافقة قبل الإرسال (MONITOR_FOLDER_REQUIRE_APPROVAL)</label>
+                                    @php $requireApproval = old('MONITOR_FOLDER_REQUIRE_APPROVAL', $settings['MONITOR_FOLDER_REQUIRE_APPROVAL'] ?? 'false'); @endphp
+                                    <select name="MONITOR_FOLDER_REQUIRE_APPROVAL" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                        <option value="false" @selected($requireApproval === 'false')>معطّل (إرسال تلقائي فوري — الوضع المعتاد)</option>
+                                        <option value="true" @selected($requireApproval === 'true')>مفعّل (حجز كل ملف بانتظار موافقة يدوية)</option>
+                                    </select>
+                                    <p class="text-xs text-gray-400 mt-1">عند التفعيل، كل ملف يصل عبر مجلد المراقبة يُحجز بانتظار موافقة صريحة قبل إرساله عبر واتساب.</p>
                                 </div>
                             </div>
 
                             <!-- Local Monitoring Settings -->
-                            <div class="bg-gray-50 p-6 rounded-lg shadow-sm border border-gray-100">
-                                <h3 class="text-lg font-bold mb-4 text-indigo-700 border-b pb-2">المراقبة المحلية (Local Monitoring)</h3>
-                                
-                                <div class="mb-4">
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">مسار المجلد (MONITORING_FOLDER_PATH)</label>
-                                    <input type="text" name="MONITORING_FOLDER_PATH" value="{{ old('MONITORING_FOLDER_PATH', env('MONITORING_FOLDER_PATH', env('MONITOR_FOLDER_PATH'))) }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                </div>
+                            <div class="bg-gray-50 p-6 rounded-lg shadow-sm border border-gray-100 md:col-span-2">
+                                <h3 class="text-lg font-bold mb-4 text-indigo-700 border-b pb-2">الطباعة الذكية (Smart Printing)</h3>
 
-                                <div class="mb-4">
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">فترة الفحص بالثواني (MONITORING_INTERVAL_SECONDS)</label>
-                                    <input type="number" name="MONITORING_INTERVAL_SECONDS" value="{{ old('MONITORING_INTERVAL_SECONDS', env('MONITORING_INTERVAL_SECONDS', env('MONITOR_INTERVAL_SECONDS'))) }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div class="mb-4">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">تفعيل الطباعة الذكية (PRINTING_ENABLED)</label>
+                                        @php $printingEnabled = old('PRINTING_ENABLED', $settings['PRINTING_ENABLED'] ?? 'true'); @endphp
+                                        <select name="PRINTING_ENABLED" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                            <option value="true" @selected($printingEnabled === 'true')>مفعّل</option>
+                                            <option value="false" @selected($printingEnabled === 'false')>معطّل</option>
+                                        </select>
+                                    </div>
 
-                                <div class="mb-4">
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">نص الرسالة (MONITORING_MESSAGE_TEXT)</label>
-                                    <textarea name="MONITORING_MESSAGE_TEXT" rows="2" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">{{ old('MONITORING_MESSAGE_TEXT', env('MONITORING_MESSAGE_TEXT', env('MONITOR_MESSAGE_TEXT'))) }}</textarea>
+                                    <div class="mb-4">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">مقاس الورق (PRINT_IMAGE_PAGE_SIZE)</label>
+                                        @php $pageSize = old('PRINT_IMAGE_PAGE_SIZE', $settings['PRINT_IMAGE_PAGE_SIZE'] ?? 'a4'); @endphp
+                                        <select name="PRINT_IMAGE_PAGE_SIZE" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                            <option value="a4" @selected($pageSize === 'a4')>A4</option>
+                                            <option value="letter" @selected($pageSize === 'letter')>Letter</option>
+                                        </select>
+                                        <p class="text-xs text-gray-400 mt-1">يجب أن يطابق الورق المُحمّل فعلياً في الطابعة.</p>
+                                    </div>
+
+                                    <div class="mb-4">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">دقة الطباعة DPI (PRINT_IMAGE_DPI)</label>
+                                        <input type="number" name="PRINT_IMAGE_DPI" value="{{ old('PRINT_IMAGE_DPI', $settings['PRINT_IMAGE_DPI'] ?? '200') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" min="72" max="600">
+                                        <p class="text-xs text-gray-400 mt-1">200 قيمة متوازنة بين الوضوح وحجم الملف.</p>
+                                    </div>
+
+                                    <div class="mb-4">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">تذكير بطلب الموافقة بعد (دقيقة)</label>
+                                        <input type="number" name="PRINTING_APPROVAL_REMINDER_AFTER_MINUTES" value="{{ old('PRINTING_APPROVAL_REMINDER_AFTER_MINUTES', $settings['PRINTING_APPROVAL_REMINDER_AFTER_MINUTES'] ?? '20') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" min="0">
+                                        <p class="text-xs text-gray-400 mt-1">بعد كم دقيقة من بقاء طلب موافقة بلا رد يُرسَل تذكير تلقائي للمسؤول.</p>
+                                    </div>
+
+                                    <div class="mb-4">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">تكرار التذكير كل (دقيقة)</label>
+                                        <input type="number" name="PRINTING_APPROVAL_REMINDER_REPEAT_MINUTES" value="{{ old('PRINTING_APPROVAL_REMINDER_REPEAT_MINUTES', $settings['PRINTING_APPROVAL_REMINDER_REPEAT_MINUTES'] ?? '30') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" min="0">
+                                        <p class="text-xs text-gray-400 mt-1">اضبطه على 0 لتعطيل التذكير التلقائي كلياً.</p>
+                                    </div>
+
+                                    <div class="mb-4 md:col-span-3">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">الامتدادات القابلة للطباعة (PRINTABLE_EXTENSIONS) <span class="text-xs text-gray-500">مفصولة بفواصل</span></label>
+                                        <input type="text" name="PRINTABLE_EXTENSIONS" value="{{ old('PRINTABLE_EXTENSIONS', $settings['PRINTABLE_EXTENSIONS'] ?? '') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" dir="ltr" placeholder="pdf,jpg,jpeg,png,...">
+                                    </div>
                                 </div>
                             </div>
 
-                            <!-- Device Settings -->
-                            <div class="bg-gray-50 p-6 rounded-lg shadow-sm border border-gray-100">
-                                <h3 class="text-lg font-bold mb-4 text-indigo-700 border-b pb-2">بيانات الجهاز (Device Info)</h3>
-                                
-                                <div class="mb-4">
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">اسم الجهاز (DEVICE_NAME)</label>
-                                    <input type="text" name="DEVICE_NAME" value="{{ old('DEVICE_NAME', env('DEVICE_NAME')) }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                </div>
+                            <!-- Smart Printing Status Replies -->
+                            <div class="bg-gray-50 p-6 rounded-lg shadow-sm border border-gray-100 md:col-span-2">
+                                <h3 class="text-lg font-bold mb-4 text-indigo-700 border-b pb-2">إشعارات حالة الطباعة الذكية</h3>
 
-                                <div class="mb-4">
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">الموقع (LOCATION)</label>
-                                    <input type="text" name="LOCATION" value="{{ old('LOCATION', env('LOCATION')) }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div class="mb-4">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">رد فوري عند استلام الطلب (PRINTING_REPLY_ACK_ON_RECEIPT)</label>
+                                        @php $replyAck = old('PRINTING_REPLY_ACK_ON_RECEIPT', $settings['PRINTING_REPLY_ACK_ON_RECEIPT'] ?? 'true'); @endphp
+                                        <select name="PRINTING_REPLY_ACK_ON_RECEIPT" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                            <option value="true" @selected($replyAck === 'true')>مفعّل (\"📥 تم استلام طلبك وجاري تنفيذه\" فور تسجيل الطلب)</option>
+                                            <option value="false" @selected($replyAck === 'false')>معطّل</option>
+                                        </select>
+                                        <p class="text-xs text-gray-400 mt-1">رسالة منفصلة عن رد النتيجة النهائية — لطمأنة العميل أن ملفه وصل بشكل صحيح.</p>
+                                    </div>
 
-                                <div class="mb-4">
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">نوع الباقة (PLAN_TYPE)</label>
-                                    <input type="text" name="PLAN_TYPE" value="{{ old('PLAN_TYPE', env('PLAN_TYPE')) }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                    <div class="mb-4">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">الرد على من طلب الطباعة (PRINTING_REPLY_STATUS_TO_SENDER)</label>
+                                        @php $replySender = old('PRINTING_REPLY_STATUS_TO_SENDER', $settings['PRINTING_REPLY_STATUS_TO_SENDER'] ?? 'true'); @endphp
+                                        <select name="PRINTING_REPLY_STATUS_TO_SENDER" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                            <option value="true" @selected($replySender === 'true')>مفعّل (يصل العميل رسالة تلقائية بنجاح/فشل طباعة ملفه)</option>
+                                            <option value="false" @selected($replySender === 'false')>معطّل</option>
+                                        </select>
+                                        <p class="text-xs text-gray-400 mt-1">لا يُرسَل عند كل محاولة فاشلة، فقط عند النجاح أو الفشل النهائي بعد استنفاد كل المحاولات.</p>
+                                    </div>
+
+                                    <div class="mb-4">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">تنبيه فني لصاحب المنشأة عند الفشل (PRINTING_NOTIFY_OWNER_ON_JOB_FAILURE)</label>
+                                        @php $notifyOwner = old('PRINTING_NOTIFY_OWNER_ON_JOB_FAILURE', $settings['PRINTING_NOTIFY_OWNER_ON_JOB_FAILURE'] ?? 'true'); @endphp
+                                        <select name="PRINTING_NOTIFY_OWNER_ON_JOB_FAILURE" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                            <option value="true" @selected($notifyOwner === 'true')>مفعّل (يصل الخطأ التقني الكامل لرقم المسؤول)</option>
+                                            <option value="false" @selected($notifyOwner === 'false')>معطّل</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
 
@@ -118,22 +215,28 @@
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div class="mb-4">
                                         <label class="block text-sm font-medium text-gray-700 mb-1">مسار التخزين (FILE_STORAGE_PATH)</label>
-                                        <input type="text" name="FILE_STORAGE_PATH" value="{{ old('FILE_STORAGE_PATH', env('FILE_STORAGE_PATH')) }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                        <input type="text" name="FILE_STORAGE_PATH" value="{{ old('FILE_STORAGE_PATH', $settings['FILE_STORAGE_PATH'] ?? '') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                     </div>
 
                                     <div class="mb-4">
                                         <label class="block text-sm font-medium text-gray-700 mb-1">أقصى حجم بالميغابايت (FILE_MAX_SIZE_MB)</label>
-                                        <input type="number" name="FILE_MAX_SIZE_MB" value="{{ old('FILE_MAX_SIZE_MB', env('FILE_MAX_SIZE_MB')) }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                        <input type="number" name="FILE_MAX_SIZE_MB" value="{{ old('FILE_MAX_SIZE_MB', $settings['FILE_MAX_SIZE_MB'] ?? '20') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                     </div>
 
                                     <div class="mb-4">
                                         <label class="block text-sm font-medium text-gray-700 mb-1">الحذف التلقائي بعد (أيام) (FILE_AUTO_DELETE_DAYS)</label>
-                                        <input type="number" name="FILE_AUTO_DELETE_DAYS" value="{{ old('FILE_AUTO_DELETE_DAYS', env('FILE_AUTO_DELETE_DAYS')) }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                        <input type="number" name="FILE_AUTO_DELETE_DAYS" value="{{ old('FILE_AUTO_DELETE_DAYS', $settings['FILE_AUTO_DELETE_DAYS'] ?? '3') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                    </div>
+
+                                    <div class="mb-4">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">الاحتفاظ بالنسخ الاحتياطية (أيام) (BACKUP_RETENTION_DAYS)</label>
+                                        <input type="number" name="BACKUP_RETENTION_DAYS" value="{{ old('BACKUP_RETENTION_DAYS', $settings['BACKUP_RETENTION_DAYS'] ?? '14') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                        <p class="text-xs text-gray-400 mt-1">عدد الأيام للاحتفاظ بالنسخ الاحتياطية التلقائية قبل حذفها.</p>
                                     </div>
                                     
                                     <div class="mb-4 md:col-span-2">
                                         <label class="block text-sm font-medium text-gray-700 mb-1">الأنواع المسموحة (FILE_ALLOWED_TYPES) <span class="text-xs text-gray-500">مفصول بفاصلة</span></label>
-                                        <input type="text" name="FILE_ALLOWED_TYPES" value="{{ old('FILE_ALLOWED_TYPES', env('FILE_ALLOWED_TYPES')) }}" placeholder="pdf,jpg,png" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                        <input type="text" name="FILE_ALLOWED_TYPES" value="{{ old('FILE_ALLOWED_TYPES', $settings['FILE_ALLOWED_TYPES'] ?? '') }}" placeholder="pdf,jpg,png" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" dir="ltr">
                                     </div>
                                 </div>
                             </div>
@@ -146,26 +249,26 @@
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div class="mb-4">
                                         <label class="block text-sm font-medium text-gray-700 mb-1">كلمات البحث عن رقم الجوال (PHONE_EXTRACTION_LABELS) <span class="text-xs text-gray-500">مفصولة بفاصلة</span></label>
-                                        <textarea name="PHONE_EXTRACTION_LABELS" rows="2" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="رقم الجوال,الجوال,جوال,phone,mobile">{{ old('PHONE_EXTRACTION_LABELS', env('PHONE_EXTRACTION_LABELS')) }}</textarea>
+                                        <textarea name="PHONE_EXTRACTION_LABELS" rows="2" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="رقم الجوال,الجوال,جوال,phone,mobile">{{ old('PHONE_EXTRACTION_LABELS', $settings['PHONE_EXTRACTION_LABELS'] ?? '') }}</textarea>
                                         <p class="text-xs text-gray-400 mt-1">إذا كانت المطابقة قريبة من إحدى هذه الكلمات يُعتبر الرقم بعدها رقم جوال العميل.</p>
                                     </div>
 
                                     <div class="mb-4">
                                         <label class="block text-sm font-medium text-gray-700 mb-1">كلمات الاستبعاد (PHONE_EXTRACTION_EXCLUDE_CONTEXT) <span class="text-xs text-gray-500">مفصولة بفاصلة</span></label>
-                                        <textarea name="PHONE_EXTRACTION_EXCLUDE_CONTEXT" rows="2" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="المحل,الشركة,مكتبنا,store,shop,company">{{ old('PHONE_EXTRACTION_EXCLUDE_CONTEXT', env('PHONE_EXTRACTION_EXCLUDE_CONTEXT')) }}</textarea>
+                                        <textarea name="PHONE_EXTRACTION_EXCLUDE_CONTEXT" rows="2" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="المحل,الشركة,مكتبنا,store,shop,company">{{ old('PHONE_EXTRACTION_EXCLUDE_CONTEXT', $settings['PHONE_EXTRACTION_EXCLUDE_CONTEXT'] ?? '') }}</textarea>
                                         <p class="text-xs text-gray-400 mt-1">إذا ظهرت إحدى هذه الكلمات قبل رقم الجوال مباشرة (مثل "هاتف المحل") يتم تجاهل هذا الرقم لأنه رقم الجهة المُصدرة وليس العميل.</p>
                                     </div>
 
                                     <div class="mb-4">
                                         <label class="block text-sm font-medium text-gray-700 mb-1">كلمات البحث عن رقم الملف (FILE_NUMBER_LABELS) <span class="text-xs text-gray-500">مفصولة بفاصلة</span></label>
-                                        <textarea name="FILE_NUMBER_LABELS" rows="2" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="رقم الملف,الملف رقم,ملف رقم,file no">{{ old('FILE_NUMBER_LABELS', env('FILE_NUMBER_LABELS')) }}</textarea>
+                                        <textarea name="FILE_NUMBER_LABELS" rows="2" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="رقم الملف,الملف رقم,ملف رقم,file no">{{ old('FILE_NUMBER_LABELS', $settings['FILE_NUMBER_LABELS'] ?? '') }}</textarea>
                                         <p class="text-xs text-gray-400 mt-1">عند العثور على رقم بجانب إحدى هذه الكلمات يبحث النظام عن جهة اتصال بنفس رقم الملف ويرسل لرقم جوالها.</p>
                                     </div>
 
                                     <div class="mb-4">
                                         <label class="block text-sm font-medium text-gray-700 mb-1">نمط المطابقة (PHONE_MATCH_MODE)</label>
+                                        @php $matchMode = old('PHONE_MATCH_MODE', $settings['PHONE_MATCH_MODE'] ?? 'partial'); @endphp
                                         <select name="PHONE_MATCH_MODE" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                            @php $matchMode = old('PHONE_MATCH_MODE', env('PHONE_MATCH_MODE', 'partial')); @endphp
                                             <option value="partial" @selected($matchMode === 'partial')>جزئي (الكلمة كجزء من نص أطول)</option>
                                             <option value="exact" @selected($matchMode === 'exact')>كامل (الكلمة ككلمة مستقلة فقط)</option>
                                         </select>
@@ -174,8 +277,8 @@
 
                                     <div class="mb-4">
                                         <label class="block text-sm font-medium text-gray-700 mb-1">السماح بالاستخراج بلا تسمية (ENABLE_UNLABELED_PHONE_FALLBACK)</label>
+                                        @php $unlabeledEnabled = old('ENABLE_UNLABELED_PHONE_FALLBACK', $settings['ENABLE_UNLABELED_PHONE_FALLBACK'] ?? 'true'); @endphp
                                         <select name="ENABLE_UNLABELED_PHONE_FALLBACK" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                            @php $unlabeledEnabled = old('ENABLE_UNLABELED_PHONE_FALLBACK', env('ENABLE_UNLABELED_PHONE_FALLBACK', 'true')); @endphp
                                             <option value="true" @selected($unlabeledEnabled === 'true')>مفعّل (يبحث عن أي رقم يشبه جوال سعودي بلا تسمية كحل أخير)</option>
                                             <option value="false" @selected($unlabeledEnabled === 'false')>معطّل (إن لم توجد تسمية صريحة يُنقل الملف لمجلد "فشلت")</option>
                                         </select>
@@ -183,7 +286,7 @@
 
                                     <div class="mb-4 md:col-span-2">
                                         <label class="block text-sm font-medium text-gray-700 mb-1">مصادر تتطلب مراجعة يدوية قبل الإرسال (PHONE_REVIEW_REQUIRED_SOURCES) <span class="text-xs text-gray-500">مفصولة بفاصلة</span></label>
-                                        <input type="text" name="PHONE_REVIEW_REQUIRED_SOURCES" value="{{ old('PHONE_REVIEW_REQUIRED_SOURCES', env('PHONE_REVIEW_REQUIRED_SOURCES')) }}" placeholder="unlabeled_fallback,corrupted_fallback,env_fallback" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                        <input type="text" name="PHONE_REVIEW_REQUIRED_SOURCES" value="{{ old('PHONE_REVIEW_REQUIRED_SOURCES', $settings['PHONE_REVIEW_REQUIRED_SOURCES'] ?? '') }}" placeholder="unlabeled_fallback,corrupted_fallback,env_fallback" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" dir="ltr">
                                         <p class="text-xs text-gray-400 mt-1">
                                             بدلاً من الإرسال التلقائي مباشرة، أي ملف يُستخرج رقمه من أحد هذه المصادر (منخفضة الثقة) يُحجز في تبويب "بانتظار المراجعة" بصفحة متابعة الإرسال حتى تُوافق عليه يدوياً.
                                             القيم الممكنة: <code dir="ltr">filename, label, file_number, unlabeled_fallback, corrupted_fallback, env_fallback</code>.
@@ -197,7 +300,7 @@
                             <div class="bg-gray-50 p-6 rounded-lg shadow-sm border border-gray-100 md:col-span-2">
                                 <h3 class="text-lg font-bold mb-4 text-indigo-700 border-b pb-2">توزيع المحادثات الجديدة (Conversation Distribution)</h3>
 
-                                @php $distributionMode = old('CONVERSATION_DISTRIBUTION_MODE', env('CONVERSATION_DISTRIBUTION_MODE', 'manual')); @endphp
+                                @php $distributionMode = old('CONVERSATION_DISTRIBUTION_MODE', $settings['CONVERSATION_DISTRIBUTION_MODE'] ?? 'manual'); @endphp
 
                                 <div class="mb-4">
                                     <label class="block text-sm font-medium text-gray-700 mb-1">وضع التعيين (CONVERSATION_DISTRIBUTION_MODE)</label>
@@ -215,7 +318,7 @@
                                 <div id="distribution-users-box" class="mb-2" style="display: {{ $distributionMode === 'specific' ? 'block' : 'none' }};">
                                     <label class="block text-sm font-medium text-gray-700 mb-2">المستخدمون المشمولون بالتوزيع (CONVERSATION_DISTRIBUTION_USER_IDS)</label>
                                     @php
-                                        $selectedIds = array_filter(array_map('trim', explode(',', old('CONVERSATION_DISTRIBUTION_USER_IDS', env('CONVERSATION_DISTRIBUTION_USER_IDS', '')))));
+                                        $selectedIds = array_filter(array_map('trim', explode(',', old('CONVERSATION_DISTRIBUTION_USER_IDS', $settings['CONVERSATION_DISTRIBUTION_USER_IDS'] ?? ''))));
                                     @endphp
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-2 bg-white p-3 rounded-md border border-gray-200">
                                         @forelse($assignableUsers as $user)
@@ -233,38 +336,21 @@
                                 </div>
                             </div>
 
-                            <!-- Smart Printing Status Replies -->
+                            <!-- System Health Settings -->
                             <div class="bg-gray-50 p-6 rounded-lg shadow-sm border border-gray-100 md:col-span-2">
-                                <h3 class="text-lg font-bold mb-4 text-indigo-700 border-b pb-2">إشعارات حالة الطباعة الذكية</h3>
+                                <h3 class="text-lg font-bold mb-4 text-indigo-700 border-b pb-2">صحة النظام (System Health)</h3>
 
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div class="mb-4">
-                                        <label class="block text-sm font-medium text-gray-700 mb-1">رد فوري عند استلام الطلب (PRINTING_REPLY_ACK_ON_RECEIPT)</label>
-                                        <select name="PRINTING_REPLY_ACK_ON_RECEIPT" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                            @php $replyAck = old('PRINTING_REPLY_ACK_ON_RECEIPT', env('PRINTING_REPLY_ACK_ON_RECEIPT', 'true')); @endphp
-                                            <option value="true" @selected($replyAck === 'true')>مفعّل ("📥 تم استلام طلبك وجاري تنفيذه" فور تسجيل الطلب)</option>
-                                            <option value="false" @selected($replyAck === 'false')>معطّل</option>
-                                        </select>
-                                        <p class="text-xs text-gray-400 mt-1">رسالة منفصلة عن رد النتيجة النهائية أدناه — لطمأنة العميل أن ملفه وصل بشكل صحيح.</p>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">حد التنبيه لتراكم المهام (HEALTH_ALERT_QUEUE_BACKLOG_THRESHOLD)</label>
+                                        <input type="number" name="HEALTH_ALERT_QUEUE_BACKLOG_THRESHOLD" value="{{ old('HEALTH_ALERT_QUEUE_BACKLOG_THRESHOLD', $settings['HEALTH_ALERT_QUEUE_BACKLOG_THRESHOLD'] ?? '50') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" min="1">
+                                        <p class="text-xs text-gray-400 mt-1">فوق كم مهمة متراكمة في طابور المعالجة يُرسَل تنبيه واتساب فوري للمسؤول.</p>
                                     </div>
 
                                     <div class="mb-4">
-                                        <label class="block text-sm font-medium text-gray-700 mb-1">الرد على من طلب الطباعة (PRINTING_REPLY_STATUS_TO_SENDER)</label>
-                                        <select name="PRINTING_REPLY_STATUS_TO_SENDER" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                            @php $replySender = old('PRINTING_REPLY_STATUS_TO_SENDER', env('PRINTING_REPLY_STATUS_TO_SENDER', 'true')); @endphp
-                                            <option value="true" @selected($replySender === 'true')>مفعّل (يصل العميل رسالة تلقائية بنجاح/فشل طباعة ملفه)</option>
-                                            <option value="false" @selected($replySender === 'false')>معطّل</option>
-                                        </select>
-                                        <p class="text-xs text-gray-400 mt-1">لا يُرسَل عند كل محاولة فاشلة، فقط عند النجاح أو الفشل النهائي بعد استنفاد كل المحاولات.</p>
-                                    </div>
-
-                                    <div class="mb-4">
-                                        <label class="block text-sm font-medium text-gray-700 mb-1">تنبيه فني لصاحب المنشأة عند الفشل (PRINTING_NOTIFY_OWNER_ON_JOB_FAILURE)</label>
-                                        <select name="PRINTING_NOTIFY_OWNER_ON_JOB_FAILURE" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                            @php $notifyOwner = old('PRINTING_NOTIFY_OWNER_ON_JOB_FAILURE', env('PRINTING_NOTIFY_OWNER_ON_JOB_FAILURE', 'true')); @endphp
-                                            <option value="true" @selected($notifyOwner === 'true')>مفعّل (يصل الخطأ التقني الكامل لرقم PRINTER_ALERT_PHONE)</option>
-                                            <option value="false" @selected($notifyOwner === 'false')>معطّل</option>
-                                        </select>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">فترة تهدئة التنبيهات (دقيقة) (HEALTH_ALERT_COOLDOWN_MINUTES)</label>
+                                        <input type="number" name="HEALTH_ALERT_COOLDOWN_MINUTES" value="{{ old('HEALTH_ALERT_COOLDOWN_MINUTES', $settings['HEALTH_ALERT_COOLDOWN_MINUTES'] ?? '60') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" min="0">
+                                        <p class="text-xs text-gray-400 mt-1">بعد إرسال تنبيه صحة النظام، كم دقيقة ننتظر قبل السماح بتكراره. اضبطه على 0 لتعطيل التنبيهات كلياً.</p>
                                     </div>
                                 </div>
                             </div>

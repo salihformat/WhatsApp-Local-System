@@ -266,8 +266,7 @@ class MonitorFolderCommand extends Command
                 }
 
                 if (empty($messageText)) {
-                    // Use MONITORING_MESSAGE_TEXT as requested by user, with backward compatibility for MONITOR_MESSAGE_TEXT
-                    $messageText = env('MONITORING_MESSAGE_TEXT', env('MONITOR_MESSAGE_TEXT', 'مرفق لكم المستند المطلوب'));
+                    $messageText = setting('MONITORING_MESSAGE_TEXT', env('MONITORING_MESSAGE_TEXT', env('MONITOR_MESSAGE_TEXT', 'مرفق لكم المستند المطلوب')));
                 }
 
                 // Create message record
@@ -486,7 +485,7 @@ class MonitorFolderCommand extends Command
             Storage::disk('public')->put($publicPath, File::get($fullPath));
             $fileUrl = '/storage/' . $publicPath;
 
-            $messageText = env('MONITORING_MESSAGE_TEXT', env('MONITOR_MESSAGE_TEXT', 'مرفق لكم المستند المطلوب'));
+            $messageText = setting('MONITORING_MESSAGE_TEXT', env('MONITORING_MESSAGE_TEXT', env('MONITOR_MESSAGE_TEXT', 'مرفق لكم المستند المطلوب')));
 
             $message = Message::create([
                 'phone_number' => $this->formatPhoneNumber($phoneNumber),
@@ -816,7 +815,7 @@ class MonitorFolderCommand extends Command
         // ملاحظة: تم تقييد هذا الاحتياطي عمداً بعد اكتشاف أنه كان يلتقط أرقاماً عشوائية غير مرتبطة
         // بجوال (مثل أرقام تقارير/فواتير طويلة داخل المستند) ويرسل الملف لرقم خاطئ تماماً.
         // يمكن تعطيل هذا المستوى بالكامل عبر ENABLE_UNLABELED_PHONE_FALLBACK=false في الإعدادات.
-        $unlabeledFallbackEnabled = filter_var(env('ENABLE_UNLABELED_PHONE_FALLBACK', true), FILTER_VALIDATE_BOOLEAN);
+        $unlabeledFallbackEnabled = filter_var(setting('ENABLE_UNLABELED_PHONE_FALLBACK', env('ENABLE_UNLABELED_PHONE_FALLBACK', true)), FILTER_VALIDATE_BOOLEAN);
         if ($unlabeledFallbackEnabled && ($phone = $this->findUnlabeledPhoneNumber($text, $filename, $trace))) {
             return $phone;
         }
@@ -1043,7 +1042,12 @@ class MonitorFolderCommand extends Command
      */
     protected function getConfiguredList(string $envKey, array $default): array
     {
-        $raw = env($envKey);
+        // أولوية القراءة: DB (عبر setting()) → .env (عبر env()) → القيمة الافتراضية
+        $raw = setting($envKey);
+        if ($raw === null || $raw === '') {
+            // تراجع لـ env() كاحتياط في حال لم يُنقل الإعداد بعد
+            $raw = env($envKey);
+        }
         if ($raw === null) {
             return $default;
         }
@@ -1057,7 +1061,7 @@ class MonitorFolderCommand extends Command
      */
     protected function labelsToPattern(array $labels): string
     {
-        $matchMode = env('PHONE_MATCH_MODE', 'partial');
+        $matchMode = setting('PHONE_MATCH_MODE', env('PHONE_MATCH_MODE', 'partial'));
         $quoted = array_map(fn ($l) => preg_quote($l, '/'), $labels);
 
         if ($matchMode === 'exact') {
