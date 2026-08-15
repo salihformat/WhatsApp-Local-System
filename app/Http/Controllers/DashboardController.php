@@ -156,28 +156,27 @@ class DashboardController extends Controller
             'url' => config('app.central_api_url')
         ];
         
-        try {
-            if (!empty($serverStatus['url'])) {
-                // We send a lightweight request. Even if 404, it means the server is reachable.
-                $http = \Illuminate\Support\Facades\Http::timeout(5);
+        if (!empty($serverStatus['url'])) {
+            try {
+                $centralApi = app(\App\Services\CentralApiService::class);
+                $result = $centralApi->checkConnection();
                 
-                if (env('API_VERIFY_SSL', true) === false || env('API_VERIFY_SSL') === 'false') {
-                    $http->withoutVerifying();
+                $serverStatus['connected'] = $result['success'];
+                if ($result['success']) {
+                    $serverStatus['message'] = 'متصل بالسيرفر بنجاح (المصادقة سليمة)';
+                } else {
+                    $serverStatus['message'] = 'متصل لكن يوجد خطأ: ' . ($result['message'] ?? 'تحقق من التوكن ورقم الشركة');
                 }
-                
-                $response = $http->get($serverStatus['url']);
-                $serverStatus['connected'] = true;
-                $serverStatus['message'] = 'متصل بالسيرفر بنجاح';
-            } else {
-                $serverStatus['message'] = 'لم يتم تعيين رابط السيرفر (CENTRAL_API_URL)';
+            } catch (\Exception $e) {
+                $serverStatus['connected'] = false;
+                if ($e instanceof \Illuminate\Http\Client\ConnectionException || str_contains($e->getMessage(), 'cURL error')) {
+                    $serverStatus['message'] = 'لا يمكن الوصول للسيرفر (تأكد من العنوان أو أن السيرفر يعمل)';
+                } else {
+                    $serverStatus['message'] = 'خطأ في الاتصال: ' . $e->getMessage();
+                }
             }
-        } catch (\Exception $e) {
-            $serverStatus['connected'] = false;
-            if ($e instanceof \Illuminate\Http\Client\ConnectionException || str_contains($e->getMessage(), 'cURL error')) {
-                $serverStatus['message'] = 'لا يمكن الوصول للسيرفر (تأكد من العنوان أو أن السيرفر يعمل)';
-            } else {
-                $serverStatus['message'] = 'خطأ في الاتصال: ' . $e->getMessage();
-            }
+        } else {
+            $serverStatus['message'] = 'لم يتم تعيين رابط السيرفر (CENTRAL_API_URL)';
         }
 
         // 6. Check Background Services Status (via PID files owned by this application only)
@@ -240,6 +239,26 @@ class DashboardController extends Controller
         } catch (\Exception $e) {
             Log::error('Dashboard Retry All Failed failed', ['error' => $e->getMessage()]);
             return redirect()->route('dashboard')->with('error', 'فشل إعادة إرسال الرسائل الفاشلة: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Verify connection to the central server manually.
+     */
+    public function checkConnection()
+    {
+        try {
+            $centralApi = app(\App\Services\CentralApiService::class);
+            $result = $centralApi->checkConnection();
+            
+            if ($result['success']) {
+                return redirect()->route('dashboard')->with('success', 'نجاح المصادقة: ' . $result['message']);
+            } else {
+                return redirect()->route('dashboard')->with('error', 'فشل المصادقة: ' . $result['message']);
+            }
+        } catch (\Exception $e) {
+            Log::error('Dashboard Check Connection failed', ['error' => $e->getMessage()]);
+            return redirect()->route('dashboard')->with('error', 'خطأ في الاتصال بالسيرفر: ' . $e->getMessage());
         }
     }
 

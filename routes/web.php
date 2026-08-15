@@ -109,6 +109,7 @@ Route::middleware(['auth'])->group(function () {
         // Dashboard service controls - can disrupt the whole company's message queue, admin-only
         Route::post('/dashboard/scan', [DashboardController::class, 'scanFolder'])->name('dashboard.scan');
         Route::post('/dashboard/retry-failed', [DashboardController::class, 'retryAllFailed'])->name('dashboard.retry-failed');
+        Route::get('/dashboard/check-connection', [DashboardController::class, 'checkConnection'])->name('dashboard.check-connection');
         Route::post('/dashboard/process-queue', [DashboardController::class, 'processQueue'])->name('dashboard.process-queue');
         Route::post('/dashboard/start-services', [DashboardController::class, 'startServices'])->name('dashboard.start-services');
         Route::post('/dashboard/stop-services', [DashboardController::class, 'stopServices'])->name('dashboard.stop-services');

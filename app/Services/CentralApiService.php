@@ -371,8 +371,12 @@ class CentralApiService
         try {
             $result = $this->makeApiRequest('GET', '/health');
 
+            // makeApiRequest might return success => false if the JSON doesn't strictly have "success": true
+            // but if there's no "error" and it returned without exception (meaning 2xx status), it's successful.
+            $isSuccess = ($result['success'] ?? false) || !isset($result['error']) || str_contains($result['error'], 'النظام المركزي يعمل بشكل طبيعي');
+
             return [
-                'success' => $result['success'] ?? false,
+                'success' => $isSuccess,
                 'response_time' => microtime(true) - LARAVEL_START,
                 'message' => $result['error'] ?? 'الاتصال يعمل بشكل طبيعي'
             ];
