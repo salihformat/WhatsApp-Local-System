@@ -231,12 +231,20 @@ class SendMessageJob implements ShouldQueue
                     if ($publicUrl) {
                         $requestData['file_url'] = $publicUrl;
                         Log::info("Fallback successful: Uploaded file to public temp storage: {$publicUrl}");
-                        
+
                         // Send as JSON with file_url
+                        // [Fix] هذا الطلب البديل كان يُنشأ من الصفر بـ withToken() فقط، فيفقد ترويسة
+                        // X-Company-ID (وAccept) المضبوطة على الطلب الأصلي أعلاه — يفشل السيرفر المركزي
+                        // برفض ثابت "رقم الشركة مطلوب في الرأس X-Company-ID" لكل محاولة رفع فشل فيها
+                        // الإرسال المباشر (multipart) واحتاجت هذا الاحتياطي. نُعيد بناء نفس الترويسات كاملة.
                         $request = Http::timeout(config('app.central_api_timeout', 60))
-                            ->withToken(config('app.central_api_token'));
-                        $response = $request->withHeaders(['Content-Type' => 'application/json'])
-                            ->post(config('app.central_api_url') . '/messages/send', $requestData);
+                            ->withHeaders([
+                                'Authorization' => 'Bearer ' . config('app.central_api_token'),
+                                'X-Company-ID' => config('app.company_id'),
+                                'Accept' => 'application/json',
+                                'Content-Type' => 'application/json',
+                            ]);
+                        $response = $request->post(config('app.central_api_url') . '/messages/send', $requestData);
                     }
                 }
             } else {
