@@ -92,7 +92,7 @@
                     @endphp
                     @if($key === 'review' && count($folder['files']) > 0)
                         <div class="px-6 py-2 bg-yellow-50 border-b border-yellow-200 text-xs text-yellow-800">
-                            هذه الملفات استُخرج رقم الجوال لها من مصدر منخفض الثقة (بلا تسمية صريحة) — راجع "تفاصيل البحث" ثم وافق أو ارفض قبل الإرسال.
+                            هذه الملفات إما استُخرج رقم الجوال لها من مصدر منخفض الثقة (بلا تسمية صريحة)، أو تتطلب موافقة عامة، أو (إن ظهر حقل إدخال رقم) تعذّر استخراج أي رقم لها تلقائياً — أدخل الرقم يدوياً في الحقل ثم اضغط "إرسال". راجع "تفاصيل البحث" لمعرفة السبب قبل الموافقة أو الرفض.
                         </div>
                     @endif
                     <table class="min-w-full divide-y divide-gray-200">
@@ -147,7 +147,19 @@
                                     </td>
                                     @if($key === 'review')
                                         <td class="px-6 py-3 whitespace-nowrap text-sm">
-                                            @if($file['message_id'])
+                                            @if(!$file['message_id'])
+                                                <span class="text-gray-300 text-xs">لم يُعثر على سجل الرسالة</span>
+                                            @elseif($file['needs_phone_entry'] ?? false)
+                                                <form action="{{ route('print-monitor.set-phone-and-approve', $file['message_id']) }}" method="POST" class="flex gap-2 items-center" onsubmit="return confirmAction(event, 'سيتم إرسال الملف فعلياً إلى هذا الرقم. متابعة؟', 'إرسال');">
+                                                    @csrf
+                                                    <input type="text" name="phone_number" required placeholder="9665xxxxxxxx" dir="ltr" class="w-32 text-xs rounded-md border-gray-300 shadow-sm" title="لم يتمكن النظام من استخراج رقم جوال تلقائياً — أدخله هنا">
+                                                    <button type="submit" class="px-3 py-1 rounded-md bg-green-600 text-white text-xs font-medium hover:bg-green-700">إرسال</button>
+                                                </form>
+                                                <form action="{{ route('print-monitor.reject', $file['message_id']) }}" method="POST" class="inline mt-1" onsubmit="return confirmAction(event, 'سيتم رفض هذا الملف ونقله لمجلد فشلت بدون إرسال. متابعة؟', 'رفض', '#dc2626');">
+                                                    @csrf
+                                                    <button type="submit" class="px-3 py-1 rounded-md bg-red-50 text-red-700 text-xs font-medium hover:bg-red-100 border border-red-200">رفض</button>
+                                                </form>
+                                            @else
                                                 <div class="flex gap-2">
                                                     <form action="{{ route('print-monitor.approve', $file['message_id']) }}" method="POST" onsubmit="confirmAction(event, 'سيتم إرسال الملف فعلياً إلى {{ $file['phone_number'] }}. متابعة؟', 'موافقة');">
                                                         @csrf
@@ -158,8 +170,6 @@
                                                         <button type="submit" class="px-3 py-1 rounded-md bg-red-600 text-white text-xs font-medium hover:bg-red-700">رفض</button>
                                                     </form>
                                                 </div>
-                                            @else
-                                                <span class="text-gray-300 text-xs">لم يُعثر على سجل الرسالة</span>
                                             @endif
                                         </td>
                                     @endif

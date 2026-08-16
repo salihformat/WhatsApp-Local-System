@@ -173,32 +173,32 @@ class MonitorFolderCommand extends Command
             $extractedFromFilename = false;
             $trace = $this->newExtractionTrace();
 
+            // [Fix] PRINT_EXTRACTION_METHOD=popup سابقاً كان يتخطى استخراج الاسم/المحتوى بالكامل
+            // ويعتمد فقط على نافذة PowerShell منبثقة (promptUserForNumber) — لكن monitor:folder يعمل
+            // كمهمة مجدولة بلا أي جلسة سطح مكتب تفاعلية (Session 0 على خدمات ويندوز/جدولة المهام)،
+            // فالنافذة إما لا تظهر إطلاقاً أو لا يوجد من يضغط عليها، فتفشل كل الملفات بلا استثناء (كما
+            // حدث فعلياً مع ملف يحمل رقماً صريحاً في اسمه مثل "0500681066.pdf" ولم يُعالَج قط لأن
+            // الاستخراج من الاسم لم يُجرَّب أصلاً). الاستخراج التلقائي (اسم الملف ثم المحتوى) يجب أن
+            // يُجرَّب دائماً بصرف النظر عن الطريقة المختارة؛ "popup" أصبحت تعني فقط "إن فشل كل استخراج
+            // تلقائي، احجز الملف لإدخال الرقم يدوياً من صفحة /print-monitor" بدل نافذة نظام لا تعمل.
             $extractionMethod = Setting::get('PRINT_EXTRACTION_METHOD', 'ocr');
 
-            if ($extractionMethod === 'popup') {
-                $this->info("Prompting user for WhatsApp number via popup for file: {$filename}");
-                $phoneNumber = $this->promptUserForNumber($filename);
-                if ($phoneNumber) {
-                    $trace['source'] = 'popup';
-                }
+            if (!empty($matches)) {
+                $phoneNumber = $matches[0];
+                $extractedFromFilename = true;
+                $trace['source'] = 'filename';
+            } elseif ($extractionMethod !== 'filename' && $extension === 'pdf' && ($extractedFromContent = $this->extractPhoneFromPdfContent($fullPath, $filename, $trace))) {
+                $phoneNumber = $extractedFromContent;
+            } elseif ($extractionMethod !== 'filename' && $extension === 'docx' && ($extractedFromContent = $this->extractPhoneFromDocxContent($fullPath, $filename, $trace))) {
+                $phoneNumber = $extractedFromContent;
+            } elseif ($extractionMethod !== 'filename' && in_array($extension, ['jpg', 'jpeg', 'png']) && ($extractedFromContent = $this->extractPhoneFromImageContent($fullPath, $filename, $trace))) {
+                $phoneNumber = $extractedFromContent;
             } else {
-                if (!empty($matches)) {
-                    $phoneNumber = $matches[0];
-                    $extractedFromFilename = true;
-                    $trace['source'] = 'filename';
-                } elseif ($extractionMethod !== 'filename' && $extension === 'pdf' && ($extractedFromContent = $this->extractPhoneFromPdfContent($fullPath, $filename, $trace))) {
-                    $phoneNumber = $extractedFromContent;
-                } elseif ($extractionMethod !== 'filename' && $extension === 'docx' && ($extractedFromContent = $this->extractPhoneFromDocxContent($fullPath, $filename, $trace))) {
-                    $phoneNumber = $extractedFromContent;
-                } elseif ($extractionMethod !== 'filename' && in_array($extension, ['jpg', 'jpeg', 'png']) && ($extractedFromContent = $this->extractPhoneFromImageContent($fullPath, $filename, $trace))) {
-                    $phoneNumber = $extractedFromContent;
-                } else {
-                    $fallbackPhone = env('MONITOR_FALLBACK_PHONE');
-                    if (!empty($fallbackPhone)) {
-                        $phoneNumber = $fallbackPhone;
-                        $trace['source'] = 'env_fallback';
-                        $this->info("No phone number found in filename '{$filename}'. Using fallback phone: {$phoneNumber}");
-                    }
+                $fallbackPhone = env('MONITOR_FALLBACK_PHONE');
+                if (!empty($fallbackPhone)) {
+                    $phoneNumber = $fallbackPhone;
+                    $trace['source'] = 'env_fallback';
+                    $this->info("No phone number found in filename '{$filename}'. Using fallback phone: {$phoneNumber}");
                 }
             }
 
@@ -209,6 +209,16 @@ class MonitorFolderCommand extends Command
 
             if (!$phoneNumber) {
                 $this->recordExtractionTrace($filename, $extension, $trace);
+
+                // وضع "popup" (اسم موروث — الآن يعني: إن فشل الاستخراج التلقائي، اطلب الرقم يدوياً
+                // من المسؤول عبر صفحة /print-monitor بدل نافذة نظام لا يمكنها الظهور أصلاً في مهمة
+                // مجدولة بلا جلسة تفاعلية) يحجز الملف للمراجعة بدل نقله لـ"فشلت" فوراً.
+                if ($extractionMethod === 'popup') {
+                    $this->warn("Holding '{$filename}' for manual phone entry: no phone number could be extracted automatically.");
+                    $this->holdForManualPhoneEntry($filename, $extension, $fullPath, $reviewPath);
+                    continue;
+                }
+
                 $this->warn("No phone number found in filename: {$filename} and no fallback phone is configured. Moving to failed folder.");
                 try {
                     $targetFailed = $failedPath . '/' . $filename;
@@ -567,17 +577,72 @@ class MonitorFolderCommand extends Command
     }
 
     /**
+     * حجز ملف تعذّر استخراج أي رقم جوال منه تلقائياً (لا اسم ملف، لا محتوى مطابق)، ليدخل المسؤول
+     * الرقم يدوياً من صفحة /print-monitor بدل رفض الملف نهائياً — بديل عملي لنافذة popup التي لا يمكن
+     * أن تعمل داخل مهمة مجدولة بلا جلسة تفاعلية (راجع الشرح في نداء هذه الدالة). phone_number يُخزَّن
+     * فارغاً مؤقتاً (العمود يقبل نصاً فارغاً) حتى يُدخله المسؤول عبر PrintMonitorController::setPhoneAndApprove.
+     */
+    protected function holdForManualPhoneEntry(string $filename, string $extension, string $fullPath, string $reviewPath): void
+    {
+        try {
+            $baseName = pathinfo($filename, PATHINFO_FILENAME);
+            if (mb_strlen($baseName) > 50) {
+                $baseName = mb_substr($baseName, 0, 50) . '_' . uniqid();
+            }
+            $publicFilename = time() . '_' . $baseName . '.' . $extension;
+
+            $storageFolder = trim(config('app.files_storage_path', 'invoices'), '/');
+            $publicPath = $storageFolder . '/' . $publicFilename;
+
+            Storage::disk('public')->put($publicPath, File::get($fullPath));
+            $fileUrl = '/storage/' . $publicPath;
+
+            $messageText = setting('MONITORING_MESSAGE_TEXT', env('MONITORING_MESSAGE_TEXT', env('MONITOR_MESSAGE_TEXT', 'مرفق لكم المستند المطلوب')));
+
+            $message = Message::create([
+                'phone_number' => '',
+                'message_text' => $messageText,
+                'file_name' => $filename,
+                'source_filename' => $filename,
+                'file_path' => $fileUrl,
+                'file_type' => $this->getMimeTypeByExtension($extension),
+                'message_type' => 'media',
+                'status' => 'review_pending',
+                'metadata' => ['needs_phone_entry' => true],
+                'created_at' => now(),
+            ]);
+
+            $reviewFile = $reviewPath . '/' . $filename;
+            if (File::exists($reviewFile)) {
+                File::delete($fullPath);
+            } else {
+                File::move($fullPath, $reviewFile);
+            }
+
+            Log::info("Held file from PrintMonitor for manual phone entry", [
+                'filename' => $filename,
+                'message_id' => $message->id,
+            ]);
+
+            $this->warn("⏸️ File held for manual phone entry: {$filename} (no phone number found automatically)");
+
+            if (!empty(app(\App\Services\AdminNotifier::class)->phones())) {
+                app(\App\Services\MonitorFolderReviewService::class)->notifyAdminForApproval($message);
+            } else {
+                Log::warning("MonitorFolder: message {$message->id} needs manual phone entry but no printing.alert_phone_number configured — it will remain stuck until entered manually from /print-monitor.");
+            }
+        } catch (\Exception $e) {
+            $this->error("Failed to hold file {$filename} for manual phone entry: " . $e->getMessage());
+            Log::error("PrintMonitor Error (holdForManualPhoneEntry): " . $e->getMessage());
+        }
+    }
+
+    /**
      * Format phone number
      */
     protected function formatPhoneNumber($phoneNumber)
     {
-        $phoneNumber = preg_replace('/[^0-9]/', '', $phoneNumber);
-        if (substr($phoneNumber, 0, 1) === '0') {
-            $phoneNumber = '966' . substr($phoneNumber, 1);
-        } elseif (strlen($phoneNumber) === 9) {
-            $phoneNumber = '966' . $phoneNumber;
-        }
-        return $phoneNumber;
+        return format_phone_number($phoneNumber);
     }
 
     /**
@@ -1256,27 +1321,5 @@ class MonitorFolderCommand extends Command
             'gif' => 'image/gif',
         ];
         return $mimes[strtolower($extension)] ?? 'application/octet-stream';
-    }
-    /**
-     * يعرض نافذة منبثقة (Popup) عبر PowerShell لطلب الرقم من المستخدم
-     */
-    protected function promptUserForNumber(string $filename): ?string
-    {
-        $safeFilename = addslashes($filename);
-        $psCommand = "powershell -Command \"Add-Type -AssemblyName Microsoft.VisualBasic; \$num = [Microsoft.VisualBasic.Interaction]::InputBox('الرجاء إدخال رقم الواتساب لإرسال الفاتورة / الملف: {$safeFilename}', 'طابعة الواتساب الافتراضية', ''); Write-Output \$num\"";
-        
-        $output = shell_exec($psCommand);
-        
-        if ($output) {
-            $number = trim($output);
-            // Basic validation for phone number (digits only, length >= 9)
-            if (preg_match('/^[0-9]{9,20}$/', $number)) {
-                return $number;
-            } else if (!empty($number)) {
-                $this->warn("User entered an invalid phone number format: {$number}");
-            }
-        }
-        
-        return null;
     }
 }

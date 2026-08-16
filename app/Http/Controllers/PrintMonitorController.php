@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use App\Models\Message;
 use App\Models\ExtractionTrace;
@@ -70,9 +71,10 @@ class PrintMonitorController extends Controller
                 'size' => $this->formatSize($file->getSize()),
                 'modified_at' => $file->getMTime(),
                 'message_id' => $message->id ?? null,
-                'phone_number' => $message->phone_number ?? null,
+                'phone_number' => $message?->phone_number ?: null,
                 'status' => $message->status ?? null,
                 'error_message' => $message->error_message ?? null,
+                'needs_phone_entry' => (bool) ($message->metadata['needs_phone_entry'] ?? false),
                 'trace' => $trace ? [
                     'source' => $trace->source,
                     'source_label' => $this->traceSourceLabel($trace->source),
@@ -175,6 +177,28 @@ class PrintMonitorController extends Controller
         return back()->with($count > 0 ? 'success' : 'info', $count > 0
             ? "تمت الموافقة على {$count} ملف."
             : 'لا توجد ملفات بانتظار المراجعة حالياً.');
+    }
+
+    /**
+     * إدخال رقم جوال يدوياً لملف حُجز بلا أي رقم مستخرَج تلقائياً (وضع PRINT_EXTRACTION_METHOD=popup
+     * عند فشل الاستخراج) ثم إرساله فوراً — بديل صفحة الويب لنافذة النظام المنبثقة غير القابلة للعمل.
+     */
+    public function setPhoneAndApprove(Message $message, Request $request, MonitorFolderReviewService $review)
+    {
+        $validated = $request->validate([
+            'phone_number' => ['required', 'string', 'max:20'],
+        ]);
+
+        $result = $review->setPhoneAndApprove($message, $validated['phone_number']);
+
+        if ($result['success']) {
+            activity('print-monitor')
+                ->causedBy(auth()->user())
+                ->withProperties(['message_id' => $message->id, 'phone_number' => $message->phone_number, 'file_name' => $message->file_name])
+                ->log('تم إدخال رقم الجوال يدوياً والموافقة على إرسال ملف');
+        }
+
+        return back()->with($result['success'] ? 'success' : 'error', $result['message']);
     }
 
     private function formatSize(int $bytes): string

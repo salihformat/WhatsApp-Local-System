@@ -365,6 +365,15 @@ class MessageController extends Controller
         }
     }
 
+
+    /**
+     * Format phone number to international format
+     */
+    protected function formatPhoneNumber($phoneNumber)
+    {
+        return format_phone_number($phoneNumber);
+    }
+
     /**
      * Retry sending a failed message.
      */
@@ -386,34 +395,6 @@ class MessageController extends Controller
         return redirect()
             ->back()
             ->with('success', 'سيتم إعادة إرسال الرسالة قريباً');
-    }
-
-    /**
-     * Format phone number to international format
-     */
-    protected function formatPhoneNumber($phoneNumber)
-    {
-        // Remove any non-numeric characters
-        $phoneNumber = preg_replace('/[^0-9]/', '', $phoneNumber);
-        
-        // If the number starts with 0, replace with 966
-        if (substr($phoneNumber, 0, 1) === '0') {
-            $phoneNumber = '966' . substr($phoneNumber, 1);
-        }
-        // If the number starts with 966, keep it as is
-        elseif (substr($phoneNumber, 0, 3) === '966') {
-            // Already in correct format
-        }
-        // If the number starts with +, remove the +
-        elseif (substr($phoneNumber, 0, 1) === '+') {
-            $phoneNumber = substr($phoneNumber, 1);
-        }
-        // If the number is 9 digits, assume it's a Saudi number and add 966
-        elseif (strlen($phoneNumber) === 9) {
-            $phoneNumber = '966' . $phoneNumber;
-        }
-        
-        return $phoneNumber;
     }
 
     /**

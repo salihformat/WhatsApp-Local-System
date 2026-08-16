@@ -50,6 +50,7 @@ class UpdateSettingRequest extends FormRequest
             'PHONE_MATCH_MODE' => 'nullable|in:partial,exact',
             'ENABLE_UNLABELED_PHONE_FALLBACK' => 'nullable|in:true,false',
             'PHONE_REVIEW_REQUIRED_SOURCES' => 'nullable|string|max:500',
+            'DEFAULT_COUNTRY_CODE' => 'nullable|string|max:10',
             'DUPLICATE_DETECTION_ENABLED' => 'nullable|in:true,false',
             'DUPLICATE_DETECTION_WINDOW_MINUTES' => 'nullable|integer|min:1|max:10080',
             'LEARNED_TRUST_THRESHOLD' => 'nullable|integer|min:0|max:20',

@@ -37,8 +37,9 @@ class PrintJobController extends Controller
 
         $printJobs = $query->latest()->paginate(20)->withQueryString();
         $printers = \App\Models\Printer::all();
+        $pendingCount = PrintJob::where('status', 'awaiting_approval')->count();
 
-        return view('print-jobs.index', compact('printJobs', 'printers'));
+        return view('print-jobs.index', compact('printJobs', 'printers', 'pendingCount'));
     }
 
     private function exportCsv($query)
@@ -126,6 +127,28 @@ class PrintJobController extends Controller
 
         return redirect()->back()->with($count > 0 ? 'success' : 'info', $count > 0
             ? "تمت الموافقة على {$count} مهمة طباعة."
+            : 'لا توجد مهام بانتظار الموافقة حالياً.');
+    }
+
+    public function rejectAll(Request $request, PrintJobDispatcher $dispatcher)
+    {
+        $printerId = $request->filled('printer_id') ? (int) $request->input('printer_id') : null;
+
+        $query = PrintJob::where('status', 'awaiting_approval');
+        if ($printerId) {
+            $query->where('printer_id', $printerId);
+        }
+
+        $count = 0;
+        $userName = auth()->user()->name ?? 'مستخدم';
+        foreach ($query->get() as $printJob) {
+            if ($dispatcher->reject($printJob, "تم الرفض الجماعي من قبل {$userName} من لوحة التحكم.")) {
+                $count++;
+            }
+        }
+
+        return redirect()->back()->with($count > 0 ? 'success' : 'info', $count > 0
+            ? "تم رفض {$count} مهمة طباعة."
             : 'لا توجد مهام بانتظار الموافقة حالياً.');
     }
 }

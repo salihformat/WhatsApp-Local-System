@@ -257,15 +257,21 @@
 
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div class="mb-4 md:col-span-2">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">كود الدولة الافتراضي (DEFAULT_COUNTRY_CODE) <span class="text-xs text-gray-500">للاستخراج الذكي</span></label>
+                                        <input type="text" name="DEFAULT_COUNTRY_CODE" value="{{ old('DEFAULT_COUNTRY_CODE', $settings['DEFAULT_COUNTRY_CODE'] ?? '966') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="مثال: 966 أو 20">
+                                        <p class="text-xs text-gray-400 mt-1">يُضاف تلقائياً إذا تم استخراج رقم بدون مفتاح أو يبدأ بصفر (يقوم النظام بحذف الصفر وإضافة هذا الكود).</p>
+                                    </div>
+                                    
+                                    <div class="mb-4 md:col-span-2">
                                         <label class="block text-sm font-medium text-gray-700 mb-1">آلية استخراج الرقم (PRINT_EXTRACTION_METHOD)</label>
                                         @php $extractionMethod = old('PRINT_EXTRACTION_METHOD', $settings['PRINT_EXTRACTION_METHOD'] ?? 'ocr'); @endphp
                                         <select name="PRINT_EXTRACTION_METHOD" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                             <option value="ocr" @selected($extractionMethod === 'ocr')>قراءة الرقم آلياً من محتوى الملف (الافتراضي الذكي)</option>
-                                            <option value="popup" @selected($extractionMethod === 'popup')>نافذة منبثقة (طلب إدخال الرقم يدوياً عند كل ملف)</option>
+                                            <option value="popup" @selected($extractionMethod === 'popup')>إدخال يدوي من الموقع عند فشل الاستخراج التلقائي</option>
                                             <option value="filename" @selected($extractionMethod === 'filename')>استخراج من اسم الملف فقط (لا يبحث داخل الملف)</option>
                                         </select>
                                         <p class="text-xs text-gray-400 mt-1">
-                                            "النافذة المنبثقة" ممتازة وتعمل بكفاءة إذا كنت تُشغل المراقبة بشكل تفاعلي، ولكنها قد لا تظهر إذا كان الخادم يعمل كخدمة مخفية في الويندوز (Session 0).
+                                            في كل الأوضاع الثلاثة يُحاوَل استخراج الرقم أولاً من اسم الملف، ثم من محتواه (إلا في وضع "اسم الملف فقط"). الفرق فقط عند فشل كل محاولات الاستخراج: "الافتراضي الذكي"/"اسم الملف فقط" ينقلان الملف مباشرة لمجلد "فشلت"، بينما "إدخال يدوي من الموقع" يحجزه في تبويب "بانتظار المراجعة" بصفحة متابعة الإرسال (<a href="{{ route('print-monitor.index') }}" class="text-indigo-600 hover:underline">/print-monitor</a>) لتُدخل الرقم يدوياً من هناك ثم يُرسَل. لا يوجد نافذة نظام منبثقة فعلية — هذا لا يمكن أن يعمل مطلقاً في مهمة مجدولة بلا جلسة تفاعلية (Session 0)، لذا استُبدل بهذا المسار العملي عبر الويب.
                                         </p>
                                     </div>
 

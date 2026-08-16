@@ -152,6 +152,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/print-monitor/approve-all', [\App\Http\Controllers\PrintMonitorController::class, 'approveAll'])->name('print-monitor.approve-all');
         Route::post('/print-monitor/{message}/approve', [\App\Http\Controllers\PrintMonitorController::class, 'approve'])->name('print-monitor.approve');
         Route::post('/print-monitor/{message}/reject', [\App\Http\Controllers\PrintMonitorController::class, 'reject'])->name('print-monitor.reject');
+        Route::post('/print-monitor/{message}/set-phone-and-approve', [\App\Http\Controllers\PrintMonitorController::class, 'setPhoneAndApprove'])->name('print-monitor.set-phone-and-approve');
 
         // محرك الأتمتة العام - Automation Rules
         Route::get('/automation-rules', [\App\Http\Controllers\AutomationRuleController::class, 'index'])->name('automation-rules.index');
@@ -166,6 +167,7 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('/print-jobs', [\App\Http\Controllers\PrintJobController::class, 'index'])->name('print-jobs.index');
         Route::post('/print-jobs/approve-all', [\App\Http\Controllers\PrintJobController::class, 'approveAll'])->name('print-jobs.approve-all');
+        Route::post('/print-jobs/reject-all', [\App\Http\Controllers\PrintJobController::class, 'rejectAll'])->name('print-jobs.reject-all');
         Route::post('/print-jobs/{printJob}/retry', [\App\Http\Controllers\PrintJobController::class, 'retry'])->name('print-jobs.retry');
         Route::post('/print-jobs/{printJob}/approve', [\App\Http\Controllers\PrintJobController::class, 'approve'])->name('print-jobs.approve');
         Route::post('/print-jobs/{printJob}/reject', [\App\Http\Controllers\PrintJobController::class, 'reject'])->name('print-jobs.reject');

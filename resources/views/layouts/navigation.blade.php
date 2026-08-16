@@ -49,22 +49,22 @@
 
                             <x-slot name="content">
                                 <div class="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">الإعداد العام</div>
-                                <x-dropdown-link :href="route('users.index')">{{ __('المستخدمين') }}</x-dropdown-link>
-                                <x-dropdown-link :href="route('settings.index')">{{ __('الإعدادات') }}</x-dropdown-link>
-                                <x-dropdown-link :href="route('reports.performance')">{{ __('تقارير الأداء') }}</x-dropdown-link>
+                                <x-dropdown-link :href="route('users.index')" :active="request()->routeIs('users.*')">{{ __('المستخدمين') }}</x-dropdown-link>
+                                <x-dropdown-link :href="route('settings.index')" :active="request()->routeIs('settings.*')">{{ __('الإعدادات') }}</x-dropdown-link>
+                                <x-dropdown-link :href="route('reports.performance')" :active="request()->routeIs('reports.*')">{{ __('تقارير الأداء') }}</x-dropdown-link>
 
                                 <div class="border-t border-gray-100 my-1"></div>
                                 <div class="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">الطباعة الذكية</div>
-                                <x-dropdown-link :href="route('printers.index')">{{ __('الطابعات وقواعد التوجيه') }}</x-dropdown-link>
-                                <x-dropdown-link :href="route('print-monitor.index')">{{ __('متابعة الإرسال') }}</x-dropdown-link>
-                                <x-dropdown-link :href="route('print-jobs.index')">{{ __('سجل عمليات الطباعة') }}</x-dropdown-link>
+                                <x-dropdown-link :href="route('printers.index')" :active="request()->routeIs('printers.*')">{{ __('الطابعات وقواعد التوجيه') }}</x-dropdown-link>
+                                <x-dropdown-link :href="route('print-monitor.index')" :active="request()->routeIs('print-monitor.*')">{{ __('متابعة مجلد المراقبة (PrintMonitor)') }}</x-dropdown-link>
+                                <x-dropdown-link :href="route('print-jobs.index')" :active="request()->routeIs('print-jobs.*')">{{ __('سجل عمليات الطباعة') }}</x-dropdown-link>
 
                                 <div class="border-t border-gray-100 my-1"></div>
                                 <div class="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">المراقبة والأتمتة</div>
-                                <x-dropdown-link :href="route('automation-rules.index')">{{ __('الأتمتة') }}</x-dropdown-link>
-                                <x-dropdown-link :href="route('system-health.index')">{{ __('صحة النظام') }}</x-dropdown-link>
-                                <x-dropdown-link :href="route('failed-jobs.index')">{{ __('المهام الفاشلة تقنياً') }}</x-dropdown-link>
-                                <x-dropdown-link :href="route('audit-log.index')">{{ __('سجل التدقيق') }}</x-dropdown-link>
+                                <x-dropdown-link :href="route('automation-rules.index')" :active="request()->routeIs('automation-rules.*')">{{ __('الأتمتة') }}</x-dropdown-link>
+                                <x-dropdown-link :href="route('system-health.index')" :active="request()->routeIs('system-health.*')">{{ __('صحة النظام') }}</x-dropdown-link>
+                                <x-dropdown-link :href="route('failed-jobs.index')" :active="request()->routeIs('failed-jobs.*')">{{ __('المهام الفاشلة تقنياً') }}</x-dropdown-link>
+                                <x-dropdown-link :href="route('audit-log.index')" :active="request()->routeIs('audit-log.*')">{{ __('سجل التدقيق') }}</x-dropdown-link>
                             </x-slot>
                         </x-dropdown>
                     @endif
@@ -212,7 +212,7 @@
                     {{ __('الطابعات وقواعد التوجيه') }}
                 </x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('print-monitor.index')" :active="request()->routeIs('print-monitor.*')">
-                    {{ __('متابعة الإرسال') }}
+                    {{ __('متابعة مجلد المراقبة (PrintMonitor)') }}
                 </x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('print-jobs.index')" :active="request()->routeIs('print-jobs.*')">
                     {{ __('سجل عمليات الطباعة') }}

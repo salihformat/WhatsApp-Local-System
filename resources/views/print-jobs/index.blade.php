@@ -18,17 +18,36 @@
                 <div class="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded relative">{{ session('info') }}</div>
             @endif
 
-            <div class="flex justify-end">
-                <form action="{{ route('print-jobs.approve-all') }}" method="POST" onsubmit="return confirm('هل أنت متأكد من الموافقة على كل مهام الطباعة المعلّقة حالياً؟');">
-                    @csrf
-                    @if(request('printer_id'))
-                        <input type="hidden" name="printer_id" value="{{ request('printer_id') }}">
-                    @endif
-                    <button type="submit" class="text-green-700 hover:text-green-900 bg-green-50 hover:bg-green-100 px-4 py-2 rounded-md transition-colors border border-green-200 text-sm font-medium">
-                        موافقة على كل الطلبات المعلّقة{{ request('printer_id') ? ' (لهذه الطابعة فقط)' : '' }}
-                    </button>
-                </form>
-            </div>
+            @if($pendingCount > 0)
+                <div class="bg-orange-50 border border-orange-300 text-orange-800 px-4 py-3 rounded-lg relative flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <svg class="h-5 w-5 text-orange-500 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
+                        <span class="font-medium">يوجد <strong>{{ $pendingCount }}</strong> {{ $pendingCount === 1 ? 'طلب طباعة' : 'طلبات طباعة' }} بانتظار موافقتك</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <form action="{{ route('print-jobs.approve-all') }}" method="POST" onsubmit="return confirm('هل أنت متأكد من الموافقة على كل مهام الطباعة المعلّقة ({{ $pendingCount }})؟');">
+                            @csrf
+                            @if(request('printer_id'))
+                                <input type="hidden" name="printer_id" value="{{ request('printer_id') }}">
+                            @endif
+                            <button type="submit" class="text-white bg-green-600 hover:bg-green-700 px-4 py-2 rounded-md transition-colors text-sm font-medium inline-flex items-center gap-1">
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                                موافقة على الكل
+                            </button>
+                        </form>
+                        <form action="{{ route('print-jobs.reject-all') }}" method="POST" onsubmit="return confirm('هل أنت متأكد من رفض كل مهام الطباعة المعلّقة ({{ $pendingCount }})؟');">
+                            @csrf
+                            @if(request('printer_id'))
+                                <input type="hidden" name="printer_id" value="{{ request('printer_id') }}">
+                            @endif
+                            <button type="submit" class="text-white bg-red-600 hover:bg-red-700 px-4 py-2 rounded-md transition-colors text-sm font-medium inline-flex items-center gap-1">
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                رفض الكل
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            @endif
 
             <!-- Filters Section -->
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
@@ -135,23 +154,41 @@
                                     @endif
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $job->duration_for_humans ?? '—' }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-500 max-w-xs truncate" title="{{ $job->error_message }}">{{ $job->error_message ?? '—' }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-1 space-x-reverse">
-                                    @if($job->status === 'failed')
+                                <td class="px-6 py-4 text-sm max-w-xs" title="{{ $job->error_message }}">
+                                    @if($job->error_message)
+                                        <span class="text-red-600 truncate block">{{ $job->error_message }}</span>
+                                    @else
+                                        <span class="text-gray-300">—</span>
+                                    @endif
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    @if($job->status === 'awaiting_approval')
+                                        <div class="flex gap-1">
+                                            <form action="{{ route('print-jobs.approve', $job) }}" method="POST">
+                                                @csrf
+                                                <button type="submit" class="text-white bg-green-600 hover:bg-green-700 px-3 py-1.5 rounded-md transition-colors text-xs font-medium inline-flex items-center gap-1" title="موافقة على طباعة هذا الملف">
+                                                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                                                    موافقة
+                                                </button>
+                                            </form>
+                                            <form action="{{ route('print-jobs.reject', $job) }}" method="POST" onsubmit="return confirm('هل أنت متأكد من رفض طباعة {{ $job->file_name }}؟');">
+                                                @csrf
+                                                <button type="submit" class="text-white bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-md transition-colors text-xs font-medium inline-flex items-center gap-1" title="رفض طباعة هذا الملف">
+                                                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                                    رفض
+                                                </button>
+                                            </form>
+                                        </div>
+                                    @elseif($job->status === 'failed')
                                         <form action="{{ route('print-jobs.retry', $job) }}" method="POST" class="inline">
                                             @csrf
-                                            <button type="submit" class="text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-3 py-1 rounded transition-colors border border-indigo-100">إعادة المحاولة</button>
+                                            <button type="submit" class="text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-md transition-colors text-xs font-medium inline-flex items-center gap-1" title="إعادة محاولة الطباعة">
+                                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                                إعادة المحاولة
+                                            </button>
                                         </form>
-                                    @endif
-                                    @if($job->status === 'awaiting_approval')
-                                        <form action="{{ route('print-jobs.approve', $job) }}" method="POST" class="inline">
-                                            @csrf
-                                            <button type="submit" class="text-green-700 hover:text-green-900 bg-green-50 hover:bg-green-100 px-3 py-1 rounded transition-colors border border-green-200">موافقة</button>
-                                        </form>
-                                        <form action="{{ route('print-jobs.reject', $job) }}" method="POST" class="inline" onsubmit="return confirm('هل أنت متأكد من رفض هذه المهمة؟');">
-                                            @csrf
-                                            <button type="submit" class="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 px-3 py-1 rounded transition-colors border border-red-100">رفض</button>
-                                        </form>
+                                    @else
+                                        <span class="text-gray-300">—</span>
                                     @endif
                                 </td>
                             </tr>

@@ -98,14 +98,6 @@ class AdminNotifier
      */
     private function formatPhoneNumber(string $phoneNumber): string
     {
-        $phoneNumber = preg_replace('/[^0-9]/', '', $phoneNumber);
-
-        if (substr($phoneNumber, 0, 1) === '0') {
-            $phoneNumber = '966' . substr($phoneNumber, 1);
-        } elseif (strlen($phoneNumber) === 9) {
-            $phoneNumber = '966' . $phoneNumber;
-        }
-
-        return $phoneNumber;
+        return format_phone_number($phoneNumber) ?? '';
     }
 }

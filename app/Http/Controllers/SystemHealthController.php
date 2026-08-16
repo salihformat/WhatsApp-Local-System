@@ -6,10 +6,11 @@ use App\Models\Message;
 use App\Models\PrintJob;
 use App\Models\Printer;
 use App\Models\SystemHealthLog;
+use App\Services\RecentErrorLogReader;
 
 class SystemHealthController extends Controller
 {
-    public function index()
+    public function index(RecentErrorLogReader $errorLogReader)
     {
         $latest = SystemHealthLog::latest('checked_at')->first();
 
@@ -48,7 +49,11 @@ class SystemHealthController extends Controller
             'review_pending_count' => Message::where('status', 'review_pending')->count(),
         ];
 
-        return view('system-health.index', compact('latest', 'chartData', 'history', 'failedJobs', 'printHealth', 'sendReview'));
+        // أخطاء PHP الفعلية الحديثة (استثناءات، أخطاء fatal) من ملف اللوج المحلي — راجع
+        // RecentErrorLogReader لسبب إضافتها هنا تحديداً.
+        $recentErrors = $errorLogReader->recent();
+
+        return view('system-health.index', compact('latest', 'chartData', 'history', 'failedJobs', 'printHealth', 'sendReview', 'recentErrors'));
     }
 
     public function restartQueue()

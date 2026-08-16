@@ -21,6 +21,31 @@ class MonitorFolderReviewService
     }
 
     /**
+     * يُستخدَم لملفات حُجزت بلا أي رقم جوال مستخرَج تلقائياً (metadata.needs_phone_entry، راجع
+     * MonitorFolderCommand::holdForManualPhoneEntry) — المسؤول يُدخل الرقم يدوياً من صفحة متابعة
+     * الإرسال، فيُحدَّث الرقم على الرسالة ثم تُعتمد نفس آلية approve() المعتادة للإرسال الفعلي.
+     *
+     * @return array{success: bool, message: string}
+     */
+    public function setPhoneAndApprove(Message $message, string $phoneNumber): array
+    {
+        if ($message->status !== 'review_pending') {
+            return ['success' => false, 'message' => 'هذا الملف ليس بانتظار المراجعة حالياً.'];
+        }
+
+        $formatted = format_phone_number($phoneNumber);
+        if (empty($formatted) || !preg_match('/^[0-9]{9,15}$/', $formatted)) {
+            return ['success' => false, 'message' => 'رقم الجوال المُدخَل غير صالح.'];
+        }
+
+        $metadata = $message->metadata ?? [];
+        unset($metadata['needs_phone_entry']);
+        $message->update(['phone_number' => $formatted, 'metadata' => $metadata ?: null]);
+
+        return $this->approve($message);
+    }
+
+    /**
      * @return array{success: bool, message: string}
      */
     public function approve(Message $message): array
@@ -124,13 +149,30 @@ class MonitorFolderReviewService
 
     /**
      * إبلاغ المسؤول (أو المسؤولين) عبر واتساب بملف بانتظار موافقته قبل إرساله، مع تعليمات الرد
-     * النصي البسيط للموافقة/الرفض. عامة (public) لإعادة استخدامها من أمر التذكير التلقائي.
+     * النصي البسيط للموافقة/الرفض. عامة (public) لإعادة استخدامها من أمر التذكير التلقائي
+     * (SendApprovalReminders، كل الرسائل بحالة review_pending تشمل هذه أيضاً) — لذا مركزية هنا بدل
+     * تكرارها في MonitorFolderCommand، حتى لا يختلف نص التذكير عن نص الإشعار الأول كما حدث سابقاً.
      * $customNotice نص تحذير إضافي اختياري يُدرَج أعلى الرسالة (يُستخدم حالياً لتنبيه اشتباه التكرار).
      */
     public function notifyAdminForApproval(Message $message, bool $isReminder = false, ?string $customNotice = null): void
     {
         $prefix = $isReminder ? "⏰ تذكير — لا يزال بانتظار موافقتك:\n\n" : '';
         $notice = $customNotice ? $customNotice . "\n\n" : '';
+        $link = rtrim(config('app.url'), '/') . '/print-monitor';
+
+        // ملفات بلا أي رقم مستخرَج تلقائياً (راجع MonitorFolderCommand::holdForManualPhoneEntry):
+        // لا يوجد رقم جوال لعرضه، ولا معنى لأوامر "وافق/رفض ارسال" النصية لأن الموافقة تتطلب أولاً
+        // إدخال الرقم من الصفحة نفسها — رسالة مختلفة تماماً بدل القالب العام.
+        if ($message->metadata['needs_phone_entry'] ?? false) {
+            $text = $prefix . $notice . "📎 ملف بانتظار إدخال رقم الجوال يدوياً\n"
+                . "رقم الرسالة: {$message->id}\n"
+                . "الملف: {$message->file_name}\n\n"
+                . "لم يتمكن النظام من استخراج رقم جوال تلقائياً. أدخل الرقم من صفحة متابعة الإرسال لإتمام الإرسال:\n"
+                . $link;
+
+            $this->adminNotifier->notify($text, ['source' => 'monitor_needs_phone_entry', 'reviewed_message_id' => $message->id]);
+            return;
+        }
 
         $text = $prefix . $notice . "📨 ملف بانتظار موافقتك قبل الإرسال عبر واتساب\n"
             . "رقم الرسالة: {$message->id}\n"
@@ -138,7 +180,8 @@ class MonitorFolderReviewService
             . "الملف: {$message->file_name}\n\n"
             . "للموافقة أرسل: وافق ارسال {$message->id}\n"
             . "للرفض أرسل: رفض ارسال {$message->id}\n"
-            . "لمعاينة الملف أولاً أرسل: ارسل لي الملف ارسال {$message->id}";
+            . "لمعاينة الملف أولاً أرسل: ارسل لي الملف ارسال {$message->id}\n"
+            . "أو راجع مباشرة: {$link}";
 
         $this->adminNotifier->notify($text, ['source' => 'monitor_send_approval_request', 'reviewed_message_id' => $message->id]);
     }

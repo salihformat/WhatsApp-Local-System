@@ -75,6 +75,23 @@
                 <div class="text-xs text-gray-400 mt-4">آخر فحص: {{ $latest->checked_at->diffForHumans() }} ({{ $latest->checked_at->format('Y-m-d H:i:s') }})</div>
             @endif
 
+            <!-- آخر الأخطاء الفنية الحقيقية من ملف اللوج المحلي -->
+            <div class="bg-white rounded-lg shadow-sm p-6">
+                <h3 class="text-sm font-bold text-gray-700 mb-4">آخر الأخطاء الفنية (من سجلات هذا النظام)</h3>
+                @if(empty($recentErrors))
+                    <p class="text-sm text-gray-500">لا توجد أخطاء حديثة مسجّلة.</p>
+                @else
+                    <div class="space-y-2 max-h-80 overflow-y-auto">
+                        @foreach($recentErrors as $err)
+                            <div class="text-xs bg-red-50 border border-red-200 rounded p-2">
+                                <span class="text-red-700 font-mono">[{{ $err['timestamp'] }}] {{ $err['level'] }}</span>
+                                <div class="text-gray-700 break-all mt-1">{{ $err['message'] }}</div>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
+
             <!-- صحة الطباعة والمراجعة اليدوية (بيانات حيّة) -->
             <div class="bg-white rounded-lg shadow-sm p-6">
                 <h3 class="text-sm font-bold text-gray-700 mb-4">صحة الطباعة والمراجعة اليدوية</h3>
