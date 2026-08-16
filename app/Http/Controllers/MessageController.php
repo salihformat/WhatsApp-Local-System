@@ -960,7 +960,23 @@ class MessageController extends Controller
             return $response;
         }
 
-        $messageType = isset($data['message_type']) && in_array($data['message_type'], ['text', 'chat']) ? 'text' : 'media';
+        $rawMessageType = $data['message_type'] ?? 'text';
+        $messageType = in_array($rawMessageType, ['text', 'chat']) ? 'text' : 'media';
+
+        // [Fix 2026-08-16] لوحظ فعلياً أن واتساب (عبر UltraMsg) يُرسل الصور بدون mime_type وبدون
+        // file_name، ورابط S3 بلا امتداد — فيفشل FileTypeResolver في تحديد نوع الملف (يرجع فارغاً)
+        // وتُرفض الصورة من الطباعة رغم مطابقتها لقاعدة. الحل: نستنتج mime_type من نوع الرسالة
+        // الأصلي (image/video/audio/document) عندما يكون المزوّد لم يُرسله صراحة.
+        $mimeType = $data['mime_type'] ?? null;
+        if (empty($mimeType) && $messageType === 'media') {
+            $mimeType = match ($rawMessageType) {
+                'image'    => 'image/jpeg',
+                'video'    => 'video/mp4',
+                'audio'    => 'audio/ogg',
+                'document' => null, // المستندات عادة تأتي باسم ملف صريح يكفي لاستخراج الامتداد
+                default    => null,
+            };
+        }
 
         // Find associated contact and user
         $contact = \App\Models\Contact::where('phone_number', $senderPhone)->first();
@@ -1006,7 +1022,7 @@ class MessageController extends Controller
             'message_type' => $messageType,
             'file_path' => $data['media_url'] ?? null,
             'file_name' => $data['file_name'] ?? null,
-            'file_type' => $data['mime_type'] ?? null,
+            'file_type' => $mimeType,
             'central_message_id' => $data['message_id'] ?? null,
             'status' => 'received',
             'metadata' => [

@@ -6,6 +6,8 @@ use App\Models\Message;
 use App\Models\PrintRule;
 use App\Models\Printer;
 
+use Illuminate\Support\Facades\Log;
+
 /**
  * يحدد الطابعة المناسبة لرسالة واردة بناءً على قواعد مُعرَّفة من المستخدم
  * (رقم الجوال، بادئة الرقم، كلمة مفتاحية في نص الرسالة، أو نوع الملف)،
@@ -16,6 +18,14 @@ class PrintRuleEngine
     public function resolvePrinter(Message $message): ?Printer
     {
         if (!$this->isPrintable($message)) {
+            Log::debug('PrintRuleEngine: message not printable', [
+                'message_id' => $message->id,
+                'message_type' => $message->message_type,
+                'file_path' => $message->file_path ? '(set)' : '(empty)',
+                'resolved_extension' => $this->fileExtension($message),
+                'file_type' => $message->file_type,
+                'file_name' => $message->file_name,
+            ]);
             return null;
         }
 
@@ -30,11 +40,28 @@ class PrintRuleEngine
             }
 
             if ($this->ruleMatches($rule, $message)) {
+                Log::info("PrintRuleEngine: matched rule #{$rule->id} ({$rule->match_type}={$rule->match_value})", [
+                    'message_id' => $message->id,
+                    'printer' => $rule->printer->name,
+                ]);
                 return $rule->printer;
             }
         }
 
-        return Printer::active()->where('is_default', true)->first();
+        $defaultPrinter = Printer::active()->where('is_default', true)->first();
+        if ($defaultPrinter) {
+            Log::info("PrintRuleEngine: no rule matched, using default printer", [
+                'message_id' => $message->id,
+                'printer' => $defaultPrinter->name,
+            ]);
+        } else {
+            Log::debug('PrintRuleEngine: no rule matched and no default printer', [
+                'message_id' => $message->id,
+                'phone' => $message->phone_number,
+                'extension' => $this->fileExtension($message),
+            ]);
+        }
+        return $defaultPrinter;
     }
 
     /**

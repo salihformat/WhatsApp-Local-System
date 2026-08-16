@@ -69,7 +69,7 @@ class MonitorFolderCommand extends Command
         // Load synced central storage policy and settings if available
         $policy = null;
         if (!Storage::disk('local')->exists('local_system_config.json')) {
-            $this->info("Local config cache not found. Automatically syncing configuration from central...");
+            $this->info("لم يتم العثور على ملف الإعدادات المحلي. جارٍ مزامنة الإعدادات من المركزي تلقائياً...");
             try {
                 $this->call('local-system:sync-config');
             } catch (\Exception $e) {
@@ -80,10 +80,10 @@ class MonitorFolderCommand extends Command
         if (Storage::disk('local')->exists('local_system_config.json')) {
             $configData = json_decode(Storage::disk('local')->get('local_system_config.json'), true);
             $policy = $configData['storage_policy'] ?? null;
-            $this->info("Loaded synced central storage policy: Max size " . ($policy['max_file_size_mb'] ?? 'N/A') . "MB");
+            $this->info("تم تحميل سياسة التخزين المركزية: الحد الأقصى " . ($policy['max_file_size_mb'] ?? 'غير محدد') . " ميجابايت");
         }
 
-        $this->info("Scanning folder: {$folderPath}...");
+        $this->info("جارٍ فحص المجلد: {$folderPath}...");
 
         $files = File::files($folderPath);
         $processedCount = 0;
@@ -100,7 +100,7 @@ class MonitorFolderCommand extends Command
 
             // Strictly skip, archive, or delete binary printer spool files (.bin) to prevent sending raw files
             if ($extension === 'bin') {
-                $this->info("Skipping printer binary spool file: {$filename}");
+                $this->info("تخطي ملف طباعة ثنائي: {$filename}");
                 try {
                     $targetArchive = $archivePath . '/' . $filename;
                     if (File::exists($targetArchive)) {
@@ -119,7 +119,7 @@ class MonitorFolderCommand extends Command
             $allowedExtensions = array_map('trim', array_map('strtolower', $allowedExtensions));
             
             if (!in_array($extension, $allowedExtensions)) {
-                $this->info("Skipping unallowed file extension: {$filename}");
+                $this->info("تخطي ملف بامتداد غير مسموح: {$filename}");
                 try {
                     $targetFailed = $failedPath . '/' . $filename;
                     if (File::exists($targetFailed)) {
@@ -198,7 +198,7 @@ class MonitorFolderCommand extends Command
                 if (!empty($fallbackPhone)) {
                     $phoneNumber = $fallbackPhone;
                     $trace['source'] = 'env_fallback';
-                    $this->info("No phone number found in filename '{$filename}'. Using fallback phone: {$phoneNumber}");
+                    $this->info("لم يُعثر على رقم جوال في اسم الملف '{$filename}'. استخدام الرقم الاحتياطي: {$phoneNumber}");
                 }
             }
 
@@ -271,7 +271,7 @@ class MonitorFolderCommand extends Command
                 continue;
             }
 
-            $this->info("Processing file: {$filename} for phone: {$phoneNumber}");
+            $this->info("جارٍ معالجة الملف: {$filename} للرقم: {$phoneNumber}");
 
             try {
                 // Clean filename for WhatsApp display (remove the phone number and tidy delimiters)
@@ -353,9 +353,9 @@ class MonitorFolderCommand extends Command
                     'message_id' => $message->id
                 ]);
 
-                $this->info("✅ File registered and queued for sending: {$filename}");
+                $this->info("✅ تم تسجيل الملف وإضافته لقائمة الإرسال: {$filename}");
             } catch (\Exception $e) {
-                $this->error("Failed to process file {$filename}: " . $e->getMessage());
+                $this->error("فشل في معالجة الملف {$filename}: " . $e->getMessage());
                 Log::error("PrintMonitor Error: " . $e->getMessage());
                 
                 // Move to failed on error
@@ -368,7 +368,7 @@ class MonitorFolderCommand extends Command
             }
         }
 
-        $this->info("Scan complete. Processed {$processedCount} files.");
+        $this->info("اكتمل الفحص. تمت معالجة {$processedCount} ملف.");
 
         $this->scanPrintFolders();
     }
