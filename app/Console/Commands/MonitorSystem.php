@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use App\Models\Message;
+use App\Models\Setting;
 use App\Models\SystemHealthLog;
 use App\Services\AdminNotifier;
 use Illuminate\Support\Facades\Cache;
@@ -145,7 +146,8 @@ class MonitorSystem extends Command
                 return;
             }
 
-            $text = "🚨 تنبيه صحة النظام\n"
+            $text = "🚨 تنبيه صحة النظام (من النظام المحلي)\n"
+                . $this->systemIdentityLine()
                 . ($queueBacklogCount > $queueBacklogThreshold ? "تراكم في طابور المعالجة: {$queueBacklogCount} مهمة بانتظار المعالجة (الحد المسموح: {$queueBacklogThreshold})\n" : '')
                 . ($oldPendingMessages > 0 ? "{$oldPendingMessages} رسالة معلّقة منذ أكثر من 10 دقائق بلا إرسال\n" : '')
                 . "قد يشير هذا لتوقف عامل الطابور (Queue Worker) بصمت — تحقق من لوحة التحكم وأعد تشغيله إن لزم.";
@@ -156,12 +158,33 @@ class MonitorSystem extends Command
             Cache::put('system_health_alert_last_sent_at', now(), now()->addDay());
         } elseif ($wasActive) {
             app(AdminNotifier::class)->notify(
-                '✅ عادت صحة النظام لوضعها الطبيعي (طابور المعالجة والرسائل المعلّقة).',
+                "✅ عادت صحة النظام لوضعها الطبيعي (من النظام المحلي)\n"
+                . $this->systemIdentityLine()
+                . 'طابور المعالجة والرسائل المعلّقة.',
                 ['source' => 'system_health_recovered']
             );
 
             Cache::forget('system_health_alert_active');
             Cache::forget('system_health_alert_last_sent_at');
         }
+    }
+
+    /**
+     * سطر يعرّف بمصدر التنبيه (اسم الجهة/الفرع واسم الجهاز) — ضروري لأن المستخدم يشغّل
+     * عدة تنصيبات من النظام المحلي في أماكن مختلفة، والتنبيه بدون هذا السطر لا يوضّح
+     * أيها المتعطل فعلياً.
+     */
+    private function systemIdentityLine(): string
+    {
+        $systemName = Setting::get('LOCAL_SYSTEM_NAME');
+        $deviceName = config('app.device_name');
+        $location = config('app.location');
+
+        $parts = [];
+        if (!empty($systemName)) $parts[] = "الجهة: {$systemName}";
+        if (!empty($location) && $location !== $systemName) $parts[] = "الموقع: {$location}";
+        if (!empty($deviceName)) $parts[] = "الجهاز: {$deviceName}";
+
+        return $parts ? implode(' | ', $parts) . "\n" : '';
     }
 }
