@@ -35,11 +35,25 @@ class ConversationController extends Controller
         // Apply Search Filter
         if ($request->has('search') && $request->search !== '') {
             $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('phone_number', 'like', "%{$search}%")
-                  ->orWhereHas('contact', function ($q2) use ($search) {
-                      $q2->where('name', 'like', "%{$search}%");
-                  });
+            $phoneSearch = ltrim($search, '0+'); // Remove leading 0 or + for better partial phone matching
+            
+            $query->where(function ($q) use ($search, $phoneSearch) {
+                // Search by exact or partial phone
+                $q->where('phone_number', 'like', "%{$search}%");
+                
+                if ($phoneSearch !== '') {
+                    $q->orWhere('phone_number', 'like', "%{$phoneSearch}%");
+                }
+                
+                // Search by contact name
+                $q->orWhereHas('contact', function ($q2) use ($search) {
+                    $q2->where('name', 'like', "%{$search}%");
+                });
+                
+                // Search within conversation messages
+                $q->orWhereHas('messages', function ($q3) use ($search) {
+                    $q3->where('message_text', 'like', "%{$search}%");
+                });
             });
         }
 

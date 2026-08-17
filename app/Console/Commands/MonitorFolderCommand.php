@@ -6,6 +6,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use App\Models\Contact;
+use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\Printer;
 use App\Models\Setting;
@@ -317,9 +318,25 @@ class MonitorFolderCommand extends Command
                     $messageText = setting('MONITORING_MESSAGE_TEXT', env('MONITORING_MESSAGE_TEXT', env('MONITOR_MESSAGE_TEXT', 'مرفق لكم المستند المطلوب')));
                 }
 
+                $formattedPhone = $this->formatPhoneNumber($phoneNumber);
+                
+                // Find associated contact
+                $contact = Contact::where('phone_number', $formattedPhone)->first();
+                
+                // Find or create an active conversation
+                $conversation = Conversation::firstOrCreate(
+                    ['phone_number' => $formattedPhone, 'status' => 'open'],
+                    [
+                        'user_id' => 1, // Default user for system automated tasks
+                        'contact_id' => $contact ? $contact->id : null,
+                        'last_message_at' => now(),
+                    ]
+                );
+
                 // Create message record
                 $message = Message::create([
-                    'phone_number' => $this->formatPhoneNumber($phoneNumber),
+                    'conversation_id' => $conversation->id,
+                    'phone_number' => $formattedPhone,
                     'message_text' => $messageText,
                     'file_name' => $cleanFilename,
                     'source_filename' => $filename,
@@ -330,6 +347,12 @@ class MonitorFolderCommand extends Command
                     'status' => 'pending',
                     'metadata' => $learnedTrusted ? ['review_source' => $trace['source'], 'auto_approved_via' => 'learned_trust'] : null,
                     'created_at' => now()
+                ]);
+
+                // Update conversation's last message
+                $conversation->update([
+                    'last_message_id' => $message->id,
+                    'last_message_at' => now(),
                 ]);
 
                 // Move file immediately to processing folder to prevent reprocessing

@@ -739,14 +739,58 @@ class MessageController extends Controller
     /**
      * Delete a message
      */
-    public function destroy(Message $message)
+    public function destroy(Message $message, Request $request, \App\Services\CentralApiService $centralApiService)
     {
         $this->authorizeMessageOwner($message);
+        
+        // Delete from Provider via Central API
+        // [Fix] makeApiRequest() لا يُعيد مفتاح 'error_code' إطلاقاً في مسار الفشل (وغالباً غير موجود
+        // في مسار النجاح أيضاً ما لم يُرجعه السيرفر المركزي صراحة) — المقارنة المباشرة كانت تنهار
+        // بخطأ "Undefined array key" يتحول لخطأ 500 فادح بدل مجرد تسجيل تحذير كما هو مقصود.
+        $centralResult = $centralApiService->deleteMessage($message);
+        if (!$centralResult['success'] && ($centralResult['error_code'] ?? null) !== 'NOT_SUPPORTED') {
+            Log::warning("Could not delete message on Provider", ['result' => $centralResult]);
+        }
+
         $message->delete();
+
+        if ($request->wantsJson()) {
+            return response()->json(['success' => true, 'message' => 'تم الحذف بنجاح']);
+        }
 
         return redirect()
             ->route('messages.index')
             ->with('success', 'تم حذف الرسالة بنجاح');
+    }
+
+    /**
+     * Update a message (AJAX)
+     */
+    public function update(Request $request, Message $message, \App\Services\CentralApiService $centralApiService)
+    {
+        $this->authorizeMessageOwner($message);
+
+        $request->validate([
+            'message_text' => 'required|string',
+        ]);
+
+        // Edit on Provider via Central API
+        // [Fix] نفس خلل destroy() أعلاه — 'error_code' غير مضمون الوجود في نتيجة makeApiRequest().
+        $centralResult = $centralApiService->editMessage($message, $request->message_text);
+        if (!$centralResult['success'] && ($centralResult['error_code'] ?? null) !== 'NOT_SUPPORTED') {
+            Log::warning("Could not edit message on Provider", ['result' => $centralResult]);
+        }
+
+        // تحديث النص محلياً
+        $message->update([
+            'message_text' => $request->message_text,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم تعديل الرسالة بنجاح',
+            'data' => $message
+        ]);
     }
 
     /**

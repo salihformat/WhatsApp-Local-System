@@ -15,6 +15,8 @@
             .chat-container::-webkit-scrollbar { width: 6px; }
             .chat-container::-webkit-scrollbar-track { background: transparent; }
             .chat-container::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 10px; }
+            .msg-actions-container { display: none; }
+            .message-wrapper:hover .msg-actions-container { display: flex; }
         </style>
         <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     </head>
@@ -89,8 +91,20 @@
                     @endif
 
                     @forelse($messages as $msg)
-                        <div class="flex w-full {{ $msg->is_incoming ? 'justify-start' : 'justify-end' }}" id="msg-{{ $msg->id }}">
-                            <div class="message-bubble {{ $msg->is_incoming ? 'incoming' : 'outgoing' }}">
+                        <div class="flex w-full {{ $msg->is_incoming ? 'justify-start' : 'justify-end' }} items-center mb-2 message-wrapper" id="msg-container-{{ $msg->id }}">
+                            <!-- Message Actions -->
+                            <div class="msg-actions-container items-center gap-1 px-2 {{ $msg->is_incoming ? 'order-last' : 'order-first' }}">
+                                @if($msg->message_text)
+                                    <button type="button" onclick="editMessage({{ $msg->id }}, this)" data-text="{{ htmlspecialchars($msg->message_text) }}" class="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors shadow-sm bg-white border border-gray-100" title="تعديل">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                                    </button>
+                                @endif
+                                <button type="button" onclick="deleteMessage({{ $msg->id }})" class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors shadow-sm bg-white border border-gray-100" title="حذف">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                </button>
+                            </div>
+                            
+                            <div class="message-bubble {{ $msg->is_incoming ? 'incoming' : 'outgoing' }} !mb-0" id="msg-{{ $msg->id }}">
                                 @if($msg->message_type === 'media' && $msg->file_path)
                                     <!-- Simple media preview -->
                                     <div class="mb-2">
@@ -106,7 +120,7 @@
                                 @endif
                                 
                                 @if($msg->message_text)
-                                    <p class="text-gray-800 text-[15px] whitespace-pre-wrap leading-relaxed">{{ $msg->message_text }}</p>
+                                    <p id="msg-text-{{ $msg->id }}" class="text-gray-800 text-[15px] whitespace-pre-wrap leading-relaxed">{{ $msg->message_text }}</p>
                                 @endif
                                 
                                 <div class="text-[11px] text-gray-500 mt-1 flex items-center justify-end gap-1" dir="ltr">
@@ -732,6 +746,117 @@
                     document.getElementById('close-conversation-form').submit();
                 }
             })
+        }
+
+        // --- Message Edit & Delete Functions --- //
+        function editMessage(msgId, btnElement) {
+            const currentText = btnElement.getAttribute('data-text');
+            Swal.fire({
+                title: 'تعديل الرسالة',
+                input: 'textarea',
+                inputValue: currentText,
+                inputAttributes: {
+                    'aria-label': 'اكتب رسالتك هنا'
+                },
+                showCancelButton: true,
+                confirmButtonText: 'حفظ التعديلات',
+                cancelButtonText: 'إلغاء',
+                confirmButtonColor: '#128C7E',
+                showLoaderOnConfirm: true,
+                preConfirm: (newText) => {
+                    if (!newText.trim()) {
+                        Swal.showValidationMessage('الرسالة لا يمكن أن تكون فارغة');
+                        return false;
+                    }
+                    if (newText === currentText) {
+                        return true; // No changes
+                    }
+                    return fetch(`/messages/${msgId}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({ message_text: newText })
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(response.statusText)
+                        }
+                        return response.json()
+                    })
+                    .catch(error => {
+                        Swal.showValidationMessage(`فشل التحديث: ${error}`)
+                    })
+                },
+                allowOutsideClick: () => !Swal.isLoading()
+            }).then((result) => {
+                if (result.isConfirmed && result.value && result.value.success) {
+                    // Update DOM
+                    const updatedText = result.value.data.message_text;
+                    const textEl = document.getElementById(`msg-text-${msgId}`);
+                    if (textEl) textEl.textContent = updatedText;
+                    
+                    // Update the button data attribute
+                    btnElement.setAttribute('data-text', updatedText);
+
+                    Swal.fire({
+                        title: 'تم التعديل!',
+                        icon: 'success',
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+                }
+            });
+        }
+
+        function deleteMessage(msgId) {
+            Swal.fire({
+                title: 'حذف الرسالة',
+                text: "هل أنت متأكد من حذف هذه الرسالة؟ لن يمكنك التراجع عن ذلك.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ef4444',
+                cancelButtonColor: '#9ca3af',
+                confirmButtonText: 'نعم، احذفها',
+                cancelButtonText: 'إلغاء',
+                reverseButtons: true,
+                showLoaderOnConfirm: true,
+                preConfirm: () => {
+                    return fetch(`/messages/${msgId}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                            'Accept': 'application/json'
+                        }
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(response.statusText)
+                        }
+                        return response.json()
+                    })
+                    .catch(error => {
+                        Swal.showValidationMessage(`فشل الحذف: ${error}`)
+                    })
+                },
+                allowOutsideClick: () => !Swal.isLoading()
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Remove message from DOM
+                    const container = document.getElementById(`msg-container-${msgId}`);
+                    if (container) {
+                        container.remove();
+                    }
+                    Swal.fire({
+                        title: 'تم الحذف!',
+                        icon: 'success',
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+                }
+            });
         }
     </script>
 </x-app-layout>

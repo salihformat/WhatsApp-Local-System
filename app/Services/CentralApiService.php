@@ -29,6 +29,56 @@ class CentralApiService
     }
 
     /**
+     * تعديل رسالة في النظام المركزي والمزود
+     *
+     * @param Message $message
+     * @param string $newText
+     * @return array
+     */
+    public function editMessage(Message $message, string $newText): array
+    {
+        $centralId = $message->central_message_id ?? $message->id;
+        $companyId = $message->company_id ?? $this->companyId ?? config('app.company_id');
+
+        Log::info("CentralApiService: Editing message", [
+            'local_id' => $message->id,
+            'central_id' => $centralId,
+            'company_id' => $companyId
+        ]);
+
+        $data = [
+            'company_id' => $companyId,
+            'message_text' => $newText
+        ];
+
+        return $this->makeApiRequest('PUT', "/messages/{$centralId}/edit", $data, $companyId);
+    }
+
+    /**
+     * حذف رسالة من النظام المركزي والمزود
+     *
+     * @param Message $message
+     * @return array
+     */
+    public function deleteMessage(Message $message): array
+    {
+        $centralId = $message->central_message_id ?? $message->id;
+        $companyId = $message->company_id ?? $this->companyId ?? config('app.company_id');
+
+        Log::info("CentralApiService: Deleting message", [
+            'local_id' => $message->id,
+            'central_id' => $centralId,
+            'company_id' => $companyId
+        ]);
+
+        $data = [
+            'company_id' => $companyId
+        ];
+
+        return $this->makeApiRequest('DELETE', "/messages/{$centralId}/delete", $data, $companyId);
+    }
+
+    /**
      * إرسال رسالة إلى النظام المركزي
      *
      * @param Message $message

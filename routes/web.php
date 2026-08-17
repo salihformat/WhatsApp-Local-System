@@ -21,7 +21,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/notifications/read-all', [\App\Http\Controllers\NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
 
     // Messages
-    Route::resource('messages', MessageController::class)->except(['edit', 'update']);
+    Route::resource('messages', MessageController::class)->except(['edit']);
 
     // Conversations - المحادثات
     Route::resource('conversations', \App\Http\Controllers\ConversationController::class)->only(['index', 'show']);
