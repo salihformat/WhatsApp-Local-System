@@ -51,7 +51,12 @@ class CentralApiService
             'message_text' => $newText
         ];
 
-        return $this->makeApiRequest('PUT', "/messages/{$centralId}/edit", $data, $companyId);
+        // [Fix] central_message_id قد يكون معرّف مزوّد خام يحتوي أحرفاً خاصة (مثل "false_...@lid_...")
+        // للرسائل الواردة — بلا ترميز، هذه الأحرف تكسر توجيه الرابط على السيرفر المركزي (404 كاذب).
+        // محاولة واحدة بمهلة قصيرة (10 ثوانٍ) لا 3 محاولات × 60 ثانية: هذا استدعاء "أفضل جهد" ثانوي
+        // من واجهة تفاعلية ينتظرها المستخدم مباشرة — لا يستحق المخاطرة بتعليق طلب التعديل المحلي
+        // بالكامل لعشرات الثواني إن كان السيرفر المركزي بطيئاً أو متوقفاً.
+        return $this->makeApiRequest('PUT', '/messages/' . rawurlencode((string) $centralId) . '/edit', $data, $companyId, maxAttempts: 1, requestTimeout: 10);
     }
 
     /**
@@ -75,7 +80,8 @@ class CentralApiService
             'company_id' => $companyId
         ];
 
-        return $this->makeApiRequest('DELETE', "/messages/{$centralId}/delete", $data, $companyId);
+        // [Fix] نفس مبدأ editMessage() أعلاه: محاولة واحدة بمهلة قصيرة بدل المخاطرة بتعليق الحذف المحلي.
+        return $this->makeApiRequest('DELETE', '/messages/' . rawurlencode((string) $centralId) . '/delete', $data, $companyId, maxAttempts: 1, requestTimeout: 10);
     }
 
     /**
@@ -219,12 +225,21 @@ class CentralApiService
     /**
      * تنفيذ طلب API إلى النظام المركزي
      */
-    public function makeApiRequest(string $method, string $endpoint, array $data = [], ?int $companyId = null): array
+    /**
+     * $maxAttempts و$requestTimeout اختياريان (يستخدمان قيم الإعدادات الافتراضية إن تُركا فارغين) —
+     * أُضيفا لتمكين استدعاءات "أفضل جهد" قصيرة (مثل تعديل/حذف رسالة من واجهة تفاعلية ينتظرها
+     * المستخدم مباشرة) من تحديد مهلة وعدد محاولات أقل بكثير من الافتراضي (قد يصل الافتراضي
+     * لعشرات الثواني عبر 3 محاولات × مهلة 60 ثانية لكل منها)، بدل خطر اصطدام هذا الطلب الثانوي
+     * بحد PHP الأقصى لزمن التنفيذ فيُسقط الطلب المحلي الأساسي بالكامل معه.
+     */
+    public function makeApiRequest(string $method, string $endpoint, array $data = [], ?int $companyId = null, ?int $maxAttempts = null, ?int $requestTimeout = null): array
     {
         $attempt = 0;
         $lastError = null;
         $currentCompanyId = $companyId ?? config('app.company_id');
         $requestId = uniqid('req_');
+        $effectiveMaxAttempts = $maxAttempts ?? $this->retryAttempts;
+        $effectiveTimeout = $requestTimeout ?? $this->timeout;
 
         Log::info("Making API request with company ID: " . $currentCompanyId, [
             'request_id' => $requestId,
@@ -245,7 +260,7 @@ class CentralApiService
         Log::info("Request Data:", $loggableData);
 
 
-        while ($attempt < $this->retryAttempts) {
+        while ($attempt < $effectiveMaxAttempts) {
             $attempt++;
 
             try {
@@ -256,8 +271,8 @@ class CentralApiService
                     'company_id' => $currentCompanyId,
 
                     'request_id' => $requestId,
-                    'attempt' => "{$attempt}/{$this->retryAttempts}",
-                    'timeout' => "{$this->timeout} seconds"
+                    'attempt' => "{$attempt}/{$effectiveMaxAttempts}",
+                    'timeout' => "{$effectiveTimeout} seconds"
 
                 ]);
                 $http = Http::withHeaders([
@@ -267,7 +282,7 @@ class CentralApiService
                     'User-Agent' => config('app.api_user_agent', 'WhatsApp-Local-System/1.0'),
 //                    'X-Request-ID' => uniqid('req_'),
                     'X-Request-ID' => $requestId,
-                ])->timeout($this->timeout);
+                ])->timeout($effectiveTimeout);
 
                 if (env('API_VERIFY_SSL', true) === false || env('API_VERIFY_SSL') === 'false') {
                     $http->withoutVerifying();
@@ -358,7 +373,7 @@ class CentralApiService
             }
 
             // انتظار قبل إعادة المحاولة (إلا في المحاولة الأخيرة)
-            if ($attempt < $this->retryAttempts) {
+            if ($attempt < $effectiveMaxAttempts) {
                 sleep($this->retryDelay * $attempt); // تأخير متزايد
             }
         }

@@ -744,12 +744,17 @@ class MessageController extends Controller
         $this->authorizeMessageOwner($message);
         
         // Delete from Provider via Central API
-        // [Fix] makeApiRequest() لا يُعيد مفتاح 'error_code' إطلاقاً في مسار الفشل (وغالباً غير موجود
-        // في مسار النجاح أيضاً ما لم يُرجعه السيرفر المركزي صراحة) — المقارنة المباشرة كانت تنهار
-        // بخطأ "Undefined array key" يتحول لخطأ 500 فادح بدل مجرد تسجيل تحذير كما هو مقصود.
-        $centralResult = $centralApiService->deleteMessage($message);
-        if (!$centralResult['success'] && ($centralResult['error_code'] ?? null) !== 'NOT_SUPPORTED') {
-            Log::warning("Could not delete message on Provider", ['result' => $centralResult]);
+        // [Fix] الحذف/التعديل لدى المزوّد عملية "أفضل جهد" ثانوية — يجب ألا يقدر فشلها (بما في ذلك
+        // 500 حقيقي من السيرفر المركزي، أو استثناء غير متوقع) على منع الحذف المحلي الأساسي إطلاقاً.
+        // makeApiRequest() نفسها لا ترمي استثناءً عادةً، لكن try/catch هنا خط دفاع أخير يضمن أن أي
+        // خلل غير متوقع في هذا الاستدعاء (شبكة، مهلة، إلخ) لا يُسقط طلب الحذف بالكامل بخطأ 500.
+        try {
+            $centralResult = $centralApiService->deleteMessage($message);
+            if (!$centralResult['success'] && ($centralResult['error_code'] ?? null) !== 'NOT_SUPPORTED') {
+                Log::warning("Could not delete message on Provider", ['result' => $centralResult]);
+            }
+        } catch (\Throwable $e) {
+            Log::error("Exception while deleting message on Provider (ignored, local delete proceeds): " . $e->getMessage());
         }
 
         $message->delete();
@@ -775,10 +780,15 @@ class MessageController extends Controller
         ]);
 
         // Edit on Provider via Central API
-        // [Fix] نفس خلل destroy() أعلاه — 'error_code' غير مضمون الوجود في نتيجة makeApiRequest().
-        $centralResult = $centralApiService->editMessage($message, $request->message_text);
-        if (!$centralResult['success'] && ($centralResult['error_code'] ?? null) !== 'NOT_SUPPORTED') {
-            Log::warning("Could not edit message on Provider", ['result' => $centralResult]);
+        // [Fix] نفس مبدأ destroy() أعلاه — التعديل لدى المزوّد "أفضل جهد" ثانوي، لا يجوز أن يُسقط
+        // التعديل المحلي الأساسي.
+        try {
+            $centralResult = $centralApiService->editMessage($message, $request->message_text);
+            if (!$centralResult['success'] && ($centralResult['error_code'] ?? null) !== 'NOT_SUPPORTED') {
+                Log::warning("Could not edit message on Provider", ['result' => $centralResult]);
+            }
+        } catch (\Throwable $e) {
+            Log::error("Exception while editing message on Provider (ignored, local update proceeds): " . $e->getMessage());
         }
 
         // تحديث النص محلياً
