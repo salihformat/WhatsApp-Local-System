@@ -16,9 +16,19 @@ class SyncMessageStatus extends Command
     {
         $limit = $this->option('limit');
 
+        // [Fix] رسائل "الصدى" المُنعكسة محلياً من خدمة العملاء/التطبيق (source=central_echo، أُضيفت
+        // في إصلاح سابق لضمان ظهورها في النظام المحلي) كانت تدخل في نطاق هذا الاستطلاع الدوري نفسه
+        // رغم أنها ليست رسائل صادرة فعلياً من هذا النظام — تحمل حالتها الصحيحة أصلاً منذ لحظة وصول
+        // الصدى ولا تحتاج أي مزامنة إضافية مع المركزي. تراكمها بلا حد (~55% من إجمالي الرسائل التي
+        // تحتاج مزامنة عملياً) كان يُضاعف حجم كل دورة استطلاع تصاعدياً، ويُشتبه بأنه سبب رئيسي في
+        // تأخر معالجة SendMessageJob الفعلية (طابور الرسائل الحقيقية ينتظر خلف عمل غير ضروري متراكم).
         $pendingMessages = Message::whereIn('status', ['pending', 'sent', 'delivered', 'queued'])
             ->whereNotNull('central_message_id')
             ->where('created_at', '>=', now()->subHours(48))
+            ->where(function ($q) {
+                $q->whereNull('metadata->source')
+                    ->orWhere('metadata->source', '!=', 'central_echo');
+            })
             ->orderBy('updated_at', 'asc')
             ->limit($limit)
             ->get();
