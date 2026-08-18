@@ -1022,6 +1022,28 @@ class MessageController extends Controller
             $existingOutbound = !empty($data['message_id'])
                 ? Message::where('central_message_id', $data['message_id'])->where('is_incoming', false)->first()
                 : null;
+
+            // [Fix] لرسالة أُرسلت من هذا النظام المحلي نفسه، central_message_id المحفوظ عليها منذ
+            // لحظة الإرسال هو مُعرِّف الرسالة الرقمي في قاعدة بيانات المركزي (يُحفَظ فوراً من رد
+            // SendMessageJob) — وليس مُعرِّف واتساب الفعلي بصيغة "true_...@lid_..." الذي يصل لاحقاً
+            // ضمن هذا الويب هوك نفسه. فشلت المطابقة أعلاه دائماً لهذا السبب تحديداً، فكانت كل رسالة
+            // تُرسَل محلياً تتكرر (نسخة أصلية + "صدى" جديد من المركزي بلا تطابق). نطابق احتياطياً
+            // بنفس النص ورقم الهاتف خلال آخر 5 دقائق (نفس النمط المستخدَم فعلياً في نظير هذا الكود
+            // على المركزي)، ونُحدِّث central_message_id بالمعرّف الصحيح بصيغة واتساب فور العثور
+            // عليها حتى تُطابَق أي أحداث تعديل/حذف لاحقة لهذه الرسالة مباشرة بلا حاجة لهذا الاحتياط.
+            if (!$existingOutbound && !empty($data['message_body'])) {
+                $existingOutbound = Message::where('phone_number', $senderPhone)
+                    ->where('is_incoming', false)
+                    ->where('message_text', $data['message_body'])
+                    ->where('created_at', '>=', now()->subMinutes(5))
+                    ->orderByDesc('id')
+                    ->first();
+
+                if ($existingOutbound && empty($existingOutbound->central_message_id) && !empty($data['message_id'])) {
+                    $existingOutbound->update(['central_message_id' => $data['message_id']]);
+                }
+            }
+
             if ($existingOutbound) {
                 Log::info('Duplicate outbound (fromMe) webhook skipped (idempotency)', [
                     'message_id' => $data['message_id'],
