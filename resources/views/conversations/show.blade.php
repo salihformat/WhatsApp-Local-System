@@ -369,7 +369,12 @@
                                    ->all();
         @endphp
         let pendingMessageIds = @json($pendingIds);
-        
+        // [Fix] الاستطلاع الدوري (fetchUpdates) كان يفحص فقط الرسائل الجديدة وتحديثات الحالة —
+        // أي تعديل نص أو حذف لرسالة معروضة أصلاً (من خدمة العملاء، التطبيق، أو حتى من هذا النظام
+        // نفسه عبر صدى الويب هوك) يبقى غير مرئي على الشاشة حتى تحديث الصفحة يدوياً رغم نجاحه فعلياً
+        // في قاعدة البيانات. نتتبّع آخر وقت فحص لجلب أي رسائل تغيّرت منذ ذلك الحين.
+        let lastCheckedAt = new Date().toISOString();
+
         function scrollToBottom() {
             if (chatContainer) {
                 chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -608,7 +613,9 @@
 
         async function fetchUpdates() {
             try {
-                const response = await fetch(`{{ route('conversations.messages.fetch', $conversation->id) }}?last_message_id=${lastMessageId}&pending_ids=${pendingMessageIds.join(',')}`, {
+                const checkedAt = lastCheckedAt;
+                lastCheckedAt = new Date().toISOString();
+                const response = await fetch(`{{ route('conversations.messages.fetch', $conversation->id) }}?last_message_id=${lastMessageId}&pending_ids=${pendingMessageIds.join(',')}&since=${encodeURIComponent(checkedAt)}`, {
                     headers: {
                         'Accept': 'application/json',
                         'X-Requested-With': 'XMLHttpRequest'
@@ -618,7 +625,17 @@
                 if (!response.ok) return;
 
                 const data = await response.json();
-                
+
+                // [Fix] رسائل مُعدَّلة أو محذوفة منذ آخر فحص — نُحدِّث النص المعروض مباشرة.
+                if (data.changed && data.changed.length > 0) {
+                    data.changed.forEach(msg => {
+                        const textEl = document.getElementById('msg-text-' + msg.id);
+                        if (textEl) {
+                            textEl.textContent = msg.message_text;
+                        }
+                    });
+                }
+
                 // Update statuses of pending messages
                 if (data.updates && data.updates.length > 0) {
                     data.updates.forEach(update => {

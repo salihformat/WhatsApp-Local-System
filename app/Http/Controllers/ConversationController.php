@@ -275,6 +275,24 @@ class ConversationController extends Controller
                 ->get(['id', 'status', 'is_incoming']);
         }
 
+        // [Fix] تعديل/حذف رسالة موجودة أصلاً على الشاشة (عبر خدمة العملاء، التطبيق، أو صدى الويب
+        // هوك لتعديل/حذف تم من هذا النظام نفسه) لم يكن يُكتشَف إطلاقاً هنا — فقط الرسائل الجديدة
+        // وحالة التسليم (status) كانتا تُفحصان. نُرجع أي رسالة (بصرف النظر عن id) تغيّر نصها منذ
+        // آخر فحص للعميل، ليُحدِّث الواجهة النص المعروض بلا حاجة لتحديث الصفحة يدوياً.
+        $since = $request->query('since');
+        $changed = [];
+        if ($since) {
+            try {
+                $sinceDate = \Carbon\Carbon::parse($since);
+                $changed = $conversation->messages()
+                    ->where('updated_at', '>', $sinceDate)
+                    ->whereColumn('updated_at', '!=', 'created_at')
+                    ->get(['id', 'message_text', 'file_path']);
+            } catch (\Exception $e) {
+                $changed = [];
+            }
+        }
+
         // Mark unread as read if there are new incoming messages
         if ($newMessages->where('is_incoming', true)->count() > 0) {
              if ($conversation->unread_count > 0) {
@@ -284,7 +302,8 @@ class ConversationController extends Controller
 
         return response()->json([
             'messages' => $newMessages,
-            'updates' => $statusUpdates
+            'updates' => $statusUpdates,
+            'changed' => $changed,
         ]);
     }
 }
