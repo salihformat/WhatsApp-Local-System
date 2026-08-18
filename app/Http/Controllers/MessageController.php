@@ -757,7 +757,21 @@ class MessageController extends Controller
             Log::error("Exception while deleting message on Provider (ignored, local delete proceeds): " . $e->getMessage());
         }
 
-        $message->delete();
+        // [New] حذف رسالة من هذا النظام كان يُنفَّذ كحذف صلب فعلي (الصف يختفي كلياً)، بخلاف حذف
+        // العميل لرسالته عبر واتساب الذي يُستبدَل بعلامة "🚫 تم حذف هذه الرسالة" (راجع
+        // messageDeleted() أعلاه). توحيداً لتجربة الحذف في كل الاتجاهات، نستخدم نفس اتفاقية
+        // العلامة هنا أيضاً بدل الحذف الصلب، مع الاحتفاظ بالنص/الملف الأصليين في metadata.
+        $metadata = $message->metadata ?? [];
+        $metadata['deleted_by_agent'] = true;
+        $metadata['deleted_at'] = now()->toDateTimeString();
+        $metadata['original_text'] = $message->message_text;
+        $metadata['original_file_path'] = $message->file_path;
+
+        $message->update([
+            'message_text' => '🚫 تم حذف هذه الرسالة',
+            'file_path' => null,
+            'metadata' => $metadata,
+        ]);
 
         if ($request->wantsJson()) {
             return response()->json(['success' => true, 'message' => 'تم الحذف بنجاح']);
