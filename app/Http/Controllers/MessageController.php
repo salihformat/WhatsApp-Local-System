@@ -1010,6 +1010,69 @@ class MessageController extends Controller
 
         $senderPhone = $data['sender_phone'];
 
+        // [Fix] النظام المركزي بدأ يُرسل أيضاً على هذا المسار نفسه (incoming_message) الرسائل
+        // الصادرة (from_me=true) — المُرسَلة من خدمة العملاء (live-chat)، أو من تطبيق واتساب/الموقع
+        // مباشرة عبر الجهاز المتصل — لا رسائل عميل حقيقية فقط. كانت هذه الحمولة تُخزَّن هنا دائماً
+        // كرسالة واردة (is_incoming=true) بصرف النظر عن قيمة from_me، فتظهر معكوسة في واجهة
+        // المحادثة (وكأن العميل هو من كتبها)، كما كانت تُفعِّل أوامر الإدارة وقواعد الأتمتة المخصصة
+        // لرسائل العميل الحقيقية فقط. نتحقق من العلم ونعالجها بمسار منفصل ومبسّط.
+        if (!empty($data['from_me'])) {
+            $existingOutbound = !empty($data['message_id'])
+                ? Message::where('central_message_id', $data['message_id'])->where('is_incoming', false)->first()
+                : null;
+            if ($existingOutbound) {
+                Log::info('Duplicate outbound (fromMe) webhook skipped (idempotency)', [
+                    'message_id' => $data['message_id'],
+                    'existing_local_id' => $existingOutbound->id,
+                ]);
+                return response()->json(['success' => true, 'message_id' => $existingOutbound->id]);
+            }
+
+            $outboundContact = \App\Models\Contact::where('phone_number', $senderPhone)->first();
+            $outboundUserId = $outboundContact ? $outboundContact->user_id : \App\Models\User::first()->id;
+
+            $outboundConversation = \App\Models\Conversation::firstOrCreate(
+                ['phone_number' => $senderPhone, 'status' => 'open'],
+                [
+                    'user_id' => $outboundUserId,
+                    'contact_id' => $outboundContact ? $outboundContact->id : null,
+                    'last_message_at' => now(),
+                ]
+            );
+
+            $rawOutboundType = $data['message_type'] ?? 'text';
+            $outboundMessageType = in_array($rawOutboundType, ['text', 'chat']) ? 'text' : 'media';
+
+            $outboundMessage = Message::create([
+                'conversation_id' => $outboundConversation->id,
+                'user_id' => $outboundUserId,
+                'is_incoming' => false,
+                'phone_number' => $senderPhone,
+                'message_text' => $data['message_body'] ?? '',
+                'message_type' => $outboundMessageType,
+                'file_path' => $data['media_url'] ?? null,
+                'file_name' => $data['file_name'] ?? null,
+                'central_message_id' => $data['message_id'] ?? null,
+                'status' => 'sent',
+                'metadata' => [
+                    'session' => $data['session'] ?? null,
+                    'channel' => $data['channel'] ?? 'whatsapp',
+                    'source' => 'central_echo',
+                ]
+            ]);
+
+            $outboundConversation->update(['last_message_at' => now()]);
+
+            Log::info("Outbound (fromMe) message synced from central for: {$senderPhone}", [
+                'local_message_id' => $outboundMessage->id,
+                'conversation_id' => $outboundConversation->id,
+            ]);
+
+            event(new \App\Events\MessageReceived($outboundMessage));
+
+            return response()->json(['success' => true, 'message_id' => $outboundMessage->id]);
+        }
+
         if ($response = $this->handleAdminCommand($senderPhone, $data['message_body'] ?? '')) {
             return $response;
         }
