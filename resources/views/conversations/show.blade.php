@@ -844,10 +844,18 @@
                 allowOutsideClick: () => !Swal.isLoading()
             }).then((result) => {
                 if (result.isConfirmed) {
-                    // Remove message from DOM
+                    // [Fix] الحذف أصبح يستبدل النص بعلامة "تم حذف هذه الرسالة" بدل حذف الصف فعلياً
+                    // (نفس اتفاقية حذف العميل عبر واتساب) — نُحدِّث عنصر الرسالة بدل إزالته كلياً.
+                    const textEl = document.getElementById(`msg-text-${msgId}`);
+                    if (textEl) {
+                        textEl.textContent = '🚫 تم حذف هذه الرسالة';
+                    }
                     const container = document.getElementById(`msg-container-${msgId}`);
                     if (container) {
-                        container.remove();
+                        const actions = container.querySelector('.msg-actions-container');
+                        if (actions) actions.remove();
+                        const mediaEl = container.querySelector('.message-bubble img, .message-bubble a[target="_blank"]');
+                        if (mediaEl) mediaEl.closest('div')?.remove();
                     }
                     Swal.fire({
                         title: 'تم الحذف!',
