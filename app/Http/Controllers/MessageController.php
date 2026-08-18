@@ -883,9 +883,11 @@ class MessageController extends Controller
             return response()->json(['success' => true, 'message' => 'Ignored incomplete payload']);
         }
 
-        $message = Message::where('central_message_id', $providerMessageId)
-            ->where('is_incoming', true)
-            ->first();
+        // [Fix] كان البحث يقتصر على is_incoming=true فقط — أي رسائل العميل الواردة حصراً — فلا
+        // يطابق أبداً رسالة صادرة (مُرسَلة من خدمة العملاء أو من تطبيق واتساب مباشرة عبر الجهاز
+        // المتصل، ثم أُرجِعت هنا كـ is_incoming=false) عندما تُعدَّل من طرف آخر غير النظام المحلي
+        // نفسه. central_message_id فريد بما يكفي لتحديد الرسالة الصحيحة بصرف النظر عن اتجاهها.
+        $message = Message::where('central_message_id', $providerMessageId)->first();
 
         if (!$message) {
             Log::info('MessageEdited webhook: original message not found locally, ignored', [
@@ -928,9 +930,9 @@ class MessageController extends Controller
             return response()->json(['success' => true, 'message' => 'Ignored incomplete payload']);
         }
 
-        $message = Message::where('central_message_id', $providerMessageId)
-            ->where('is_incoming', true)
-            ->first();
+        // [Fix] نفس قيد is_incoming=true الموجود في messageEdited() أعلاه — يمنع مطابقة رسالة
+        // صادرة (خدمة العملاء/تطبيق واتساب) عند حذفها من طرف آخر غير النظام المحلي نفسه.
+        $message = Message::where('central_message_id', $providerMessageId)->first();
 
         if (!$message) {
             Log::info('MessageDeleted webhook: original message not found locally, ignored', [
