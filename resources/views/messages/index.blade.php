@@ -391,7 +391,7 @@
 
                                             <!-- Resend Button (only for failed messages) -->
                                             @if($message->status === 'failed')
-                                                <form action="{{ route('messages.retry', $message->id) }}" method="POST" class="inline" onsubmit="return confirm('هل تريد إعادة إرسال هذه الرسالة؟')">
+                                                <form action="{{ route('messages.retry', $message->id) }}" method="POST" class="inline" onsubmit="confirmSingleAction(event, 'هل تريد إعادة إرسال هذه الرسالة؟', 'retry')">
                                                     @csrf
                                                     <button type="submit" class="p-1.5 text-amber-600 hover:text-amber-900 hover:bg-amber-50 rounded-lg transition-colors" title="إعادة إرسال">
                                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -402,7 +402,7 @@
                                             @endif
 
                                             <!-- Delete Button -->
-                                            <form action="{{ route('messages.destroy', $message->id) }}" method="POST" class="inline" onsubmit="return confirm('هل أنت متأكد من حذف هذه الرسالة؟')">
+                                            <form action="{{ route('messages.destroy', $message->id) }}" method="POST" class="inline" onsubmit="confirmSingleAction(event, 'هل أنت متأكد من حذف هذه الرسالة؟', 'delete')">
                                                 @csrf
                                                 @method('DELETE')
                                                 <button type="submit" class="p-1.5 text-rose-600 hover:text-rose-900 hover:bg-rose-50 rounded-lg transition-colors" title="حذف">
@@ -488,7 +488,7 @@
                 
                 const checkedCheckboxes = document.querySelectorAll('.message-checkbox:checked');
                 if (checkedCheckboxes.length === 0) {
-                    alert('الرجاء تحديد رسالة واحدة على الأقل');
+                    Swal.fire({ icon: 'warning', title: 'تنبيه', text: 'الرجاء تحديد رسالة واحدة على الأقل', confirmButtonText: 'حسناً', confirmButtonColor: '#128C7E' });
                     return;
                 }
 
@@ -499,27 +499,36 @@
                     confirmMessage = 'هل تريد إعادة إرسال الرسائل المحددة قريباً؟';
                 }
 
-                if (!confirm(confirmMessage)) {
-                    return;
-                }
+                Swal.fire({
+                    title: 'تأكيد الإجراء',
+                    text: confirmMessage,
+                    icon: action === 'delete' ? 'error' : 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: action === 'delete' ? '#d33' : '#128C7E',
+                    cancelButtonColor: '#6b7280',
+                    confirmButtonText: 'نعم، متأكد',
+                    cancelButtonText: 'إلغاء'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        const form = document.getElementById('bulk-actions-form');
+                        document.getElementById('bulk-action').value = action;
 
-                const form = document.getElementById('bulk-actions-form');
-                document.getElementById('bulk-action').value = action;
+                        // Remove any previous dynamic inputs
+                        form.querySelectorAll('.dynamic-selected').forEach(el => el.remove());
 
-                // Remove any previous dynamic inputs
-                form.querySelectorAll('.dynamic-selected').forEach(el => el.remove());
+                        // Inject selected IDs as selected[]
+                        checkedCheckboxes.forEach(cb => {
+                            const input = document.createElement('input');
+                            input.type = 'hidden';
+                            input.name = 'selected[]';
+                            input.value = cb.value;
+                            input.className = 'dynamic-selected';
+                            form.appendChild(input);
+                        });
 
-                // Inject selected IDs as selected[]
-                checkedCheckboxes.forEach(cb => {
-                    const input = document.createElement('input');
-                    input.type = 'hidden';
-                    input.name = 'selected[]';
-                    input.value = cb.value;
-                    input.className = 'dynamic-selected';
-                    form.appendChild(input);
+                        form.submit();
+                    }
                 });
-
-                form.submit();
             }
 
             function checkStatus(messageId) {
@@ -666,6 +675,27 @@
                     icon.classList.remove('rotate-180');
                 }
             }
+
+            function confirmSingleAction(event, message, type = 'warning') {
+                event.preventDefault();
+                const form = event.target;
+                Swal.fire({
+                    title: 'تأكيد الإجراء',
+                    text: message,
+                    icon: type === 'delete' ? 'error' : 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: type === 'delete' ? '#d33' : '#128C7E',
+                    cancelButtonColor: '#6b7280',
+                    confirmButtonText: 'نعم',
+                    cancelButtonText: 'إلغاء'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        form.submit();
+                    }
+                });
+            }
         </script>
+        <!-- SweetAlert2 -->
+        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     @endpush
 </x-app-layout>
