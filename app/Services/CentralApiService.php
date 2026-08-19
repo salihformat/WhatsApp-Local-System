@@ -471,6 +471,8 @@ class CentralApiService
                 'status' => $result['status'] ?? 'unknown',
                 'message' => $result['message'] ?? null,
                 'provider' => $result['provider'] ?? null,
+                'provider_source' => $result['provider_source'] ?? 'default',
+                'provider_source_label' => $result['provider_source_label'] ?? null,
             ];
         } catch (Exception $e) {
             return [
@@ -478,6 +480,8 @@ class CentralApiService
                 'status' => 'error',
                 'message' => 'فشل التحقق من حالة واتساب: ' . $e->getMessage(),
                 'provider' => null,
+                'provider_source' => null,
+                'provider_source_label' => null,
             ];
         }
     }
