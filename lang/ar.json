@@ -41,5 +41,12 @@
     "Dashboard": "لوحة التحكم",
     "Users": "المستخدمين",
     "Manage Users": "إدارة المستخدمين",
-    "WhatsApp Local System Rasayily": "نظام واتساب المحلي - رسائلي"
+    "WhatsApp Local System Rasayily": "نظام واتساب المحلي - رسائلي",
+    "WhatsApp Connected": "واتساب متصل",
+    "WhatsApp Disconnected": "واتساب غير متصل",
+    "Provider:": "المزوّد:",
+    "API status: WORKING": "حالة الـ API: يعمل",
+    "WhatsApp": "واتساب",
+    "المزوّد الافتراضي للشركة": "المزوّد الافتراضي للشركة",
+    "مزوّد مخصَّص للنظام المحلي": "مزوّد مخصَّص للنظام المحلي"
 }

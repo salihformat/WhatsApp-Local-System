@@ -425,19 +425,19 @@
                                     <div class="{{ $whatsappStatus['connected'] ? 'pulse-dot-green' : 'pulse-dot-red' }}"></div>
                                     <div>
                                         <div style="font-weight: 700; font-size: 14px; color: {{ $whatsappStatus['connected'] ? '#15803d' : '#b91c1c' }};">
-                                            {{ $whatsappStatus['connected'] ? 'واتساب متصل' : 'واتساب غير متصل' }}
+                                            {{ $whatsappStatus['connected'] ? __('WhatsApp Connected') : __('WhatsApp Disconnected') }}
                                         </div>
                                         <div style="font-size: 11px; color: {{ $whatsappStatus['connected'] ? '#166534' : '#991b1b' }}; opacity: 0.9; margin-top: 2px;">
-                                            {{ $whatsappStatus['message'] ?? ($whatsappStatus['provider'] ?? '') }}
+                                            {{ __($whatsappStatus['message'] ?? ($whatsappStatus['provider'] ?? '')) }}
                                         </div>
                                         @if(!empty($whatsappStatus['provider_source_label']))
                                         <div style="font-size: 10px; color: #64748b; opacity: 0.85; margin-top: 2px;">
-                                            المزوّد: {{ $whatsappStatus['provider'] ?? '' }} ({{ $whatsappStatus['provider_source_label'] }})
+                                            {{ __('Provider:') }} {{ $whatsappStatus['provider'] ?? '' }} ({{ __($whatsappStatus['provider_source_label']) }})
                                         </div>
                                         @endif
                                     </div>
                                 </div>
-                                <span style="color: #64748b; font-size: 12px; font-family: monospace;">WhatsApp</span>
+                                <span style="color: #64748b; font-size: 12px; font-family: monospace;">{{ __('WhatsApp') }}</span>
                             </div>
 
                             @if(auth()->user()->isAdmin())
