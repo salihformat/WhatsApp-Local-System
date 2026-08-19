@@ -456,6 +456,33 @@ class CentralApiService
     }
 
     /**
+     * [New] فحص حالة اتصال واتساب الفعلية عبر المركزي — منفصل تماماً عن checkConnection() أعلاه،
+     * الذي يتحقق فقط من الوصول للسيرفر المركزي نفسه والمصادقة (لا يعرف شيئاً عن حالة جلسة واتساب
+     * الفعلية). يستخدم مسار /api/whatsapp/status الجديد الذي يعيد نفس منطق الأولوية الحقيقي
+     * المستخدَم فعلياً عند الإرسال (getGlobalProvider لشركة النظام، ثم أفضل مزوّد نشط لغيرها).
+     */
+    public function checkWhatsAppStatus(): array
+    {
+        try {
+            $result = $this->makeApiRequest('GET', '/whatsapp/status', [], null, 1, 15);
+
+            return [
+                'connected' => $result['connected'] ?? false,
+                'status' => $result['status'] ?? 'unknown',
+                'message' => $result['message'] ?? null,
+                'provider' => $result['provider'] ?? null,
+            ];
+        } catch (Exception $e) {
+            return [
+                'connected' => false,
+                'status' => 'error',
+                'message' => 'فشل التحقق من حالة واتساب: ' . $e->getMessage(),
+                'provider' => null,
+            ];
+        }
+    }
+
+    /**
      * الحصول على إحصائيات الشركة من النظام المركزي
      */
     public function getCompanyStatistics(): array

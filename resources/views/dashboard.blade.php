@@ -419,6 +419,22 @@
                                 <span style="color: #64748b; font-size: 12px; font-family: monospace;">Server</span>
                             </div>
 
+                            <!-- [New] WhatsApp Connection Status — منفصل عن اتصال السيرفر أعلاه -->
+                            <div style="padding: 16px; border-radius: 16px; display: flex; align-items: center; justify-content: space-between; background-color: {{ $whatsappStatus['connected'] ? '#dcfce7' : '#fee2e2' }}; border: 1px solid {{ $whatsappStatus['connected'] ? '#bbf7d0' : '#fecaca' }};">
+                                <div class="flex items-center gap-3">
+                                    <div class="{{ $whatsappStatus['connected'] ? 'pulse-dot-green' : 'pulse-dot-red' }}"></div>
+                                    <div>
+                                        <div style="font-weight: 700; font-size: 14px; color: {{ $whatsappStatus['connected'] ? '#15803d' : '#b91c1c' }};">
+                                            {{ $whatsappStatus['connected'] ? 'واتساب متصل' : 'واتساب غير متصل' }}
+                                        </div>
+                                        <div style="font-size: 11px; color: {{ $whatsappStatus['connected'] ? '#166534' : '#991b1b' }}; opacity: 0.9; margin-top: 2px;">
+                                            {{ $whatsappStatus['message'] ?? ($whatsappStatus['provider'] ?? '') }}
+                                        </div>
+                                    </div>
+                                </div>
+                                <span style="color: #64748b; font-size: 12px; font-family: monospace;">WhatsApp</span>
+                            </div>
+
                             @if(auth()->user()->isAdmin())
                                 <div class="flex flex-wrap justify-center gap-3">
                                     <!-- Mini Stat: Folder Pending -->

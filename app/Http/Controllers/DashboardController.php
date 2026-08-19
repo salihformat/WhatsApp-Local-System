@@ -179,6 +179,23 @@ class DashboardController extends Controller
             $serverStatus['message'] = 'لم يتم تعيين رابط السيرفر (CENTRAL_API_URL)';
         }
 
+        // 5.5 [New] فحص حالة اتصال واتساب الفعلية — منفصل عن فحص الوصول للسيرفر المركزي أعلاه، الذي
+        // لا يعرف شيئاً عن حالة جلسة واتساب نفسها. لا يُنفَّذ إلا إذا كان السيرفر متصلاً أصلاً
+        // (تجنّباً لطلب ثانٍ للسيرفر إن كان غير متاح أصلاً).
+        $whatsappStatus = [
+            'connected' => false,
+            'message' => 'لم يتم الفحص (السيرفر المركزي غير متصل)',
+            'provider' => null,
+        ];
+        if ($serverStatus['connected']) {
+            try {
+                $centralApi = app(\App\Services\CentralApiService::class);
+                $whatsappStatus = $centralApi->checkWhatsAppStatus();
+            } catch (\Exception $e) {
+                $whatsappStatus['message'] = 'خطأ أثناء فحص حالة واتساب: ' . $e->getMessage();
+            }
+        }
+
         // 6. Check Background Services Status (via PID files owned by this application only)
         $queueRunning = $this->isTrackedProcessRunning('queue');
         $scheduleRunning = $this->isTrackedProcessRunning('schedule');
@@ -189,7 +206,7 @@ class DashboardController extends Controller
             'all_running' => $queueRunning && $scheduleRunning
         ];
 
-        return view('dashboard', compact('stats', 'folderStats', 'recentMessages', 'chartData', 'serverStatus', 'servicesStatus', 'pendingApprovals'));
+        return view('dashboard', compact('stats', 'folderStats', 'recentMessages', 'chartData', 'serverStatus', 'whatsappStatus', 'servicesStatus', 'pendingApprovals'));
     }
 
     /**
