@@ -629,19 +629,55 @@ class MessageController extends Controller
             return;
         }
 
-        $printer = app(PrintRuleEngine::class)->resolvePrinter($message);
+        $engine = app(PrintRuleEngine::class);
+        $targetMessage = $message;
+
+        // [Fix] كابشن واتساب لا يصل أحياناً على الملفات — خصوصاً "إعادة توجيه" — فتفشل مطابقة الكلمة
+        // المفتاحية المعتادة (تعتمد على نص/كابشن الملف نفسه) رغم أن العميل فعلياً يريد طباعته. نسمح
+        // برسالة نصية منفصلة تالية للملف (مثال: "طباعة") تُطبَّق على آخر ملف وارد من نفس الرقم، بدل
+        // تجاهل الطلب تماماً لمجرد وصول الكلمة في رسالة مستقلة عن الملف.
+        if (($message->message_type !== 'media' || empty($message->file_path)) && !empty($message->message_text)) {
+            $matchedRule = $engine->findMatchingKeywordRule($message->message_text);
+            if (!$matchedRule) {
+                return; // نص عادي لا علاقة له بأمر طباعة
+            }
+
+            $lastFileMessage = Message::where('phone_number', $message->phone_number)
+                ->where('is_incoming', true)
+                ->where('message_type', 'media')
+                ->whereNotNull('file_path')
+                ->where('created_at', '>=', now()->subMinutes((int) config('printing.last_file_command_window_minutes', 30)))
+                ->orderByDesc('id')
+                ->first();
+
+            // لا نطبع نفس الملف مرتين حتى لو أعاد العميل إرسال كلمة "طباعة" لاحقاً — نتحقق من عدم وجود
+            // مهمة طباعة سابقة لهذا الملف تحديداً.
+            if (!$lastFileMessage || PrintJob::where('message_id', $lastFileMessage->id)->exists()) {
+                return;
+            }
+
+            Log::info('Print keyword arrived as a separate text message; applying it to sender\'s last file', [
+                'command_message_id' => $message->id,
+                'target_message_id' => $lastFileMessage->id,
+                'phone_number' => $message->phone_number,
+            ]);
+
+            $targetMessage = $lastFileMessage;
+        }
+
+        $printer = $engine->resolvePrinter($targetMessage);
         if (!$printer) {
             return;
         }
 
-        $printJob = app(PrintJobDispatcher::class)->dispatch($message, $printer, 'whatsapp_incoming');
+        $printJob = app(PrintJobDispatcher::class)->dispatch($targetMessage, $printer, 'whatsapp_incoming');
 
-        Log::info("Print job dispatched for incoming message {$message->id}", [
+        Log::info("Print job dispatched for incoming message {$targetMessage->id}", [
             'printer' => $printer->name,
             'print_job_id' => $printJob->id,
         ]);
 
-        $this->sendPrintReceivedAck($message, $printJob);
+        $this->sendPrintReceivedAck($targetMessage, $printJob);
     }
 
     /**

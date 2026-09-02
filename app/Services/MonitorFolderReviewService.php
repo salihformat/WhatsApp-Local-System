@@ -62,24 +62,27 @@ class MonitorFolderReviewService
             return ['success' => false, 'message' => 'تعذّر العثور على الملف الفعلي في مجلد المراجعة.'];
         }
 
-        $processingPath = $folderPath . '/processing';
-        if (!File::exists($processingPath)) {
-            File::makeDirectory($processingPath, 0755, true);
+        // [New] إن كان الملف قد عُلِّق بسبب قاعدة hold_for_approval (لا بسبب رقم غير مؤكد)، نُنفِّذ
+        // بالضبط الإجراء الذي كانت القاعدة ستطبّقه أصلاً (طباعة/إرسال/كليهما) بدل افتراض الإرسال
+        // دائماً — وإلا سنتجاهل نيّة القاعدة الأصلية (مثال: قاعدة "طباعة فقط بانتظار موافقة").
+        $pendingAction = $message->metadata['pending_action'] ?? 'print_and_send';
+        $pendingPrinterId = $message->metadata['pending_printer_id'] ?? null;
+
+        // save_only/print_only لا تمر بـSendMessageJob (الذي يؤرشف الملف لاحقاً) فتذهب مباشرة لمجلد
+        // saved/ المستقل عن processing، بنفس منطق MonitorFolderCommand.
+        $isTerminalWithoutSend = in_array($pendingAction, ['save_only', 'print_only'], true);
+        $destinationPath = $isTerminalWithoutSend ? ($folderPath . '/saved') : ($folderPath . '/processing');
+        if (!File::exists($destinationPath)) {
+            File::makeDirectory($destinationPath, 0755, true);
         }
 
         try {
-            $targetPath = $processingPath . '/' . basename($reviewFile);
+            $targetPath = $destinationPath . '/' . basename($reviewFile);
             if (File::exists($targetPath)) {
                 File::delete($reviewFile);
             } else {
                 File::move($reviewFile, $targetPath);
             }
-
-            // [New] إن كان الملف قد عُلِّق بسبب قاعدة hold_for_approval (لا بسبب رقم غير مؤكد)، نُنفِّذ
-            // بالضبط الإجراء الذي كانت القاعدة ستطبّقه أصلاً (طباعة/إرسال/كليهما) بدل افتراض الإرسال
-            // دائماً — وإلا سنتجاهل نيّة القاعدة الأصلية (مثال: قاعدة "طباعة فقط بانتظار موافقة").
-            $pendingAction = $message->metadata['pending_action'] ?? 'print_and_send';
-            $pendingPrinterId = $message->metadata['pending_printer_id'] ?? null;
 
             $newStatus = in_array($pendingAction, ['print_and_send', 'send_only'], true) ? 'pending' : 'skipped_send';
             $message->update(['status' => $newStatus]);

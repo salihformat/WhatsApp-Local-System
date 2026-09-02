@@ -62,6 +62,14 @@ class MonitorFolderCommand extends Command
             File::makeDirectory($processingPath, 0755, true);
         }
 
+        // [New] وجهة مستقلة عن archive (المخصص للملفات التي أُرسلت فعلاً) خاصة بقواعد save_only/
+        // print_only — حتى يكون واضحاً لأي ملف ما الإجراء الذي طُبِّق عليه فعلياً بمجرد النظر لمكانه،
+        // بدل خلط الملفات "المحفوظة فقط" مع الملفات "المُرسَلة والمؤرشفة" في نفس المجلد.
+        $savedPath = $folderPath . '/saved';
+        if (!File::exists($savedPath)) {
+            File::makeDirectory($savedPath, 0755, true);
+        }
+
         $reviewPath = $folderPath . '/review';
         if (!File::exists($reviewPath)) {
             File::makeDirectory($reviewPath, 0755, true);
@@ -395,10 +403,10 @@ class MonitorFolderCommand extends Command
                 } else {
                     // save_only/print_only لا يمران أبداً بـSendMessageJob (الذي ينقل الملف من processing
                     // إلى archive بعد الإرسال بنجاح) — فلا فائدة من ترك الملف في processing إلى الأبد؛
-                    // ننقله مباشرة إلى archive بما أن الإجراء المطلوب (حفظ/طباعة) سيكتمل بلا خطوة لاحقة
-                    // تعتمد على وجوده هناك.
+                    // ننقله مباشرة إلى مجلد saved/ المستقل (وليس archive المخصص للمُرسَل فعلاً) بما أن
+                    // الإجراء المطلوب (حفظ/طباعة) سيكتمل بلا خطوة لاحقة تعتمد على وجوده في processing.
                     $isTerminalWithoutSend = in_array($actionType, ['save_only', 'print_only'], true);
-                    $destinationFolder = $isTerminalWithoutSend ? $archivePath : $processingPath;
+                    $destinationFolder = $isTerminalWithoutSend ? $savedPath : $processingPath;
                     if (!File::exists($destinationFolder)) {
                         File::makeDirectory($destinationFolder, 0755, true);
                     }

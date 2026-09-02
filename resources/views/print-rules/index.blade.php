@@ -28,7 +28,7 @@
             <!-- إضافة قاعدة -->
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6 mb-6">
                 <h3 class="text-lg font-bold mb-6 text-indigo-700">{{ __('local_agent.add_routing_rule') }}</h3>
-                <form action="{{ route('print-rules.store') }}" method="POST" class="grid grid-cols-1 md:grid-cols-6 gap-6 items-end" x-data="{ actionType: 'print_and_send' }">
+                <form action="{{ route('print-rules.store') }}" method="POST" class="grid grid-cols-1 md:grid-cols-6 gap-6 items-end" x-data="{ actionType: 'print_only' }">
                     @csrf
 
                     <div class="md:col-span-2">

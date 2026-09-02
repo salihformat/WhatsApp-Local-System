@@ -25,6 +25,23 @@ class PrintRuleEngine
     }
 
     /**
+     * [New] يتحقق هل نص معيّن يطابق قاعدة "كلمة مفتاحية" نشطة، بمعزل عن أي رسالة/ملف فعلي — يُستخدم
+     * للتعامل مع رسالة نصية منفصلة عن الملف (مثال: عميل يرسل ملفاً بلا كابشن ثم يرسل "طباعة" في رسالة
+     * تالية)، بدل الاعتماد حصراً على كابشن الملف نفسه الذي لا يصل أحياناً (خصوصاً ملفات إعادة التوجيه).
+     */
+    public function findMatchingKeywordRule(string $text): ?PrintRule
+    {
+        if (trim($text) === '') {
+            return null;
+        }
+
+        return PrintRule::active()
+            ->orderedByPriority()
+            ->get()
+            ->first(fn (PrintRule $rule) => $rule->match_type === 'keyword' && $this->matchesAnyKeyword($rule->match_value, $text));
+    }
+
+    /**
      * يحدد الإجراء الكامل المطلوب لرسالة/ملف وارد: هل يُطبع، يُرسل، كلاهما، يُحفظ فقط، أو يُعلَّق
      * لموافقة يدوية — بناءً على أول قاعدة PrintRule نشطة تُطابقه (بأولوية priority)، أو السلوك
      * الافتراضي التاريخي (طباعة + إرسال) إن لم تُطابق أي قاعدة.
