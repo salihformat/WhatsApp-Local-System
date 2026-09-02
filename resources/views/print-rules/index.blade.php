@@ -60,6 +60,9 @@
                             <option value="save_only">{{ __('local_agent.action_save_only') }}</option>
                             <option value="hold_for_approval">{{ __('local_agent.action_hold_for_approval') }}</option>
                         </select>
+                        <p class="text-xs text-gray-400 mt-1" x-show="actionType === 'print_only' || actionType === 'save_only'">
+                            {{ __('local_agent.action_saved_location_hint') }}
+                        </p>
                     </div>
 
                     <div class="md:col-span-2">
@@ -202,6 +205,9 @@
                                                                         <option value="save_only">{{ __('local_agent.action_save_only') }}</option>
                                                                         <option value="hold_for_approval">{{ __('local_agent.action_hold_for_approval') }}</option>
                                                                     </select>
+                                                                    <p class="text-xs text-gray-400 mt-1" x-show="actionType === 'print_only' || actionType === 'save_only'">
+                                                                        {{ __('local_agent.action_saved_location_hint') }}
+                                                                    </p>
                                                                 </div>
 
                                                                 <div class="grid grid-cols-2 gap-4">
