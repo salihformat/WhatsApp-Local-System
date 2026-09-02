@@ -49,4 +49,12 @@ class ConversationPolicy
     {
         return $this->view($user, $conversation);
     }
+
+    /**
+     * إسناد (تعيين) محادثة لوكيل - مسموح للمشرفين والمدراء فقط
+     */
+    public function assign(User $user, Conversation $conversation): bool
+    {
+        return $user->isSupervisor();
+    }
 }

@@ -22,7 +22,7 @@ class DashboardController extends Controller
 
         // 1. Fetch Queue & Delivery Statistics
         $statsQuery = Message::query();
-        if (!$isAdmin) {
+        if (!$isAdmin && !$user->isSupervisor()) {
             $statsQuery->where('user_id', $user->id);
         }
 
@@ -123,7 +123,7 @@ class DashboardController extends Controller
 
         // 3. Fetch Recent Messages
         $messagesQuery = Message::query();
-        if (!$isAdmin) {
+        if (!$isAdmin && !$user->isSupervisor()) {
             $messagesQuery->where('user_id', $user->id);
         }
         $recentMessages = $messagesQuery->latest()->take(10)->get();
@@ -140,7 +140,7 @@ class DashboardController extends Controller
             $failedQuery = Message::whereDate('created_at', $date)
                 ->where('status', 'failed');
 
-            if (!$isAdmin) {
+            if (!$isAdmin && !$user->isSupervisor()) {
                 $sentQuery->where('user_id', $user->id);
                 $failedQuery->where('user_id', $user->id);
             }
@@ -152,48 +152,62 @@ class DashboardController extends Controller
         // 5. Check Server Connection Status
         $serverStatus = [
             'connected' => false,
-            'message' => 'جاري الفحص...',
+            'message' => __('local_agent.checking_connection'),
             'url' => config('app.central_api_url')
         ];
-        
+
         if (!empty($serverStatus['url'])) {
             try {
                 $centralApi = app(\App\Services\CentralApiService::class);
                 $result = $centralApi->checkConnection();
-                
+
                 $serverStatus['connected'] = $result['success'];
                 if ($result['success']) {
-                    $serverStatus['message'] = 'متصل بالسيرفر بنجاح (المصادقة سليمة)';
+                    $serverStatus['message'] = __('local_agent.server_connected_ok');
                 } else {
-                    $serverStatus['message'] = 'متصل لكن يوجد خطأ: ' . ($result['message'] ?? 'تحقق من التوكن ورقم الشركة');
+                    $serverStatus['message'] = __('local_agent.server_connected_with_error', ['detail' => $result['message'] ?? __('local_agent.check_token_and_company')]);
                 }
             } catch (\Exception $e) {
                 $serverStatus['connected'] = false;
                 if ($e instanceof \Illuminate\Http\Client\ConnectionException || str_contains($e->getMessage(), 'cURL error')) {
-                    $serverStatus['message'] = 'لا يمكن الوصول للسيرفر (تأكد من العنوان أو أن السيرفر يعمل)';
+                    $serverStatus['message'] = __('local_agent.server_unreachable');
                 } else {
-                    $serverStatus['message'] = 'خطأ في الاتصال: ' . $e->getMessage();
+                    $serverStatus['message'] = __('local_agent.connection_error', ['detail' => $e->getMessage()]);
                 }
             }
         } else {
-            $serverStatus['message'] = 'لم يتم تعيين رابط السيرفر (CENTRAL_API_URL)';
+            $serverStatus['message'] = __('local_agent.server_url_not_set');
         }
 
-        // 5.5 [New] فحص حالة اتصال واتساب الفعلية — منفصل عن فحص الوصول للسيرفر المركزي أعلاه، الذي
-        // لا يعرف شيئاً عن حالة جلسة واتساب نفسها. لا يُنفَّذ إلا إذا كان السيرفر متصلاً أصلاً
-        // (تجنّباً لطلب ثانٍ للسيرفر إن كان غير متاح أصلاً).
-        $whatsappStatus = [
-            'connected' => false,
-            'message' => 'لم يتم الفحص (السيرفر المركزي غير متصل)',
-            'provider' => null,
-        ];
-        if ($serverStatus['connected']) {
-            try {
-                $centralApi = app(\App\Services\CentralApiService::class);
-                $whatsappStatus = $centralApi->checkWhatsAppStatus();
-            } catch (\Exception $e) {
-                $whatsappStatus['message'] = 'خطأ أثناء فحص حالة واتساب: ' . $e->getMessage();
-            }
+        // 5.5 فحص حالة اتصال واتساب الفعلية — منفصل عن فحص الوصول للسيرفر المركزي أعلاه، الذي
+        // لا يعرف شيئاً عن حالة جلسة واتساب نفسها. يُنفَّذ دائماً بشكل مستقل (بدل الاعتماد على
+        // نجاح فحص السيرفر أعلاه أولاً)، لأن ذلك كان يُخفي حالة واتساب الحقيقية بالكامل عند فشل
+        // فحص السيرفر (مثلاً بسبب توكن غير صالح) فتظهر اللوحة "غير متصل" دون أي توضيح لسبب ذلك،
+        // رغم أن واتساب قد يكون متصلاً فعلياً على الجهاز/المركزي. checkWhatsAppStatus() تتعامل مع
+        // الأخطاء داخلياً وتعيد status='error' بدل رمي استثناء، لذا لا حاجة لبوابة مسبقة هنا.
+        try {
+            $centralApi = app(\App\Services\CentralApiService::class);
+            $whatsappStatus = $centralApi->checkWhatsAppStatus();
+        } catch (\Exception $e) {
+            $whatsappStatus = [
+                'connected' => false,
+                'status' => 'error',
+                'message' => 'خطأ أثناء فحص حالة واتساب: ' . $e->getMessage(),
+                'provider' => null,
+            ];
+        }
+
+        // حالة "غير مؤكدة" (unknown) منفصلة عن "غير متصل" المؤكدة: تُستخدم عندما فشل الفحص نفسه
+        // (خطأ شبكة/مصادقة/استثناء) بدل أن يُبلغ المركزي فعلياً أن واتساب غير متصل. الواجهة تعرض
+        // لوناً مختلفاً (كهرماني) لهذه الحالة بدل الأحمر المخصص للحالة المؤكدة.
+        $whatsappStatus['check_failed'] = in_array($whatsappStatus['status'] ?? null, ['error', 'failed'], true);
+
+        // 5.6 تنبيه "مانع" ظاهر في اللوحة — يُرفَع من SendMessageJob عند أخطاء دائمة (مصادقة/باقة) تمنع
+        // إرسال أي رسالة، بدل أن يبقى الخطأ مدفوناً في ملف الـ log فقط.
+        $centralBlockingError = null;
+        $rawBlockingError = \App\Models\Setting::get('CENTRAL_BLOCKING_ERROR');
+        if (!empty($rawBlockingError)) {
+            $centralBlockingError = json_decode($rawBlockingError, true);
         }
 
         // 6. Check Background Services Status (via PID files owned by this application only)
@@ -206,7 +220,7 @@ class DashboardController extends Controller
             'all_running' => $queueRunning && $scheduleRunning
         ];
 
-        return view('dashboard', compact('stats', 'folderStats', 'recentMessages', 'chartData', 'serverStatus', 'whatsappStatus', 'servicesStatus', 'pendingApprovals'));
+        return view('dashboard', compact('stats', 'folderStats', 'recentMessages', 'chartData', 'serverStatus', 'whatsappStatus', 'servicesStatus', 'pendingApprovals', 'centralBlockingError'));
     }
 
     /**
@@ -276,6 +290,31 @@ class DashboardController extends Controller
         } catch (\Exception $e) {
             Log::error('Dashboard Check Connection failed', ['error' => $e->getMessage()]);
             return redirect()->route('dashboard')->with('error', 'خطأ في الاتصال بالسيرفر: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Verify actual WhatsApp session status manually — منفصل عن checkConnection() أعلاه الذي
+     * يتحقق فقط من الوصول للسيرفر المركزي، لا من حالة جلسة واتساب نفسها.
+     */
+    public function checkWhatsAppConnection()
+    {
+        try {
+            $centralApi = app(\App\Services\CentralApiService::class);
+            $result = $centralApi->checkWhatsAppStatus();
+
+            if ($result['connected'] ?? false) {
+                return redirect()->route('dashboard')->with('success', 'واتساب متصل: ' . ($result['message'] ?? ''));
+            }
+
+            if (in_array($result['status'] ?? null, ['error', 'failed'], true)) {
+                return redirect()->route('dashboard')->with('error', 'تعذّر التحقق من حالة واتساب: ' . ($result['message'] ?? 'خطأ غير معروف'));
+            }
+
+            return redirect()->route('dashboard')->with('error', 'واتساب غير متصل: ' . ($result['message'] ?? ''));
+        } catch (\Exception $e) {
+            Log::error('Dashboard Check WhatsApp Connection failed', ['error' => $e->getMessage()]);
+            return redirect()->route('dashboard')->with('error', 'خطأ أثناء فحص حالة واتساب: ' . $e->getMessage());
         }
     }
 

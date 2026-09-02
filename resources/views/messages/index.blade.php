@@ -119,7 +119,7 @@
     </head>
 
     <x-slot name="header">
-        <div class="flex justify-between items-center premium-font" dir="rtl">
+        <div class="flex justify-between items-center premium-font" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
             <h2 class="font-black text-2xl text-gray-800 leading-tight flex items-center gap-2">
                 <svg class="w-7 h-7 text-[#25D366]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"></path>
@@ -135,7 +135,7 @@
         </div>
     </x-slot>
 
-    <div class="py-6 premium-font" dir="rtl">
+    <div class="py-6 premium-font" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-2xl border border-gray-100">
                 <div class="p-6 bg-white border-b border-gray-200">

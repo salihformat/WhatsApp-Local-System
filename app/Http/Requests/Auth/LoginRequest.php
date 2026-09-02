@@ -49,6 +49,14 @@ class LoginRequest extends FormRequest
             ]);
         }
 
+        // التحقق من أن الحساب مُفعَّل — المستخدمون الموقوفون لا يستطيعون تسجيل الدخول
+        if (! Auth::user()->is_active) {
+            Auth::logout();
+            throw ValidationException::withMessages([
+                'email' => 'حسابك موقوف مؤقتاً. يرجى التواصل مع مدير النظام.',
+            ]);
+        }
+
         RateLimiter::clear($this->throttleKey());
     }
 

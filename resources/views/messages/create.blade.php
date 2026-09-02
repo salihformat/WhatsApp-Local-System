@@ -36,20 +36,20 @@
             }
         </style>
     </head>
-    <div class="container mx-auto px-4 py-8 max-w-4xl premium-font" dir="rtl">
+    <div class="container mx-auto px-4 py-8 max-w-4xl premium-font" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
         <div class="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
             <h1 class="text-2xl font-black text-gray-800 mb-8 flex items-center gap-2">
                 <svg class="w-5 h-5 text-[#25D366]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                 </svg>
-                إرسال رسالة جديدة
+                {{ __('local_agent.compose_title') }}
             </h1>
 
             <form action="{{ route('messages.store') }}" method="POST" enctype="multipart/form-data">
                 @csrf
 
                 <div class="mb-6 flex items-center gap-4">
-                    <label for="phone_number" class="w-1/4 text-sm font-medium text-gray-700">رقم الجوال (دولي)</label>
+                    <label for="phone_number" class="w-1/4 text-sm font-medium text-gray-700">{{ __('local_agent.compose_phone_intl') }}</label>
                     <div class="flex-grow w-3/4">
                         <div class="relative rounded-md shadow-sm" id="phone-autocomplete-wrapper">
                             <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none z-10">
@@ -59,20 +59,20 @@
                             </div>
                             <input type="tel" name="phone_number" id="phone_number"
                                    class="focus:ring-[#128C7E] focus:border-[#128C7E] block w-full pr-10 sm:text-sm border-gray-300 rounded-md p-3 border"
-                                   placeholder="ابحث بالاسم أو الرقم... أو أدخل رقم جديد"
+                                   placeholder="{{ __('local_agent.compose_phone_placeholder') }}"
                                    pattern="[0-9]{10,15}"
                                    required
                                    autocomplete="off"
                                    dir="ltr">
                             <!-- قائمة الاقتراحات -->
-                            <div id="contact-suggestions" class="hidden absolute z-50 w-full mt-1 bg-white rounded-xl shadow-2xl border border-gray-200 max-h-64 overflow-y-auto" style="direction:rtl">
+                            <div id="contact-suggestions" class="hidden absolute z-50 w-full mt-1 bg-white rounded-xl shadow-2xl border border-gray-200 max-h-64 overflow-y-auto" style="direction: {{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }};">
                                 <div id="suggestions-list"></div>
                                 <div id="suggestions-loading" class="hidden p-3 text-center text-xs text-gray-400">
                                     <svg class="animate-spin h-4 w-4 mx-auto mb-1 text-[#128C7E]" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                                    جاري البحث...
+                                    {{ __('local_agent.compose_searching') }}
                                 </div>
                                 <div id="suggestions-empty" class="hidden p-3 text-center text-xs text-gray-400">
-                                    لا توجد نتائج مطابقة
+                                    {{ __('local_agent.compose_no_results') }}
                                 </div>
                             </div>
                         </div>
@@ -85,25 +85,25 @@
                                     <p class="text-[10px] text-gray-500" id="selected-info"></p>
                                 </div>
                             </div>
-                            <button type="button" onclick="clearSelectedContact()" class="text-gray-400 hover:text-red-500 p-1 cursor-pointer" title="إزالة">
+                            <button type="button" onclick="clearSelectedContact()" class="text-gray-400 hover:text-red-500 p-1 cursor-pointer" title="{{ __('local_agent.remove') }}">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                             </button>
                         </div>
-                        <p class="mt-1 text-sm text-gray-500">أدخل الرمز الدولي متبوعاً برقم الجوال (بدون + أو 00) أو ابحث باسم العميل</p>
+                        <p class="mt-1 text-sm text-gray-500">{{ __('local_agent.compose_phone_help') }}</p>
                     </div>
                 </div>
 
                 <div class="mb-6 flex items-start gap-4">
-                    <label for="message_text" class="w-1/4 text-sm font-medium text-gray-700 pt-3">نص الرسالة</label>
+                    <label for="message_text" class="w-1/4 text-sm font-medium text-gray-700 pt-3">{{ __('local_agent.compose_message_text') }}</label>
                     <div class="flex-grow w-3/4">
                         <textarea name="message_text" id="message_text" rows="4"
                                   class="shadow-sm focus:ring-blue-500 focus:border-blue-500 mt-1 block w-full sm:text-sm border border-gray-300 rounded-md p-3"
-                                  placeholder="اكتب نص الرسالة هنا..."></textarea>
+                                  placeholder="{{ __('local_agent.compose_message_placeholder') }}"></textarea>
                     </div>
                 </div>
 
                 <div class="mb-6 flex items-start gap-4">
-                    <label class="w-1/4 text-sm font-medium text-gray-700 pt-3">المرفقات (عدة ملفات)</label>
+                    <label class="w-1/4 text-sm font-medium text-gray-700 pt-3">{{ __('local_agent.compose_attachments') }}</label>
                     <div class="flex-grow w-3/4">
                         <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
                             <div class="space-y-1 text-center">
@@ -112,18 +112,18 @@
                                 </svg>
                                 <div class="flex text-sm text-gray-600 justify-center">
                                     <label for="file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
-                                        <span>اختر الملفات</span>
+                                        <span>{{ __('local_agent.compose_choose_files') }}</span>
                                         <input id="file-upload" name="files[]" type="file" multiple class="sr-only" accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx">
                                     </label>
-                                    <p class="pr-1">أو اسحب وأفلت</p>
+                                    <p class="pr-1">{{ __('local_agent.compose_or_drag') }}</p>
                                 </div>
-                                <p class="text-xs text-gray-500">PNG, JPG, PDF, DOC, XLS حتى 10 ميجابايت للملف</p>
+                                <p class="text-xs text-gray-500">{{ __('local_agent.compose_file_types_hint') }}</p>
                             </div>
                         </div>
                         <div id="file-preview" class="mt-3 hidden">
                             <div class="flex justify-between items-center mb-2">
-                                <span class="text-sm font-bold text-gray-700">الملفات المحددة:</span>
-                                <button type="button" id="clear-all-files" class="text-xs text-red-600 hover:text-red-800 font-medium">حذف الكل</button>
+                                <span class="text-sm font-bold text-gray-700">{{ __('local_agent.compose_selected_files') }}</span>
+                                <button type="button" id="clear-all-files" class="text-xs text-red-600 hover:text-red-800 font-medium">{{ __('local_agent.compose_delete_all') }}</button>
                             </div>
                             <div id="file-list-container" class="space-y-2 max-h-60 overflow-y-auto pr-1"></div>
                         </div>
@@ -138,13 +138,13 @@
                             </svg>
                         </div>
                         <div class="mr-3">
-                            <h3 class="text-sm font-medium text-blue-800">نصائح هامة</h3>
+                            <h3 class="text-sm font-medium text-blue-800">{{ __('local_agent.compose_tips_title') }}</h3>
                             <div class="mt-2 text-sm text-blue-700">
                                 <ul class="list-disc pr-5 space-y-1">
-                                    <li>تأكد من صحة الرقم الدولي المدخل</li>
-                                    <li>استخدم الأرقام بالصيغة الدولية (مثال: 966501234567)</li>
-                                    <li>يمكنك تحديد عدة ملفات معاً، وسيتم إرسالها بفاصل زمني عشوائي بين 1 إلى 10 ثواني</li>
-                                    <li>الحد الأقصى لحجم الملف 10 ميجابايت</li>
+                                    <li>{{ __('local_agent.compose_tip_1') }}</li>
+                                    <li>{{ __('local_agent.compose_tip_2') }}</li>
+                                    <li>{{ __('local_agent.compose_tip_3') }}</li>
+                                    <li>{{ __('local_agent.compose_tip_4') }}</li>
                                 </ul>
                             </div>
                         </div>
@@ -156,10 +156,10 @@
                         <svg class="ml-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                         </svg>
-                        إرسال الرسالة
+                        {{ __('local_agent.compose_send') }}
                     </button>
                     <a href="{{ route('messages.index') }}" class="btn-whatsapp-secondary py-3 px-8 rounded-xl shadow-sm text-sm font-bold text-center">
-                        إلغاء
+                        {{ __('local_agent.cancel') }}
                     </a>
                 </div>
             </form>

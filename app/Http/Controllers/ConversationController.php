@@ -108,7 +108,7 @@ class ConversationController extends Controller
      */
     public function assign(Request $request, Conversation $conversation)
     {
-        $this->authorize('view', $conversation); // Same as view for now, or could be a specific 'assign' policy
+        $this->authorize('assign', $conversation); // Only supervisors and admins can assign
 
         $request->validate([
             'assigned_to' => 'nullable|exists:users,id'

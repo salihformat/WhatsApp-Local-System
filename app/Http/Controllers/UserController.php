@@ -67,6 +67,7 @@ class UserController extends Controller
             'phone_number' => ['nullable', 'string', 'max:20'],
             'password' => ['nullable', 'string', 'min:8', 'confirmed'],
             'role' => ['required', 'string', 'in:admin,supervisor,agent'],
+            'is_active' => ['nullable', 'boolean'],
         ]);
 
         $user->name = $validated['name'];
@@ -80,6 +81,21 @@ class UserController extends Controller
 
         $user->role = $validated['role'];
         $user->is_admin = $validated['role'] === 'admin';
+
+        if ($user->id !== auth()->id()) {
+            $newStatus = $request->has('is_active');
+            
+            if (!$newStatus && $user->isAdmin() && $user->is_active) {
+                $activeAdminCount = User::where('is_admin', true)->where('is_active', true)->count();
+                if ($activeAdminCount <= 1) {
+                    return redirect()->back()
+                        ->withInput()
+                        ->with('error', 'لا يمكنك تعطيل آخر حساب مدير نظام. يجب أن يبقى مدير واحد نشط على الأقل.');
+                }
+            }
+            $user->is_active = $newStatus;
+        }
+
         $user->save();
 
         // كلمة المرور مستثناة عمداً من التدقيق التلقائي للحقول (لا نُخزّن قيمتها ولو مُجزّأة)،
@@ -114,6 +130,41 @@ class UserController extends Controller
         return redirect()->back()->with('success', $user->is_available_for_assignment
             ? "{$user->name} أصبح متاحاً لاستلام محادثات جديدة."
             : "{$user->name} لن يستلم محادثات جديدة تلقائياً حتى تُفعّله مجدداً.");
+    }
+
+    /**
+     * تفعيل أو تعطيل حساب المستخدم — المستخدم المُعطَّل لا يستطيع تسجيل الدخول
+     * ويُستثنى فوراً من التوزيع التلقائي بمعزل عن إعداد is_available_for_assignment.
+     */
+    public function toggleStatus(User $user)
+    {
+        // منع تعطيل الحساب الشخصي
+        if ($user->id === auth()->id()) {
+            return redirect()->back()
+                ->with('error', 'لا يمكنك تعطيل حسابك الشخصي.');
+        }
+
+        // منع تعطيل آخر حساب Admin لتجنب قفل النظام
+        if ($user->isAdmin() && $user->is_active) {
+            $activeAdminCount = User::where('is_admin', true)->where('is_active', true)->count();
+            if ($activeAdminCount <= 1) {
+                return redirect()->back()
+                    ->with('error', 'لا يمكنك تعطيل آخر حساب مدير نظام. يجب أن يبقى مدير واحد نشط على الأقل.');
+            }
+        }
+
+        $user->update(['is_active' => !$user->is_active]);
+
+        activity('users')
+            ->causedBy(auth()->user())
+            ->performedOn($user)
+            ->log($user->is_active
+                ? "تم تفعيل حساب المستخدم: {$user->name}"
+                : "تم تعطيل حساب المستخدم: {$user->name}");
+
+        return redirect()->back()->with('success', $user->is_active
+            ? "تم تفعيل حساب {$user->name} بنجاح."
+            : "تم تعطيل حساب {$user->name}. لن يتمكن من تسجيل الدخول حتى تُعيد تفعيله.");
     }
 
     /**

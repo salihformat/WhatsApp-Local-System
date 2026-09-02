@@ -17,7 +17,7 @@ class User extends Authenticatable
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['name', 'email', 'role', 'is_admin'])
+            ->logOnly(['name', 'email', 'role', 'is_admin', 'is_active'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
             ->useLogName('users');
@@ -36,6 +36,7 @@ class User extends Authenticatable
         'is_admin',
         'role',
         'is_available_for_assignment',
+        'is_active',
     ];
 
     /**
@@ -60,6 +61,8 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_admin' => 'boolean',
             'is_available_for_assignment' => 'boolean',
+            'is_active' => 'boolean',
+            'last_login_at' => 'datetime',
         ];
     }
     public function isAdmin()
@@ -105,6 +108,14 @@ class User extends Authenticatable
     public function scopeAvailableForAssignment($query)
     {
         return $query->where('is_available_for_assignment', true);
+    }
+
+    /**
+     * Scope لاستعلام المستخدمين النشطين (غير الموقوفين) فقط.
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
     }
 
 }

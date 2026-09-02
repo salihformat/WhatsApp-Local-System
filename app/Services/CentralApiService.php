@@ -473,6 +473,8 @@ class CentralApiService
                 'provider' => $result['provider'] ?? null,
                 'provider_source' => $result['provider_source'] ?? 'default',
                 'provider_source_label' => $result['provider_source_label'] ?? null,
+                'company_name' => $result['company_name'] ?? null,
+                'phone' => $result['phone'] ?? null,
             ];
         } catch (Exception $e) {
             return [

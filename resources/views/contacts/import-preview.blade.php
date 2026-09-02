@@ -20,7 +20,7 @@
 .mapping-select.mapped{border-color:#25D366;background-color:#f0fdf4}
 </style>
 <x-slot name="header">
-<div class="flex justify-between items-center premium-font" dir="rtl">
+<div class="flex justify-between items-center premium-font" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
 <h2 class="font-black text-xl text-gray-800 flex items-center gap-2">
 <svg class="w-6 h-6 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
 {{ __('contacts.preview_file') }}: {{ $file_name }}
@@ -29,7 +29,7 @@
 </div>
 </x-slot>
 
-<div class="py-6 premium-font" dir="rtl">
+<div class="py-6 premium-font" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
 <div class="max-w-6xl mx-auto sm:px-6 lg:px-8">
 
 <!-- ملخص -->
@@ -68,7 +68,7 @@
 @if(in_array($field, ['phone_number', 'name']))
     <span class="text-red-500">*</span>
 @else
-    <span class="text-gray-400 font-normal text-[10px]">(اختياري)</span>
+    <span class="text-gray-400 font-normal text-[10px]">({{ __('contacts.optional') }})</span>
 @endif
 </label>
 <select name="mapping[{{ $field }}]" class="mapping-select" onchange="this.classList.toggle('mapped',this.value!=='')">

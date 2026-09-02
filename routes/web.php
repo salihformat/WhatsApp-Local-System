@@ -48,11 +48,13 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/contacts-groups/{group}', [ContactController::class, 'updateGroup'])->name('contacts.groups.update');
     Route::delete('/contacts-groups/{group}', [ContactController::class, 'destroyGroup'])->name('contacts.groups.destroy');
 
-    // Contact Import - الاستيراد
-    Route::get('/contacts-import', [ContactImportController::class, 'index'])->name('contacts.import.index');
-    Route::post('/contacts-import/upload', [ContactImportController::class, 'upload'])->name('contacts.import.upload');
-    Route::post('/contacts-import/process', [ContactImportController::class, 'process'])->name('contacts.import.process');
-    Route::get('/contacts-import/template', [ContactImportController::class, 'downloadTemplate'])->name('contacts.import.template');
+    // Contact Import - الاستيراد (Supervisors & Admins only)
+    Route::middleware(['supervisor'])->group(function () {
+        Route::get('/contacts-import', [ContactImportController::class, 'index'])->name('contacts.import.index');
+        Route::post('/contacts-import/upload', [ContactImportController::class, 'upload'])->name('contacts.import.upload');
+        Route::post('/contacts-import/process', [ContactImportController::class, 'process'])->name('contacts.import.process');
+        Route::get('/contacts-import/template', [ContactImportController::class, 'downloadTemplate'])->name('contacts.import.template');
+    });
 
     // أدوات PDF - متاحة لكل المستخدمين المسجّلين (أداة مساعدة، ليست إدارية)
     Route::get('/pdf-tools', [\App\Http\Controllers\PdfToolController::class, 'index'])->name('pdf-tools.index');
@@ -110,6 +112,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/dashboard/scan', [DashboardController::class, 'scanFolder'])->name('dashboard.scan');
         Route::post('/dashboard/retry-failed', [DashboardController::class, 'retryAllFailed'])->name('dashboard.retry-failed');
         Route::get('/dashboard/check-connection', [DashboardController::class, 'checkConnection'])->name('dashboard.check-connection');
+        Route::get('/dashboard/check-whatsapp', [DashboardController::class, 'checkWhatsAppConnection'])->name('dashboard.check-whatsapp');
         Route::post('/dashboard/process-queue', [DashboardController::class, 'processQueue'])->name('dashboard.process-queue');
         Route::post('/dashboard/start-services', [DashboardController::class, 'startServices'])->name('dashboard.start-services');
         Route::post('/dashboard/stop-services', [DashboardController::class, 'stopServices'])->name('dashboard.stop-services');
@@ -117,6 +120,7 @@ Route::middleware(['auth'])->group(function () {
 
         Route::resource('users', UserController::class);
         Route::post('/users/{user}/toggle-availability', [UserController::class, 'toggleAvailability'])->name('users.toggle-availability');
+        Route::post('/users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
 
         // Settings
         Route::get('/settings', [\App\Http\Controllers\SettingController::class, 'index'])->name('settings.index');
@@ -187,5 +191,3 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
-
-

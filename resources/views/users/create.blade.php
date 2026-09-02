@@ -30,7 +30,7 @@
                         <div class="mb-4">
                             <x-input-label for="phone_number" :value="__('رقم الواتساب (اختياري)')" />
                             <x-text-input id="phone_number" class="block mt-1 w-full" type="text" name="phone_number" :value="old('phone_number')" placeholder="966501234567" dir="ltr" />
-                            <p class="text-xs text-gray-400 mt-1">إن أُدخل، يصل هذا المستخدم إشعار واتساب فعلي (بالإضافة لجرس الإشعارات) عند تعيين محادثة له.</p>
+                            <p class="text-xs text-gray-400 mt-1">{{ __('local_agent.users_phone_hint') }}</p>
                             <x-input-error :messages="$errors->get('phone_number')" class="mt-2" />
                         </div>
 

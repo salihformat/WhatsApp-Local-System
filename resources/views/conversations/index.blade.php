@@ -43,7 +43,7 @@
     </head>
 
     <x-slot name="header">
-        <div class="flex justify-between items-center premium-font" dir="rtl">
+        <div class="flex justify-between items-center premium-font" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
             <h2 class="font-black text-2xl text-gray-800 leading-tight flex items-center gap-2">
                 <svg class="w-7 h-7 text-[#25D366]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
@@ -59,7 +59,7 @@
         </div>
     </x-slot>
 
-    <div class="py-6 premium-font" dir="rtl">
+    <div class="py-6 premium-font" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-2xl border border-gray-100">
                 <div class="p-6 bg-white border-b border-gray-200">
@@ -80,7 +80,7 @@
                         <form method="GET" action="{{ route('conversations.index') }}" class="flex flex-wrap items-center gap-3 w-full lg:w-auto">
                             <!-- Search -->
                             <div class="relative rounded-lg shadow-sm w-full sm:w-64">
-                                <input type="text" name="search" value="{{ request('search') }}" placeholder="بحث برقم الهاتف أو الاسم..."
+                                <input type="text" name="search" value="{{ request('search') }}" placeholder="{{ __('local_agent.conv_search_placeholder') }}"
                                        class="block w-full rounded-lg border-gray-300 pr-10 pl-3 text-xs focus:border-indigo-500 focus:ring-indigo-500">
                                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
                                     <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -100,11 +100,11 @@
                             </div>
 
                             <button type="submit" class="px-4 py-2 btn-whatsapp-primary rounded-lg text-xs font-bold shadow-sm">
-                                تصفية
+                                {{ __('local_agent.conv_filter') }}
                             </button>
-                            
+
                             @if(request('search') || request('status'))
-                                <a href="{{ route('conversations.index') }}" class="text-xs text-gray-500 hover:text-indigo-600 font-medium">إعادة تعيين</a>
+                                <a href="{{ route('conversations.index') }}" class="text-xs text-gray-500 hover:text-indigo-600 font-medium">{{ __('local_agent.conv_reset') }}</a>
                             @endif
                         </form>
                     </div>
@@ -150,20 +150,20 @@
                                             @if($conversation->lastMessage)
                                                 <span class="text-gray-600 text-xs">
                                                     @if($conversation->lastMessage->message_type === 'media')
-                                                        <span class="text-blue-500"><i class="fas fa-image"></i> وسائط</span>
+                                                        <span class="text-blue-500"><i class="fas fa-image"></i> {{ __('local_agent.conv_media') }}</span>
                                                     @else
                                                         {{ \Illuminate\Support\Str::limit($conversation->lastMessage->message_text, 50) }}
                                                     @endif
                                                 </span>
                                             @else
-                                                <span class="text-gray-400 text-xs">لا يوجد رسائل</span>
+                                                <span class="text-gray-400 text-xs">{{ __('local_agent.conv_no_messages') }}</span>
                                             @endif
                                         </td>
                                         <td class="px-4 py-4 text-center">
                                             @if($conversation->status === 'open')
-                                                <span class="px-2 py-1 rounded bg-green-50 text-green-700 text-xs font-bold border border-green-200">مفتوحة</span>
+                                                <span class="px-2 py-1 rounded bg-green-50 text-green-700 text-xs font-bold border border-green-200">{{ __('مفتوحة') }}</span>
                                             @else
-                                                <span class="px-2 py-1 rounded bg-gray-50 text-gray-700 text-xs font-bold border border-gray-200">مغلقة</span>
+                                                <span class="px-2 py-1 rounded bg-gray-50 text-gray-700 text-xs font-bold border border-gray-200">{{ __('مغلقة') }}</span>
                                             @endif
                                         </td>
                                         <td class="px-4 py-4 whitespace-nowrap text-xs text-gray-500 font-mono">
@@ -173,15 +173,15 @@
                                             <div class="flex items-center justify-center gap-2">
                                                 <a href="{{ route('conversations.show', $conversation->id) }}"
                                                    class="p-1.5 text-indigo-600 hover:text-indigo-900 hover:bg-indigo-50 rounded-lg transition-colors"
-                                                   title="فتح المحادثة">
+                                                   title="{{ __('local_agent.conv_open_tooltip') }}">
                                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"></path>
                                                     </svg>
                                                 </a>
                                                 @if($conversation->status === 'open')
-                                                    <form action="{{ route('conversations.close', $conversation->id) }}" method="POST" class="inline" onsubmit="return confirm('هل أنت متأكد من إغلاق هذه المحادثة؟')">
+                                                    <form action="{{ route('conversations.close', $conversation->id) }}" method="POST" class="inline" onsubmit="return confirm({{ Js::from(__('local_agent.conv_confirm_close')) }})">
                                                         @csrf
-                                                        <button type="submit" class="p-1.5 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors" title="إغلاق المحادثة">
+                                                        <button type="submit" class="p-1.5 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors" title="{{ __('local_agent.conv_close_tooltip') }}">
                                                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                                                             </svg>

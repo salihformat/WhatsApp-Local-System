@@ -17,7 +17,7 @@
 .color-option:hover,.color-option.selected{transform:scale(1.15);border-color:#1f2937;box-shadow:0 2px 8px rgba(0,0,0,.2)}
 </style>
 <x-slot name="header">
-<div class="flex justify-between items-center premium-font" dir="rtl">
+<div class="flex justify-between items-center premium-font" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
 <h2 class="font-black text-2xl text-gray-800 flex items-center gap-2">
 <svg class="w-7 h-7 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
 {{ __('contacts.manage_groups') }}
@@ -35,7 +35,7 @@
 </div>
 </x-slot>
 
-<div class="py-6 premium-font" dir="rtl">
+<div class="py-6 premium-font" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
 <div class="max-w-5xl mx-auto sm:px-6 lg:px-8">
 
 @if(session('success'))<div class="mb-6 bg-emerald-50 border-r-4 border-emerald-500 rounded-xl p-4 flex items-center justify-between"><p class="text-sm font-bold text-emerald-800">✅ {{ session('success') }}</p><button onclick="this.parentElement.remove()" class="text-emerald-600 cursor-pointer">✕</button></div>@endif
@@ -54,7 +54,7 @@
 <button onclick="editGroup({{ $group->id }}, '{{ addslashes($group->name) }}', '{{ addslashes($group->description) }}', '{{ $group->color }}')" class="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg cursor-pointer">
 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
 </button>
-<form action="{{ route('contacts.groups.destroy', $group) }}" method="POST" onsubmit="return confirm('هل تريد حذف المجموعة؟')">@csrf @method('DELETE')
+<form action="{{ route('contacts.groups.destroy', $group) }}" method="POST" onsubmit="return confirm({{ Js::from(__('contacts.confirm_delete_group')) }})">@csrf @method('DELETE')
 <button class="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
 </form>
 </div>
@@ -79,7 +79,7 @@
 
 <!-- Modal إضافة/تعديل -->
 <div class="modal-overlay" id="group-modal" onclick="if(event.target===this)closeModal()">
-<div class="modal-box premium-font" dir="rtl">
+<div class="modal-box premium-font" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
 <h3 class="text-lg font-black text-gray-800 mb-5" id="modal-title">{{ __('contacts.add_group') }}</h3>
 <form id="group-form" method="POST" action="{{ route('contacts.groups.store') }}">
 @csrf
@@ -87,11 +87,11 @@
 <div class="space-y-4">
 <div>
 <label class="form-label">{{ __('contacts.group_name') }} <span class="text-red-500">*</span></label>
-<input type="text" name="name" id="group-name" class="form-input" placeholder="اسم المجموعة" required>
+<input type="text" name="name" id="group-name" class="form-input" placeholder="{{ __('contacts.group_name') }}" required>
 </div>
 <div>
 <label class="form-label">{{ __('contacts.description') }}</label>
-<textarea name="description" id="group-desc" rows="2" class="form-input" placeholder="وصف المجموعة (اختياري)"></textarea>
+<textarea name="description" id="group-desc" rows="2" class="form-input" placeholder="{{ __('contacts.group_description_optional') }}"></textarea>
 </div>
 <div>
 <label class="form-label">{{ __('contacts.color') }}</label>

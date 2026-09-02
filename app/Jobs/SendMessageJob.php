@@ -266,6 +266,11 @@ class SendMessageJob implements ShouldQueue
                     'central_message_id' => $responseData['message_id'] ?? null
                 ]);
 
+                if (\App\Models\Setting::get('CENTRAL_BLOCKING_ERROR')) {
+                    \App\Models\Setting::set('CENTRAL_BLOCKING_ERROR', null);
+                    \App\Models\Setting::flushCache();
+                }
+
                 $this->moveFolderFile($message, true);
 
             } else {
@@ -313,6 +318,7 @@ class SendMessageJob implements ShouldQueue
                 'status' => 'failed',
                 'error_message' => 'خطأ في المصادقة: ' . $errorMessage,
             ]);
+            $this->raiseBlockingAlert('AUTH', $errorMessage);
             $this->moveFolderFile($message, false);
             return;
         }
@@ -327,6 +333,21 @@ class SendMessageJob implements ShouldQueue
             return;
         }
 
+        // [Fix] أخطاء 403 (مثل FEATURE_NOT_ENABLED أو COMPANY_INACTIVE) دائمة على مستوى الباقة/الشركة
+        // ولن تُحلّ بإعادة المحاولة — كانت تُعاد المحاولة كل بضع دقائق إلى 5 مرات، ما يُغرق الـ log
+        // ويُكرّر نفس الطلب الفاشل للمركزي بلا فائدة. نوقفها فوراً كباقي الأخطاء الدائمة، ونرفع تنبيهاً
+        // ظاهراً في لوحة النظام المحلي (بدل بقاء الخطأ مدفوناً في ملف الـ log فقط) لأنه يعني أن *كل*
+        // الرسائل ستفشل حتى تُحل المشكلة من جهة الباقة/الاشتراك في النظام المركزي.
+        if ($response->status() === 403) {
+            $message->update([
+                'status' => 'failed',
+                'error_message' => $errorMessage,
+            ]);
+            $this->raiseBlockingAlert($responseData['error_code'] ?? 'FORBIDDEN', $errorMessage);
+            $this->moveFolderFile($message, false);
+            return;
+        }
+
         // للأخطاء الأخرى، نعيد المحاولة
         $message->update([
             'status' => 'failed',
@@ -336,6 +357,20 @@ class SendMessageJob implements ShouldQueue
         if ($this->attempts() < $this->tries) {
             $this->release($this->backoff[$this->attempts() - 1] ?? 300);
         }
+    }
+
+    /**
+     * تسجيل تنبيه "مانع" ظاهر في لوحة تحكم النظام المحلي — يُستخدم للأخطاء التي تمنع إرسال أي
+     * رسالة إطلاقاً (مصادقة أو باقة) حتى تُعرَض بوضوح للمسؤول بدل بقائها في ملف الـ log فقط.
+     */
+    private function raiseBlockingAlert(string $code, string $message): void
+    {
+        \App\Models\Setting::set('CENTRAL_BLOCKING_ERROR', json_encode([
+            'code' => $code,
+            'message' => $message,
+            'at' => now()->toDateTimeString(),
+        ], JSON_UNESCAPED_UNICODE));
+        \App\Models\Setting::flushCache();
     }
 
     private function handleException($message, $exception)

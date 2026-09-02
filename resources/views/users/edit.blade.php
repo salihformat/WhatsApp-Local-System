@@ -31,7 +31,7 @@
                         <div class="mb-4">
                             <x-input-label for="phone_number" :value="__('رقم الواتساب (اختياري)')" />
                             <x-text-input id="phone_number" class="block mt-1 w-full" type="text" name="phone_number" :value="old('phone_number', $user->phone_number)" placeholder="966501234567" dir="ltr" />
-                            <p class="text-xs text-gray-400 mt-1">إن أُدخل، يصل هذا المستخدم إشعار واتساب فعلي (بالإضافة لجرس الإشعارات) عند تعيين محادثة له.</p>
+                            <p class="text-xs text-gray-400 mt-1">{{ __('local_agent.users_phone_hint') }}</p>
                             <x-input-error :messages="$errors->get('phone_number')" class="mt-2" />
                         </div>
 
@@ -63,6 +63,18 @@
                                 <option value="admin" {{ old('role', $user->role) === 'admin' ? 'selected' : '' }}>{{ __('مدير نظام (صلاحيات كاملة)') }}</option>
                             </select>
                             <x-input-error :messages="$errors->get('role')" class="mt-2" />
+                        </div>
+
+                        <!-- Account Status -->
+                        <div class="mb-4">
+                            <label for="is_active" class="inline-flex items-center">
+                                <input id="is_active" type="checkbox" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 {{ $user->id === auth()->id() ? 'opacity-50 cursor-not-allowed' : '' }}" name="is_active" value="1" {{ old('is_active', $user->is_active) ? 'checked' : '' }} {{ $user->id === auth()->id() ? 'disabled' : '' }}>
+                                <span class="ml-2 text-sm text-gray-600 mr-2">{{ __('تفعيل الحساب (يستطيع تسجيل الدخول واستخدام النظام)') }}</span>
+                            </label>
+                            @if($user->id === auth()->id())
+                                <p class="text-xs text-gray-400 mt-1 mr-6">{{ __('لا يمكنك تعطيل حسابك الشخصي') }}</p>
+                            @endif
+                            <x-input-error :messages="$errors->get('is_active')" class="mt-2" />
                         </div>
 
                         <div class="flex items-center justify-end mt-4">

@@ -50,7 +50,7 @@
     </head>
 
     <x-slot name="header">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 premium-font" dir="rtl">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 premium-font" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
             <h2 class="font-black text-2xl text-gray-800 leading-tight flex items-center gap-3">
                 <div class="p-2.5 bg-emerald-50 rounded-2xl text-[#25D366] shadow-sm">
                     <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -88,7 +88,7 @@
         </div>
     </x-slot>
 
-    <div class="py-8 premium-font" dir="rtl">
+    <div class="py-8 premium-font" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             
             @if(session('success'))

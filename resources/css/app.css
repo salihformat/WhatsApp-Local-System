@@ -113,3 +113,51 @@ body {
 .nav-link-active {
     @apply border-indigo-500 text-gray-900 focus:border-indigo-700;
 }
+
+/* ===== Dashboard Sidebar Layout ===== */
+
+/* Desktop Sidebar - fixed on right for RTL */
+.sidebar-desktop {
+    display: none;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    width: 16rem; /* w-64 */
+    background: #fff;
+    border-left: 1px solid #f3f4f6;
+    box-shadow: 0 1px 3px rgba(0,0,0,.05);
+    z-index: 20;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+[dir="rtl"] .sidebar-desktop {
+    right: 0;
+}
+
+[dir="ltr"] .sidebar-desktop {
+    left: 0;
+}
+
+@media (min-width: 1024px) {
+    .sidebar-desktop {
+        display: flex;
+    }
+}
+
+/* Main content offset for sidebar */
+.main-content-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+@media (min-width: 1024px) {
+    [dir="rtl"] .main-content-wrapper {
+        margin-right: 16rem; /* sidebar width */
+    }
+    [dir="ltr"] .main-content-wrapper {
+        margin-left: 16rem;
+    }
+}

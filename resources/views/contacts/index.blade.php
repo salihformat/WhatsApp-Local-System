@@ -21,12 +21,12 @@
 </style>
 </head>
 <x-slot name="header">
-<div class="flex justify-between items-center premium-font" dir="rtl">
+<div class="flex flex-wrap justify-between items-center gap-3 premium-font" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
 <h2 class="font-black text-2xl text-gray-800 flex items-center gap-2">
 <svg class="w-7 h-7 text-[#25D366]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
 {{ __('contacts.contact_list') }}
 </h2>
-<div class="flex items-center gap-3">
+<div class="flex flex-wrap items-center gap-3">
 <a href="{{ route('contacts.import.index') }}" class="px-4 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all">
 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
 {{ __('contacts.import_contacts') }}
@@ -39,7 +39,7 @@
     @csrf
     <button type="submit" class="px-4 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-        مزامنة جهات الاتصال
+        {{ __('contacts.sync_contacts_button') }}
     </button>
 </form>
 <a href="{{ route('contacts.create') }}" class="btn-wa-premium shadow-lg">
@@ -50,7 +50,7 @@
 </div>
 </x-slot>
 
-<div class="py-6 premium-font" dir="rtl">
+<div class="py-6 premium-font" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
 <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
 
 <!-- Stats Cards -->
@@ -79,10 +79,10 @@
 @foreach($groups as $g)<option value="{{ $g->id }}" {{ request('group_id') == $g->id ? 'selected' : '' }}>{{ $g->name }}</option>@endforeach
 </select>
 <select name="per_page" onchange="this.form.submit()" class="w-full sm:w-32 rounded-lg border-gray-300 text-xs">
-<option value="15" {{ request('per_page',15)==15?'selected':'' }}>15 سجل</option>
-<option value="25" {{ request('per_page')==25?'selected':'' }}>25 سجل</option>
-<option value="50" {{ request('per_page')==50?'selected':'' }}>50 سجل</option>
-<option value="100" {{ request('per_page')==100?'selected':'' }}>100 سجل</option>
+<option value="15" {{ request('per_page',15)==15?'selected':'' }}>{{ __('contacts.records_per_page', ['count' => 15]) }}</option>
+<option value="25" {{ request('per_page')==25?'selected':'' }}>{{ __('contacts.records_per_page', ['count' => 25]) }}</option>
+<option value="50" {{ request('per_page')==50?'selected':'' }}>{{ __('contacts.records_per_page', ['count' => 50]) }}</option>
+<option value="100" {{ request('per_page')==100?'selected':'' }}>{{ __('contacts.records_per_page', ['count' => 100]) }}</option>
 </select>
 <button type="submit" class="px-4 py-2 btn-wa-primary rounded-lg text-xs font-bold shadow-sm">{{ __('contacts.filter') }}</button>
 <button type="submit" name="export" value="excel" class="px-4 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-lg text-xs font-bold flex items-center gap-1.5">
@@ -96,18 +96,18 @@
 @csrf
 <input type="hidden" name="action" id="bulk-action">
 <div class="flex items-center gap-2 bg-indigo-50 px-3.5 py-2 rounded-xl border border-indigo-100">
-<span class="text-xs text-indigo-800 font-bold ml-2">تم تحديد <span id="selected-count" class="text-sm font-black underline">0</span>:</span>
+<span class="text-xs text-indigo-800 font-bold ml-2">{{ __('contacts.bulk_selected_prefix') }} <span id="selected-count" class="text-sm font-black underline">0</span>:</span>
 <button type="button" onclick="submitBulkAction('delete')" class="bg-rose-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1">
 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
 {{ __('contacts.delete_selected') }}
 </button>
-<button type="button" onclick="submitBulkAction('toggle_favorite')" class="bg-amber-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1">⭐ مفضلة</button>
+<button type="button" onclick="submitBulkAction('toggle_favorite')" class="bg-amber-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1">⭐ {{ __('contacts.mark_favorite') }}</button>
 <div class="h-6 w-px bg-indigo-200 mx-1"></div>
 <select id="bulk-group-id" name="group_id" class="rounded-lg border-indigo-200 text-xs text-indigo-700 bg-white focus:border-indigo-500 focus:ring-indigo-500 pr-8 py-1.5">
-<option value="">إضافة لمجموعة...</option>
+<option value="">{{ __('contacts.add_to_group') }}...</option>
 @foreach($groups as $g)<option value="{{ $g->id }}">{{ $g->name }}</option>@endforeach
 </select>
-<button type="button" onclick="submitBulkGroupAction()" class="btn-wa-primary px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition">إضافة</button>
+<button type="button" onclick="submitBulkGroupAction()" class="btn-wa-primary px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition">{{ __('contacts.add_button') }}</button>
 </div>
 </form>
 </div>
@@ -157,7 +157,7 @@
 <td class="px-4 py-4 text-center font-bold text-gray-700">{{ $contact->total_messages }}</td>
 <td class="px-4 py-4 text-center">
 <div class="flex items-center justify-center gap-1.5">
-<a href="{{ route('messages.create', ['contact_id' => $contact->id]) }}" class="p-1.5 text-[#128C7E] hover:bg-emerald-50 rounded-lg" title="إرسال رسالة"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg></a>
+<a href="{{ route('messages.create', ['contact_id' => $contact->id]) }}" class="p-1.5 text-[#128C7E] hover:bg-emerald-50 rounded-lg" title="{{ __('contacts.send_message') }}"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg></a>
 <a href="{{ route('contacts.show', $contact) }}" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg" title="{{ __('contacts.view') }}"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg></a>
 <a href="{{ route('contacts.edit', $contact) }}" class="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg" title="{{ __('contacts.edit') }}"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></a>
 <form action="{{ route('contacts.destroy', $contact) }}" method="POST" class="inline" onsubmit="return confirm('{{ __('contacts.confirm_delete') }}')">@csrf @method('DELETE')
@@ -182,8 +182,8 @@ const sa=document.getElementById('select-all'),cbs=document.querySelectorAll('.c
 if(sa){sa.addEventListener('change',function(){cbs.forEach(c=>c.checked=this.checked);toggleBulk()});cbs.forEach(c=>c.addEventListener('change',function(){if(!this.checked)sa.checked=false;else{sa.checked=document.querySelectorAll('.contact-checkbox:checked').length===cbs.length}toggleBulk()}));}
 });
 function toggleBulk(){const c=document.querySelectorAll('.contact-checkbox:checked'),f=document.getElementById('bulk-actions-form'),s=document.getElementById('selected-count');if(c.length>0){f.classList.remove('hidden');s.innerText=c.length}else f.classList.add('hidden')}
-function submitBulkAction(a){const c=document.querySelectorAll('.contact-checkbox:checked');if(!c.length){alert('الرجاء تحديد جهة اتصال');return}if(a==='delete'&&!confirm('{{ __("contacts.confirm_bulk_delete") }}'))return;const f=document.getElementById('bulk-actions-form');document.getElementById('bulk-action').value=a;f.querySelectorAll('.dyn').forEach(e=>e.remove());c.forEach(cb=>{const i=document.createElement('input');i.type='hidden';i.name='selected[]';i.value=cb.value;i.className='dyn';f.appendChild(i)});f.submit()}
-function submitBulkGroupAction(){const g=document.getElementById('bulk-group-id').value;if(!g){alert('الرجاء تحديد المجموعة أولاً');return;}submitBulkAction('add_to_group');}
+function submitBulkAction(a){const c=document.querySelectorAll('.contact-checkbox:checked');if(!c.length){alert({{ Js::from(__('contacts.please_select_contact')) }});return}if(a==='delete'&&!confirm('{{ __("contacts.confirm_bulk_delete") }}'))return;const f=document.getElementById('bulk-actions-form');document.getElementById('bulk-action').value=a;f.querySelectorAll('.dyn').forEach(e=>e.remove());c.forEach(cb=>{const i=document.createElement('input');i.type='hidden';i.name='selected[]';i.value=cb.value;i.className='dyn';f.appendChild(i)});f.submit()}
+function submitBulkGroupAction(){const g=document.getElementById('bulk-group-id').value;if(!g){alert({{ Js::from(__('contacts.please_select_group')) }});return;}submitBulkAction('add_to_group');}
 function toggleFav(id,btn){fetch(`/contacts/${id}/toggle-favorite`,{method:'POST',headers:{'X-CSRF-TOKEN':document.querySelector('meta[name="csrf-token"]').content,'Accept':'application/json'}}).then(r=>r.json()).then(d=>{if(d.success)btn.textContent=d.is_favorite?'⭐':'☆'}).catch(e=>console.error(e))}
 </script>
 @endpush

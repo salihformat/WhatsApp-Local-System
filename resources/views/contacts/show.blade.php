@@ -17,7 +17,7 @@
 .action-btn{display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border-radius:12px;font-size:12px;font-weight:700;transition:all .2s;text-decoration:none;font-family:'Cairo',sans-serif}
 </style>
 <x-slot name="header">
-<div class="flex justify-between items-center premium-font" dir="rtl">
+<div class="flex justify-between items-center premium-font" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
 <h2 class="font-black text-2xl text-gray-800 flex items-center gap-2">
 <svg class="w-7 h-7 text-[#25D366]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
 {{ __('contacts.contact_details') }}
@@ -29,7 +29,7 @@
 </div>
 </x-slot>
 
-<div class="py-6 premium-font" dir="rtl">
+<div class="py-6 premium-font" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
 <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 

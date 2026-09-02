@@ -13,10 +13,15 @@ class LogAuthenticationEvents
 {
     public function handleLogin(Login $event): void
     {
+        if ($event->user instanceof \App\Models\User) {
+            $event->user->last_login_at = now();
+            $event->user->save();
+        }
+
         activity('auth')
             ->causedBy($event->user)
             ->withProperties(['ip' => request()->ip()])
-            ->log('تسجيل دخول');
+            ->log(__('local_agent.audit_event_login'));
     }
 
     public function handleLogout(Logout $event): void
@@ -28,7 +33,7 @@ class LogAuthenticationEvents
         activity('auth')
             ->causedBy($event->user)
             ->withProperties(['ip' => request()->ip()])
-            ->log('تسجيل خروج');
+            ->log(__('local_agent.audit_event_logout'));
     }
 
     public function handleFailedLogin(Failed $event): void
@@ -38,6 +43,6 @@ class LogAuthenticationEvents
                 'ip' => request()->ip(),
                 'email' => $event->credentials['email'] ?? null,
             ])
-            ->log('محاولة دخول فاشلة');
+            ->log(__('local_agent.audit_event_failed_login'));
     }
 }

@@ -10,19 +10,19 @@
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 bg-white border-b border-gray-200">
                     <div class="flex justify-between items-center mb-6">
-                        <h3 class="text-lg font-medium text-gray-900">قائمة المستخدمين</h3>
+                        <h3 class="text-lg font-medium text-gray-900">{{ __('local_agent.users_list_title') }}</h3>
                         <div class="flex gap-2">
-                            <a href="{{ route('users.index', ['export' => 'excel']) }}" class="text-white px-4 py-2 rounded-md transition-colors text-sm font-medium inline-flex items-center gap-2" style="background-color: #16a34a;" onmouseover="this.style.backgroundColor='#15803d'" onmouseout="this.style.backgroundColor='#16a34a'" title="تصدير النتائج إلى ملف Excel (CSV)">
+                            <a href="{{ route('users.index', ['export' => 'excel']) }}" class="text-white px-4 py-2 rounded-md transition-colors text-sm font-medium inline-flex items-center gap-2" style="background-color: #16a34a;" onmouseover="this.style.backgroundColor='#15803d'" onmouseout="this.style.backgroundColor='#16a34a'" title="{{ __('local_agent.users_export_title') }}">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                 </svg>
-                                تصدير Excel
+                                {{ __('local_agent.fj_export_excel') }}
                             </a>
                             <a href="{{ route('users.create') }}" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors text-sm font-medium inline-flex items-center gap-2">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                                 </svg>
-                                إضافة مستخدم
+                                {{ __('local_agent.users_add_user') }}
                             </a>
                         </div>
                     </div>
@@ -33,51 +33,95 @@
                         </div>
                     @endif
 
+                    @if (session('error'))
+                        <div class="alert alert-danger mb-6" role="alert">
+                            {{ session('error') }}
+                        </div>
+                    @endif
+
                     <div class="table-responsive">
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الاسم</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">البريد الإلكتروني</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الدور</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider" title="هل يستلم هذا المستخدم محادثات جديدة عبر التوزيع التلقائي؟ راجع إعدادات توزيع المحادثات">التوزيع التلقائي 🛈</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">تاريخ الإنشاء</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الإجراءات</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('local_agent.users_col_name') }}</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('local_agent.users_col_email') }}</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('local_agent.users_col_role') }}</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider" title="{{ __('local_agent.users_account_status_title') }}">{{ __('local_agent.users_col_account_status') }}</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('local_agent.users_col_auto_distribution') }} 🛈</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('local_agent.users_col_last_login') }}</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('local_agent.users_col_created_at') }}</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('local_agent.col_actions') }}</th>
                             </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
                             @foreach ($users as $user)
-                                <tr>
+                                <tr class="{{ !$user->is_active ? 'bg-gray-50 opacity-70' : '' }}">
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <div class="flex items-center">
                                             <div class="flex-shrink-0 h-10 w-10">
-                                                <div class="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
-                                                    <span class="text-indigo-600 font-medium">{{ strtoupper(substr($user->name, 0, 1)) }}</span>
+                                                <div class="h-10 w-10 rounded-full flex items-center justify-center {{ $user->is_active ? 'bg-indigo-100' : 'bg-gray-200' }}">
+                                                    <span class="font-medium {{ $user->is_active ? 'text-indigo-600' : 'text-gray-400' }}">{{ strtoupper(substr($user->name, 0, 1)) }}</span>
                                                 </div>
                                             </div>
                                             <div class="ml-4">
-                                                <div class="text-sm font-medium text-gray-900">{{ $user->name }}</div>
+                                                <div class="text-sm font-medium {{ $user->is_active ? 'text-gray-900' : 'text-gray-400' }}">{{ $user->name }}</div>
+                                                @if (!$user->is_active)
+                                                    <div class="text-xs text-red-500">{{ __('local_agent.users_account_deactivated_hint') }}</div>
+                                                @endif
                                             </div>
                                         </div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $user->email }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         @if($user->role === 'admin')
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">مدير نظام</span>
+                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">{{ __('local_agent.users_role_admin') }}</span>
                                         @elseif($user->role === 'supervisor')
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">مشرف</span>
+                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">{{ __('local_agent.users_role_supervisor') }}</span>
                                         @else
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">موظف خدمة عملاء</span>
+                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">{{ __('local_agent.users_role_agent') }}</span>
                                         @endif
                                     </td>
+
+                                    {{-- عمود حالة الحساب (تفعيل / تعطيل) --}}
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        @if($user->id !== auth()->id())
+                                            <form action="{{ route('users.toggle-status', $user) }}" method="POST" class="inline-flex items-center gap-1">
+                                                @csrf
+                                                <input type="checkbox" 
+                                                       onchange="confirmToggle(this, '{{ $user->is_active ? __('local_agent.users_confirm_deactivate') : __('local_agent.users_confirm_activate') }}')" 
+                                                       {{ $user->is_active ? 'checked' : '' }} 
+                                                       title="{{ $user->is_active ? __('local_agent.users_deactivate_title') : __('local_agent.users_activate_title') }}">
+                                                <span class="text-xs font-medium {{ $user->is_active ? 'text-green-700' : 'text-red-500' }}">
+                                                    {{ $user->is_active ? __('local_agent.users_status_active') : __('local_agent.users_status_inactive') }}
+                                                </span>
+                                            </form>
+                                        @else
+                                            {{-- حسابك الشخصي — لا يمكن تعطيله --}}
+                                            <span class="inline-flex items-center gap-1" title="{{ __('local_agent.users_own_account_hint') }}">
+                                                <input type="checkbox" checked disabled class="opacity-50 cursor-not-allowed">
+                                                <span class="text-xs text-green-700">{{ __('local_agent.users_status_active') }}</span>
+                                            </span>
+                                        @endif
+                                    </td>
+
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <form action="{{ route('users.toggle-availability', $user) }}" method="POST" class="inline-flex items-center gap-1">
                                             @csrf
-                                            <input type="checkbox" onchange="this.form.submit()" {{ $user->is_available_for_assignment ? 'checked' : '' }} title="متاح لاستلام محادثات جديدة تلقائياً">
+                                            <input type="checkbox" 
+                                                   onchange="confirmToggle(this, 'هل أنت متأكد من تغيير حالة التوزيع التلقائي؟')" 
+                                                   {{ $user->is_available_for_assignment ? 'checked' : '' }} 
+                                                   title="{{ __('local_agent.users_available_title') }}">
                                             <span class="text-xs {{ $user->is_available_for_assignment ? 'text-green-700 font-medium' : 'text-gray-400' }}">
-                                                {{ $user->is_available_for_assignment ? 'متاح' : 'غير متاح' }}
+                                                {{ $user->is_available_for_assignment ? __('local_agent.users_available') : __('local_agent.users_unavailable') }}
                                             </span>
                                         </form>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        @if($user->last_login_at)
+                                            <span title="{{ $user->last_login_at->format('Y-m-d H:i:s') }}">{{ $user->last_login_at->diffForHumans() }}</span>
+                                        @else
+                                            <span class="text-gray-400">{{ __('لم يسجل الدخول أبداً') }}</span>
+                                        @endif
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $user->created_at->diffForHumans() }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -86,17 +130,17 @@
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                                 </svg>
-                                                تعديل
+                                                {{ __('local_agent.edit') }}
                                             </a>
                                             @if($user->id !== auth()->id())
-                                                <form action="{{ route('users.destroy', $user) }}" method="POST" class="inline m-0 p-0" onsubmit="return confirm('هل أنت متأكد من حذف هذا المستخدم؟');">
+                                                <form action="{{ route('users.destroy', $user) }}" method="POST" class="inline m-0 p-0" onsubmit="event.preventDefault(); confirmDelete(this, {{ Js::from(__('local_agent.users_confirm_delete')) }});">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-md transition-colors text-xs font-medium" style="background-color: #fee2e2; color: #dc2626;" onmouseover="this.style.backgroundColor='#fecaca'" onmouseout="this.style.backgroundColor='#fee2e2'">
                                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                                         </svg>
-                                                        حذف
+                                                        {{ __('local_agent.delete') }}
                                                     </button>
                                                 </form>
                                             @endif
@@ -115,4 +159,45 @@
             </div>
         </div>
     </div>
+
+    @push('scripts')
+        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+        <script>
+            function confirmToggle(checkbox, message) {
+                Swal.fire({
+                    title: message,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#3085d6',
+                    cancelButtonColor: '#d33',
+                    confirmButtonText: 'نعم، متأكد',
+                    cancelButtonText: 'إلغاء',
+                    reverseButtons: true
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        checkbox.form.submit();
+                    } else {
+                        checkbox.checked = !checkbox.checked; // Revert the visual state
+                    }
+                });
+            }
+
+            function confirmDelete(form, message) {
+                Swal.fire({
+                    title: message,
+                    icon: 'error',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#3085d6',
+                    confirmButtonText: 'نعم، احذف',
+                    cancelButtonText: 'إلغاء',
+                    reverseButtons: true
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        form.submit();
+                    }
+                });
+            }
+        </script>
+    @endpush
 </x-app-layout>

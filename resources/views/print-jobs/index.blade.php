@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            {{ __('سجل عمليات الطباعة') }}
+            {{ __('local_agent.print_jobs_title') }}
         </h2>
     </x-slot>
 
@@ -22,27 +22,27 @@
                 <div class="bg-orange-50 border border-orange-300 text-orange-800 px-4 py-3 rounded-lg relative flex items-center justify-between">
                     <div class="flex items-center gap-2">
                         <svg class="h-5 w-5 text-orange-500 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
-                        <span class="font-medium">يوجد <strong>{{ $pendingCount }}</strong> {{ $pendingCount === 1 ? 'طلب طباعة' : 'طلبات طباعة' }} بانتظار موافقتك</span>
+                        <span class="font-medium">{{ __('local_agent.pending_approval_title') }} ({{ $pendingCount }})</span>
                     </div>
                     <div class="flex gap-2">
-                        <form action="{{ route('print-jobs.approve-all') }}" method="POST" onsubmit="return confirm('هل أنت متأكد من الموافقة على كل مهام الطباعة المعلّقة ({{ $pendingCount }})؟');">
+                        <form action="{{ route('print-jobs.approve-all') }}" method="POST" onsubmit="return confirm('{{ __('local_agent.approve_all') }}?');">
                             @csrf
                             @if(request('printer_id'))
                                 <input type="hidden" name="printer_id" value="{{ request('printer_id') }}">
                             @endif
-                            <button type="submit" class="text-white bg-green-600 hover:bg-green-700 px-4 py-2 rounded-md transition-colors text-sm font-medium inline-flex items-center gap-1">
+                            <button type="submit" class="text-white bg-green-600 hover:bg-green-700 px-4 py-2 rounded-md transition-colors text-sm font-medium inline-flex items-center gap-1" style="background-color: #16a34a; color: #ffffff;">
                                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                                موافقة على الكل
+                                {{ __('local_agent.approve_all') }}
                             </button>
                         </form>
-                        <form action="{{ route('print-jobs.reject-all') }}" method="POST" onsubmit="return confirm('هل أنت متأكد من رفض كل مهام الطباعة المعلّقة ({{ $pendingCount }})؟');">
+                        <form action="{{ route('print-jobs.reject-all') }}" method="POST" onsubmit="return confirm('{{ __('local_agent.reject_all') }}?');">
                             @csrf
                             @if(request('printer_id'))
                                 <input type="hidden" name="printer_id" value="{{ request('printer_id') }}">
                             @endif
-                            <button type="submit" class="text-white bg-red-600 hover:bg-red-700 px-4 py-2 rounded-md transition-colors text-sm font-medium inline-flex items-center gap-1">
+                            <button type="submit" class="text-white bg-red-600 hover:bg-red-700 px-4 py-2 rounded-md transition-colors text-sm font-medium inline-flex items-center gap-1" style="background-color: #dc2626; color: #ffffff;">
                                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                رفض الكل
+                                {{ __('local_agent.reject_all') }}
                             </button>
                         </form>
                     </div>
@@ -53,24 +53,24 @@
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
                 <form method="GET" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">تصفية حسب الحالة</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('local_agent.col_status') }}</label>
                         <select name="status" class="w-full rounded-md border-gray-300 shadow-sm text-sm">
-                            <option value="">الكل</option>
-                            @foreach(['pending' => 'قيد الانتظار', 'awaiting_approval' => 'بانتظار الموافقة', 'printing' => 'جارٍ الطباعة', 'completed' => 'مكتملة', 'failed' => 'فشلت', 'rejected' => 'مرفوضة'] as $value => $label)
+                            <option value="">{{ __('local_agent.all_types') }}</option>
+                            @foreach(['pending' => __('local_agent.print_status_pending'), 'awaiting_approval' => __('local_agent.print_status_awaiting_approval'), 'printing' => __('local_agent.print_status_printing'), 'completed' => __('local_agent.print_status_completed'), 'failed' => __('local_agent.print_status_failed'), 'rejected' => __('local_agent.print_status_rejected')] as $value => $label)
                                 <option value="{{ $value }}" {{ request('status') === $value ? 'selected' : '' }}>{{ $label }}</option>
                             @endforeach
                         </select>
                     </div>
 
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">اسم الملف</label>
-                        <input type="text" name="file_name" value="{{ request('file_name') }}" class="w-full rounded-md border-gray-300 shadow-sm text-sm" placeholder="ابحث باسم الملف...">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('local_agent.col_file') }}</label>
+                        <input type="text" name="file_name" value="{{ request('file_name') }}" class="w-full rounded-md border-gray-300 shadow-sm text-sm" placeholder="{{ __('local_agent.search_by_filename') }}">
                     </div>
 
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">الطابعة</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('local_agent.col_printer') }}</label>
                         <select name="printer_id" class="w-full rounded-md border-gray-300 shadow-sm text-sm">
-                            <option value="">الكل</option>
+                            <option value="">{{ __('local_agent.all_printers') }}</option>
                             @if(isset($printers))
                                 @foreach($printers as $printer)
                                     <option value="{{ $printer->id }}" {{ request('printer_id') == $printer->id ? 'selected' : '' }}>{{ $printer->name }}</option>
@@ -80,19 +80,19 @@
                     </div>
 
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">رقم الجوال</label>
-                        <input type="text" name="phone_number" value="{{ request('phone_number') }}" class="w-full rounded-md border-gray-300 shadow-sm text-sm" placeholder="ابحث برقم الجوال...">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('local_agent.col_phone') }}</label>
+                        <input type="text" name="phone_number" value="{{ request('phone_number') }}" class="w-full rounded-md border-gray-300 shadow-sm text-sm" placeholder="{{ __('local_agent.search_by_phone') }}">
                     </div>
 
                     <div class="md:col-span-4 flex justify-end gap-2 mt-2">
-                        <a href="{{ route('print-jobs.index') }}" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition-colors text-sm font-medium">إعادة ضبط</a>
-                        <button type="submit" name="export" value="excel" class="text-white px-4 py-2 rounded-md transition-colors text-sm font-medium inline-flex items-center gap-2" style="background-color: #16a34a;" onmouseover="this.style.backgroundColor='#15803d'" onmouseout="this.style.backgroundColor='#16a34a'" title="تصدير النتائج الحالية إلى ملف Excel (CSV)">
+                        <a href="{{ route('print-jobs.index') }}" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition-colors text-sm font-medium">{{ __('local_agent.reset') }}</a>
+                        <button type="submit" name="export" value="excel" class="text-white px-4 py-2 rounded-md transition-colors text-sm font-medium inline-flex items-center gap-2" style="background-color: #16a34a;" onmouseover="this.style.backgroundColor='#15803d'" onmouseout="this.style.backgroundColor='#16a34a'" title="{{ __('local_agent.export_csv_hint') }}">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
-                            تصدير Excel
+                            {{ __('local_agent.export') }}
                         </button>
-                        <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors text-sm font-medium">بحث وتصفية</button>
+                        <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors text-sm font-medium">{{ __('local_agent.search_and_filter') }}</button>
                     </div>
                 </form>
             </div>
@@ -104,17 +104,17 @@
                     <thead class="bg-gray-50">
                         <tr>
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">#</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">رقم الجوال</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الملف</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الطابعة</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الحالة</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المحاولات</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الصفحات</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">وقت الوصول</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">وقت الاكتمال</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المدة</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">السبب</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">إجراءات</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('local_agent.col_phone') }}</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('local_agent.col_file') }}</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('local_agent.col_printer') }}</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('local_agent.col_status') }}</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('local_agent.col_attempts') }}</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('local_agent.col_pages') }}</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('local_agent.col_arrived_at') }}</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('local_agent.col_completed_at') }}</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('local_agent.col_duration') }}</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('local_agent.col_failure_reason') }}</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('local_agent.col_actions') }}</th>
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
@@ -166,25 +166,25 @@
                                         <div class="flex gap-1">
                                             <form action="{{ route('print-jobs.approve', $job) }}" method="POST">
                                                 @csrf
-                                                <button type="submit" class="text-white bg-green-600 hover:bg-green-700 px-3 py-1.5 rounded-md transition-colors text-xs font-medium inline-flex items-center gap-1" title="موافقة على طباعة هذا الملف">
+                                                <button type="submit" class="text-white bg-green-600 hover:bg-green-700 px-3 py-1.5 rounded-md transition-colors text-xs font-medium inline-flex items-center gap-1" title="{{ __('local_agent.approve') }}" style="background-color: #16a34a; color: #ffffff;">
                                                     <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                                                    موافقة
+                                                    {{ __('local_agent.approve') }}
                                                 </button>
                                             </form>
-                                            <form action="{{ route('print-jobs.reject', $job) }}" method="POST" onsubmit="return confirm('هل أنت متأكد من رفض طباعة {{ $job->file_name }}؟');">
+                                            <form action="{{ route('print-jobs.reject', $job) }}" method="POST" onsubmit="return confirm('{{ __('local_agent.reject') }} {{ $job->file_name }}?');">
                                                 @csrf
-                                                <button type="submit" class="text-white bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-md transition-colors text-xs font-medium inline-flex items-center gap-1" title="رفض طباعة هذا الملف">
+                                                <button type="submit" class="text-white bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-md transition-colors text-xs font-medium inline-flex items-center gap-1" title="{{ __('local_agent.reject') }}" style="background-color: #dc2626; color: #ffffff;">
                                                     <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                                    رفض
+                                                    {{ __('local_agent.reject') }}
                                                 </button>
                                             </form>
                                         </div>
                                     @elseif($job->status === 'failed')
                                         <form action="{{ route('print-jobs.retry', $job) }}" method="POST" class="inline">
                                             @csrf
-                                            <button type="submit" class="text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-md transition-colors text-xs font-medium inline-flex items-center gap-1" title="إعادة محاولة الطباعة">
+                                            <button type="submit" class="text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-md transition-colors text-xs font-medium inline-flex items-center gap-1" title="{{ __('local_agent.retry') }}">
                                                 <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                                                إعادة المحاولة
+                                                {{ __('local_agent.retry') }}
                                             </button>
                                         </form>
                                     @else
@@ -198,7 +198,7 @@
                                     <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                     </svg>
-                                    <p class="mt-2 text-sm text-gray-500">لا توجد عمليات طباعة مطابقة للبحث</p>
+                                    <p class="mt-2 text-sm text-gray-500">{{ __('local_agent.no_print_jobs') }}</p>
                                 </td>
                             </tr>
                         @endforelse

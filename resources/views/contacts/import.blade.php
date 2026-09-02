@@ -11,7 +11,7 @@
 .status-processing{background:#dbeafe;color:#1e40af}
 </style>
 <x-slot name="header">
-<div class="flex justify-between items-center premium-font" dir="rtl">
+<div class="flex justify-between items-center premium-font" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
 <h2 class="font-black text-2xl text-gray-800 flex items-center gap-2">
 <svg class="w-7 h-7 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
 {{ __('contacts.import_contacts') }}
@@ -29,7 +29,7 @@
 </div>
 </x-slot>
 
-<div class="py-6 premium-font" dir="rtl">
+<div class="py-6 premium-font" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
 <div class="max-w-5xl mx-auto sm:px-6 lg:px-8">
 
 @if(session('success'))<div class="mb-6 bg-emerald-50 border-r-4 border-emerald-500 rounded-xl p-4 flex items-center justify-between"><p class="text-sm font-bold text-emerald-800">✅ {{ session('success') }}</p><button onclick="this.parentElement.remove()" class="text-emerald-600 cursor-pointer">✕</button></div>@endif
@@ -44,7 +44,7 @@
 <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
 <p class="text-base font-bold text-gray-600 mb-3" id="file-label">{{ __('contacts.drag_drop_file') }}</p>
 <button type="button" class="px-5 py-2 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-lg text-sm font-bold shadow-sm transition-all mb-2" onclick="event.stopPropagation(); document.getElementById('file-input').click()">
-    اختيار ملف (Browse)
+    {{ __('contacts.browse_file') }}
 </button>
 <p class="text-xs text-gray-400 mt-2">{{ __('contacts.supported_formats') }}: XLSX, XLS, CSV ({{ __('contacts.max_size') }}: 10MB)</p>
 </div>
@@ -111,7 +111,7 @@ dz.addEventListener('drop',e=>{
 });
 function handleFile(input){
     if(input.files.length){
-        document.getElementById('file-label').textContent='📄 '+input.files[0].name + ' (يرجى النقر على زر معاينة واستيراد)';
+        document.getElementById('file-label').textContent='📄 '+input.files[0].name + ' ' + {{ Js::from(__('contacts.click_preview_import_hint')) }};
         dz.style.borderColor='#25D366';
         dz.style.background='rgba(37,211,102,.05)';
     }

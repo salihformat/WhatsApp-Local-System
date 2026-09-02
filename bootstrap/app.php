@@ -18,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Register middleware aliases
         $middleware->alias([
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
+            'supervisor' => \App\Http\Middleware\SupervisorMiddleware::class,
             'permission' => \App\Http\Middleware\CheckPermission::class,
             'api.token' => \App\Http\Middleware\VerifyApiToken::class,
             'api.ratelimit' => \App\Http\Middleware\RateLimitApi::class,

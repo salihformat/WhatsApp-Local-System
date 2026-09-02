@@ -26,8 +26,8 @@ class ConversationDistributionService
 
         $eligibleUserIds = match ($mode) {
             'specific' => $this->specificUserIds(),
-            'all' => User::availableForAssignment()->where('role', 'agent')->pluck('id')->all(),
-            default => [],
+            'all'      => User::availableForAssignment()->active()->where('role', 'agent')->pluck('id')->all(),
+            default    => [],
         };
 
         if (empty($eligibleUserIds)) {
@@ -49,7 +49,7 @@ class ConversationDistributionService
             return [];
         }
 
-        return User::availableForAssignment()->whereIn('id', $configuredIds)->pluck('id')->all();
+        return User::availableForAssignment()->active()->whereIn('id', $configuredIds)->pluck('id')->all();
     }
 
     /**

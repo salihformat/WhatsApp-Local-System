@@ -16,7 +16,7 @@
 .group-chip.selected, .group-chip:has(input:checked){border-color:currentColor;box-shadow:0 2px 8px rgba(0,0,0,.1)}
 </style>
 <x-slot name="header">
-<div class="flex justify-between items-center premium-font" dir="rtl">
+<div class="flex justify-between items-center premium-font" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
 <h2 class="font-black text-2xl text-gray-800 flex items-center gap-2">
 <svg class="w-7 h-7 text-[#25D366]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
 {{ isset($contact) ? __('contacts.edit_contact') : __('contacts.add_contact') }}
@@ -28,12 +28,12 @@
 </div>
 </x-slot>
 
-<div class="py-6 premium-font" dir="rtl">
+<div class="py-6 premium-font" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
 <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
 
 @if($errors->any())
 <div class="mb-6 bg-red-50 border border-red-200 rounded-2xl p-4">
-<div class="flex items-center gap-2 text-red-800 font-bold text-sm mb-2"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>يرجى تصحيح الأخطاء التالية:</div>
+<div class="flex items-center gap-2 text-red-800 font-bold text-sm mb-2"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>{{ __('contacts.fix_errors_below') }}</div>
 <ul class="list-disc list-inside text-xs text-red-700 space-y-1">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul>
 </div>
 @endif
@@ -51,16 +51,16 @@
 <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
 <div>
 <label class="form-label">{{ __('contacts.name') }} <span class="text-red-500">*</span></label>
-<input type="text" name="name" value="{{ old('name', $contact->name ?? '') }}" class="form-input {{ $errors->has('name') ? 'error' : '' }}" placeholder="اسم العميل" required>
+<input type="text" name="name" value="{{ old('name', $contact->name ?? '') }}" class="form-input {{ $errors->has('name') ? 'error' : '' }}" placeholder="{{ __('contacts.name') }}" required>
 </div>
 <div>
 <label class="form-label">{{ __('contacts.phone_number') }} <span class="text-red-500">*</span></label>
 <input type="text" name="phone_number" value="{{ old('phone_number', $contact->phone_number ?? '') }}" class="form-input {{ $errors->has('phone_number') ? 'error' : '' }}" placeholder="966512345678" dir="ltr" required>
-<p class="text-[10px] text-gray-400 mt-1">أدخل الرقم بالصيغة الدولية بدون + أو 00</p>
+<p class="text-[10px] text-gray-400 mt-1">{{ __('contacts.phone_format_hint') }}</p>
 </div>
 <div>
 <label class="form-label">{{ __('contacts.file_number') }}</label>
-<input type="text" name="file_number" value="{{ old('file_number', $contact->file_number ?? '') }}" class="form-input" placeholder="رقم الملف (اختياري)">
+<input type="text" name="file_number" value="{{ old('file_number', $contact->file_number ?? '') }}" class="form-input" placeholder="{{ __('contacts.file_number_optional') }}">
 </div>
 <div>
 <label class="form-label">{{ __('contacts.email') }}</label>
@@ -68,17 +68,17 @@
 </div>
 <div>
 <label class="form-label">{{ __('contacts.company_name') }}</label>
-<input type="text" name="company_name" value="{{ old('company_name', $contact->company_name ?? '') }}" class="form-input" placeholder="اسم الشركة (اختياري)">
+<input type="text" name="company_name" value="{{ old('company_name', $contact->company_name ?? '') }}" class="form-input" placeholder="{{ __('contacts.company_name_optional') }}">
 </div>
 <div>
 <label class="form-label">{{ __('contacts.tags') }}</label>
-<input type="text" name="tags" value="{{ old('tags', isset($contact) && $contact->tags ? implode(',', $contact->tags) : '') }}" class="form-input" placeholder="وسم1, وسم2, وسم3">
-<p class="text-[10px] text-gray-400 mt-1">افصل بين الوسوم بفاصلة</p>
+<input type="text" name="tags" value="{{ old('tags', isset($contact) && $contact->tags ? implode(',', $contact->tags) : '') }}" class="form-input" placeholder="{{ __('contacts.tags_placeholder') }}">
+<p class="text-[10px] text-gray-400 mt-1">{{ __('contacts.tags_hint') }}</p>
 </div>
 </div>
 <div class="mt-5">
 <label class="form-label">{{ __('contacts.notes') }}</label>
-<textarea name="notes" rows="3" class="form-input" placeholder="ملاحظات إضافية (اختياري)">{{ old('notes', $contact->notes ?? '') }}</textarea>
+<textarea name="notes" rows="3" class="form-input" placeholder="{{ __('contacts.notes_optional') }}">{{ old('notes', $contact->notes ?? '') }}</textarea>
 </div>
 </div>
 
@@ -98,7 +98,7 @@
 <span class="text-[10px] opacity-70">({{ $g->contacts_count ?? $g->contacts()->count() }})</span>
 </label>
 @empty
-<p class="text-sm text-gray-400">لا توجد مجموعات بعد. <a href="{{ route('contacts.groups.index') }}" class="text-indigo-600 hover:underline font-bold">إنشاء مجموعة</a></p>
+<p class="text-sm text-gray-400">{{ __('contacts.no_groups_yet') }} <a href="{{ route('contacts.groups.index') }}" class="text-indigo-600 hover:underline font-bold">{{ __('contacts.create_group') }}</a></p>
 @endforelse
 </div>
 </div>

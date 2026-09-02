@@ -45,18 +45,19 @@ class PrintJob extends Model
     }
 
     /**
-     * التسميات العربية لكل حالات مهمة الطباعة — نقطة مرجعية واحدة تُستخدم في الواجهة، تصدير CSV،
-     * وردود واتساب (بدل تكرار نفس القائمة في كل مكان يعرض الحالة، كما كان الحال سابقاً).
+     * تسميات حالات مهمة الطباعة (مترجمة حسب لغة الطلب الحالية) — نقطة مرجعية واحدة تُستخدم في الواجهة،
+     * تصدير CSV، وردود واتساب (بدل تكرار نفس القائمة في كل مكان يعرض الحالة، كما كان الحال سابقاً).
+     * ردود واتساب تُبنى دائماً بلغة APP_LOCALE الافتراضية (لا تتأثر بلغة متصفح الموظف الحالي).
      */
     public static function statusLabels(): array
     {
         return [
-            'pending' => 'قيد الانتظار',
-            'awaiting_approval' => 'بانتظار الموافقة',
-            'printing' => 'جارٍ الطباعة',
-            'completed' => 'مكتملة',
-            'failed' => 'فشلت',
-            'rejected' => 'مرفوضة',
+            'pending' => __('local_agent.print_status_pending'),
+            'awaiting_approval' => __('local_agent.print_status_awaiting_approval'),
+            'printing' => __('local_agent.print_status_printing'),
+            'completed' => __('local_agent.print_status_completed'),
+            'failed' => __('local_agent.print_status_failed'),
+            'rejected' => __('local_agent.print_status_rejected'),
         ];
     }
 

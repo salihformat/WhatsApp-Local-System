@@ -22,7 +22,7 @@
     </head>
 
     <x-slot name="header">
-        <div class="flex items-center justify-between premium-font" dir="rtl">
+        <div class="flex items-center justify-between premium-font" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
             <div class="flex items-center gap-4">
                 <a href="{{ route('conversations.index') }}" class="text-gray-500 hover:text-gray-700 p-2 rounded-full hover:bg-gray-100 transition-colors">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
@@ -39,7 +39,7 @@
                         <h2 class="font-black text-xl text-gray-800 leading-tight flex items-center gap-2">
                             {{ $conversation->contact ? $conversation->contact->name : $conversation->phone_number }}
                             @if($conversation->status === 'closed')
-                                <span class="bg-gray-200 text-gray-600 text-[10px] px-2 py-0.5 rounded-full font-bold">مغلقة</span>
+                                <span class="bg-gray-200 text-gray-600 text-[10px] px-2 py-0.5 rounded-full font-bold">{{ __('مغلقة') }}</span>
                             @endif
                         </h2>
                         <p class="text-sm text-gray-500" dir="ltr">{{ $conversation->phone_number }}</p>
@@ -52,7 +52,7 @@
                     @csrf
                     <button type="button" onclick="confirmClose()" class="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-4 py-2 rounded-lg text-sm font-bold transition-colors shadow-sm flex items-center gap-2">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                        إنهاء المحادثة
+                        {{ __('local_agent.conv_end') }}
                     </button>
                 </form>
             @else
@@ -60,14 +60,14 @@
                     @csrf
                     <button type="submit" class="text-green-600 hover:text-green-800 bg-green-50 hover:bg-green-100 px-4 py-2 rounded-lg text-sm font-bold transition-colors shadow-sm flex items-center gap-2">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                        إعادة فتح المحادثة
+                        {{ __('local_agent.conv_reopen') }}
                     </button>
                 </form>
             @endif
         </div>
     </x-slot>
 
-    <div class="py-6 premium-font" dir="rtl">
+    <div class="py-6 premium-font" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="flex flex-col lg:flex-row gap-6 h-[calc(100vh-100px)] lg:h-[calc(100vh-200px)]">
                 
@@ -77,7 +77,7 @@
                     @if($conversation->status === 'closed')
                         <div class="flex justify-center mb-6 sticky top-2 z-10">
                             <span class="bg-yellow-100 text-yellow-800 text-xs font-bold px-4 py-2 rounded-full shadow-sm border border-yellow-200">
-                                هذه المحادثة مغلقة. لا يمكنك إرسال رسائل جديدة.
+                                {{ __('local_agent.conv_closed_notice') }}
                             </span>
                         </div>
                     @endif
@@ -85,7 +85,7 @@
                     @if($messages->hasMorePages())
                         <div class="flex justify-center mb-4">
                             <a href="{{ $messages->nextPageUrl() }}" class="text-xs bg-white text-gray-600 font-bold px-4 py-2 rounded-full shadow-sm border border-gray-200 hover:bg-gray-50 transition-colors">
-                                تحميل الرسائل القديمة
+                                {{ __('local_agent.conv_load_older') }}
                             </a>
                         </div>
                     @endif
@@ -95,11 +95,11 @@
                             <!-- Message Actions -->
                             <div class="msg-actions-container items-center gap-1 px-2 {{ $msg->is_incoming ? 'order-last' : 'order-first' }}">
                                 @if($msg->message_text)
-                                    <button type="button" onclick="editMessage({{ $msg->id }}, this)" data-text="{{ htmlspecialchars($msg->message_text) }}" class="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors shadow-sm bg-white border border-gray-100" title="تعديل">
+                                    <button type="button" onclick="editMessage({{ $msg->id }}, this)" data-text="{{ htmlspecialchars($msg->message_text) }}" class="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors shadow-sm bg-white border border-gray-100" title="{{ __('local_agent.conv_edit_tooltip') }}">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                                     </button>
                                 @endif
-                                <button type="button" onclick="deleteMessage({{ $msg->id }})" class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors shadow-sm bg-white border border-gray-100" title="حذف">
+                                <button type="button" onclick="deleteMessage({{ $msg->id }})" class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors shadow-sm bg-white border border-gray-100" title="{{ __('local_agent.delete') }}">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                 </button>
                             </div>
@@ -113,7 +113,7 @@
                                         @else
                                             <a href="{{ $msg->file_path }}" target="_blank" class="flex items-center gap-2 text-indigo-600 bg-indigo-50 p-3 rounded-lg hover:bg-indigo-100 transition-colors">
                                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
-                                                <span class="text-sm font-bold font-mono dir-ltr">{{ $msg->file_name ?? 'مرفق' }}</span>
+                                                <span class="text-sm font-bold font-mono dir-ltr">{{ $msg->file_name ?? __('local_agent.conv_attachment') }}</span>
                                             </a>
                                         @endif
                                     </div>
@@ -144,7 +144,7 @@
                         </div>
                     @empty
                         <div class="flex justify-center items-center h-full">
-                            <p class="text-gray-500 bg-white/80 px-4 py-2 rounded-full text-sm font-medium shadow-sm">لا توجد رسائل سابقة. ابدأ المحادثة الآن!</p>
+                            <p class="text-gray-500 bg-white/80 px-4 py-2 rounded-full text-sm font-medium shadow-sm">{{ __('local_agent.conv_no_previous_messages') }}</p>
                         </div>
                     @endforelse
                 </div>
@@ -173,30 +173,30 @@
                         <input type="file" id="attachmentInput" class="hidden" onchange="handleFileSelect(event)">
                         
                         <!-- Attach Button -->
-                        <button type="button" onclick="document.getElementById('attachmentInput').click()" class="p-3 text-gray-500 hover:text-indigo-600 hover:bg-gray-200 rounded-full transition-colors flex-shrink-0" title="إرفاق ملف">
+                        <button type="button" onclick="document.getElementById('attachmentInput').click()" class="p-3 text-gray-500 hover:text-indigo-600 hover:bg-gray-200 rounded-full transition-colors flex-shrink-0" title="{{ __('local_agent.conv_attach_file') }}">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
                         </button>
 
                         <!-- Quick Replies Dropdown -->
                         <div class="relative" id="quickRepliesDropdownContainer">
-                            <button type="button" onclick="document.getElementById('quickRepliesMenu').classList.toggle('hidden')" class="p-3 text-gray-500 hover:text-[#128C7E] hover:bg-gray-200 rounded-full transition-colors flex-shrink-0" title="الردود السريعة">
+                            <button type="button" onclick="document.getElementById('quickRepliesMenu').classList.toggle('hidden')" class="p-3 text-gray-500 hover:text-[#128C7E] hover:bg-gray-200 rounded-full transition-colors flex-shrink-0" title="{{ __('local_agent.conv_quick_replies') }}">
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
                             </button>
                             <div id="quickRepliesMenu" class="hidden absolute bottom-full right-0 mb-2 w-64 bg-white border border-gray-200 rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto">
-                                <div class="p-2 border-b border-gray-100 bg-gray-50 text-xs font-bold text-gray-500">الردود السريعة</div>
+                                <div class="p-2 border-b border-gray-100 bg-gray-50 text-xs font-bold text-gray-500">{{ __('local_agent.conv_quick_replies') }}</div>
                                 @forelse($quickReplies as $qr)
                                     <button type="button" class="w-full text-right px-4 py-2 text-sm text-gray-700 hover:bg-[#128C7E] hover:text-white transition-colors border-b border-gray-100 last:border-0" onclick="insertQuickReply('{{ addslashes($qr->content) }}')">
                                         <div class="font-bold mb-1">{{ $qr->title }}</div>
                                         <div class="text-xs opacity-80 truncate">{{ $qr->content }}</div>
                                     </button>
                                 @empty
-                                    <div class="px-4 py-3 text-sm text-gray-500 text-center">لا توجد ردود سريعة</div>
+                                    <div class="px-4 py-3 text-sm text-gray-500 text-center">{{ __('local_agent.conv_no_quick_replies') }}</div>
                                 @endforelse
                             </div>
                         </div>
                         
                         <div class="flex-1 relative">
-                            <textarea id="messageInput" rows="1" class="w-full rounded-2xl border-gray-300 focus:border-[#128C7E] focus:ring focus:ring-[#128C7E] focus:ring-opacity-20 resize-none py-3 px-4 text-[15px] shadow-sm bg-white" placeholder="اكتب رسالة..." oninput="this.style.height = ''; this.style.height = Math.min(this.scrollHeight, 120) + 'px'"></textarea>
+                            <textarea id="messageInput" rows="1" class="w-full rounded-2xl border-gray-300 focus:border-[#128C7E] focus:ring focus:ring-[#128C7E] focus:ring-opacity-20 resize-none py-3 px-4 text-[15px] shadow-sm bg-white" placeholder="{{ __('local_agent.conv_type_message') }}" oninput="this.style.height = ''; this.style.height = Math.min(this.scrollHeight, 120) + 'px'"></textarea>
                         </div>
 
                         <button type="submit" id="sendBtn" class="btn-whatsapp-primary w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed">
@@ -208,7 +208,7 @@
                 <div class="bg-red-50 p-4 border-t border-red-200 text-center rounded-b-2xl">
                     <p class="text-red-600 font-medium text-sm flex justify-center items-center gap-2">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-                        هذه المحادثة مغلقة. لا يمكنك إرسال رسائل جديدة إلا إذا قمت بإعادة فتحها.
+                        {{ __('local_agent.conv_closed_notice_full') }}
                     </p>
                 </div>
                 @endif
@@ -222,18 +222,18 @@
                     <div class="bg-white border-b border-gray-200 p-4">
                         <h3 class="font-bold text-gray-800 text-sm mb-2 flex items-center gap-2">
                             <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-                            تعيين المحادثة
+                            {{ __('local_agent.conv_assign_title') }}
                         </h3>
                         <form action="{{ route('conversations.assign', $conversation->id) }}" method="POST" class="flex gap-2">
                             @csrf
                             <select name="assigned_to" class="flex-1 rounded-lg border-gray-300 text-sm focus:border-[#128C7E] focus:ring focus:ring-[#128C7E] focus:ring-opacity-20">
-                                <option value="">-- بدون تعيين --</option>
+                                <option value="">-- {{ __('local_agent.conv_unassigned') }} --</option>
                                 @foreach($users as $u)
                                     <option value="{{ $u->id }}" {{ $conversation->assigned_to == $u->id ? 'selected' : '' }}>{{ $u->name }}</option>
                                 @endforeach
                             </select>
                             <button type="submit" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-bold border border-gray-300 transition-colors">
-                                حفظ
+                                {{ __('local_agent.conv_save') }}
                             </button>
                         </form>
                     </div>
@@ -243,11 +243,11 @@
                     <div class="bg-white border-b border-gray-200 flex text-sm text-center">
                         <button type="button" onclick="switchSidebarTab('notes')" id="tab-btn-notes" class="flex-1 font-bold py-3 text-[#128C7E] border-b-2 border-[#128C7E] flex items-center justify-center gap-2">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-                            ملاحظات داخلية
+                            {{ __('local_agent.conv_internal_notes') }}
                         </button>
                         <button type="button" onclick="switchSidebarTab('activities')" id="tab-btn-activities" class="flex-1 font-bold py-3 text-gray-500 border-b-2 border-transparent hover:text-gray-700 hover:border-gray-300 flex items-center justify-center gap-2">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                            سجل الأنشطة
+                            {{ __('local_agent.conv_activity_log') }}
                         </button>
                     </div>
                     
@@ -264,7 +264,7 @@
                                                 <form action="{{ route('conversations.notes.destroy', [$conversation->id, $note->id]) }}" method="POST" class="inline">
                                                     @csrf
                                                     @method('DELETE')
-                                                    <button type="submit" class="text-red-400 hover:text-red-600" onclick="return confirm('هل أنت متأكد من حذف هذه الملاحظة؟')">
+                                                    <button type="submit" class="text-red-400 hover:text-red-600" onclick="return confirm({{ Js::from(__('local_agent.conv_confirm_delete_note')) }})">
                                                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                                                     </button>
                                                 </form>
@@ -275,7 +275,7 @@
                                 </div>
                             @empty
                                 <div class="text-center text-gray-500 py-8 text-sm">
-                                    لا توجد ملاحظات داخلية
+                                    {{ __('local_agent.conv_no_internal_notes') }}
                                 </div>
                             @endforelse
                         </div>
@@ -283,9 +283,9 @@
                         <div class="p-4 bg-white border-t border-gray-200">
                             <form action="{{ route('conversations.notes.store', $conversation->id) }}" method="POST">
                                 @csrf
-                                <textarea name="note" rows="2" class="w-full rounded-lg border-gray-300 focus:border-yellow-400 focus:ring focus:ring-yellow-200 focus:ring-opacity-50 text-sm mb-2" placeholder="اكتب ملاحظة مرئية لفريق العمل فقط..." required></textarea>
+                                <textarea name="note" rows="2" class="w-full rounded-lg border-gray-300 focus:border-yellow-400 focus:ring focus:ring-yellow-200 focus:ring-opacity-50 text-sm mb-2" placeholder="{{ __('local_agent.conv_note_placeholder') }}" required></textarea>
                                 <button type="submit" class="w-full bg-yellow-100 hover:bg-yellow-200 text-yellow-800 font-bold py-2 px-4 rounded-lg text-sm transition-colors border border-yellow-300">
-                                    إضافة ملاحظة
+                                    {{ __('local_agent.conv_add_note') }}
                                 </button>
                             </form>
                         </div>
@@ -312,7 +312,7 @@
                             </div>
                         @empty
                             <div class="text-center text-gray-500 py-8 text-sm">
-                                لا يوجد سجل للأنشطة
+                                {{ __('local_agent.conv_no_activity_log') }}
                             </div>
                         @endforelse
                     </div>
@@ -324,12 +324,46 @@
 
     <!-- Scripts -->
     <script>
+        const CONV_I18N = {
+            done: {{ Js::from(__('local_agent.conv_js_done_title')) }},
+            ok: {{ Js::from(__('local_agent.conv_js_ok')) }},
+            alertTitle: {{ Js::from(__('local_agent.conv_js_alert_title')) }},
+            errorTitle: {{ Js::from(__('local_agent.conv_js_error_title')) }},
+            fileTooLarge: {{ Js::from(__('local_agent.conv_file_too_large')) }},
+            errGeneric: {{ Js::from(__('local_agent.conv_err_generic')) }},
+            err413: {{ Js::from(__('local_agent.conv_err_413')) }},
+            err419: {{ Js::from(__('local_agent.conv_err_419')) }},
+            err422: {{ Js::from(__('local_agent.conv_err_422')) }},
+            sendFailedTitle: {{ Js::from(__('local_agent.conv_send_failed_title')) }},
+            unknownError: {{ Js::from(__('local_agent.conv_unknown_error')) }},
+            connectionLost: {{ Js::from(__('local_agent.conv_connection_lost')) }},
+            newAttachmentReceived: {{ Js::from(__('local_agent.conv_new_attachment_received')) }},
+            attachment: {{ Js::from(__('local_agent.conv_attachment')) }},
+            newMessageFrom: {{ Js::from(__('local_agent.conv_new_message_from')) }},
+            closeConversationTitle: {{ Js::from(__('local_agent.conv_close_conversation_title')) }},
+            confirmClose: {{ Js::from(__('local_agent.conv_confirm_close')) }},
+            yesClose: {{ Js::from(__('local_agent.conv_yes_close')) }},
+            cancel: {{ Js::from(__('local_agent.cancel')) }},
+            editMessageTitle: {{ Js::from(__('local_agent.conv_edit_message_title')) }},
+            writeMessageHere: {{ Js::from(__('local_agent.conv_write_message_here')) }},
+            saveEdits: {{ Js::from(__('local_agent.conv_save_edits')) }},
+            messageEmpty: {{ Js::from(__('local_agent.conv_message_empty')) }},
+            updateFailedPrefix: {{ Js::from(__('local_agent.conv_update_failed_prefix')) }},
+            editedSuccess: {{ Js::from(__('local_agent.conv_edited_success')) }},
+            deleteMessageTitle: {{ Js::from(__('local_agent.conv_delete_message_title')) }},
+            confirmDeleteMessage: {{ Js::from(__('local_agent.conv_confirm_delete_message')) }},
+            yesDelete: {{ Js::from(__('local_agent.conv_yes_delete')) }},
+            deleteFailedPrefix: {{ Js::from(__('local_agent.conv_delete_failed_prefix')) }},
+            messageDeletedMarker: {{ Js::from(__('local_agent.conv_message_deleted_marker')) }},
+            deletedSuccess: {{ Js::from(__('local_agent.conv_deleted_success')) }},
+        };
+
         @if(session('success'))
-            Swal.fire({ icon: 'success', title: 'تم', text: @json(session('success')), confirmButtonText: 'حسناً', confirmButtonColor: '#128C7E', timer: 4000 });
+            Swal.fire({ icon: 'success', title: CONV_I18N.done, text: @json(session('success')), confirmButtonText: CONV_I18N.ok, confirmButtonColor: '#128C7E', timer: 4000 });
         @elseif(session('warning'))
-            Swal.fire({ icon: 'warning', title: 'تنبيه', text: @json(session('warning')), confirmButtonText: 'حسناً', confirmButtonColor: '#128C7E' });
+            Swal.fire({ icon: 'warning', title: CONV_I18N.alertTitle, text: @json(session('warning')), confirmButtonText: CONV_I18N.ok, confirmButtonColor: '#128C7E' });
         @elseif(session('error'))
-            Swal.fire({ icon: 'error', title: 'خطأ', text: @json(session('error')), confirmButtonText: 'حسناً', confirmButtonColor: '#128C7E' });
+            Swal.fire({ icon: 'error', title: CONV_I18N.errorTitle, text: @json(session('error')), confirmButtonText: CONV_I18N.ok, confirmButtonColor: '#128C7E' });
         @endif
 
         // Request Notification Permission on first user interaction to prevent browser blocking
@@ -444,7 +478,7 @@
 
             // Check size (max 10MB)
             if (file.size > 10 * 1024 * 1024) {
-                alert('حجم الملف كبير جداً (أقصى حجم 10 ميغابايت)');
+                alert(CONV_I18N.fileTooLarge);
                 event.target.value = '';
                 return;
             }
@@ -552,11 +586,11 @@
                 });
 
                 if (!response.ok) {
-                    let errMsg = 'حدث خطأ أثناء الاتصال بالخادم.';
-                    if (response.status === 413) errMsg = 'حجم الملف كبير جداً وتجاوز الحد المسموح به.';
-                    else if (response.status === 419) errMsg = 'انتهت الجلسة، يرجى تحديث الصفحة.';
-                    else if (response.status === 422) errMsg = 'البيانات المدخلة غير صالحة.';
-                    else errMsg = `حدث خطأ (${response.status})`;
+                    let errMsg = CONV_I18N.errGeneric;
+                    if (response.status === 413) errMsg = CONV_I18N.err413;
+                    else if (response.status === 419) errMsg = CONV_I18N.err419;
+                    else if (response.status === 422) errMsg = CONV_I18N.err422;
+                    else errMsg = `${CONV_I18N.errGeneric} (${response.status})`;
                     
                     try {
                         const errData = await response.json();
@@ -586,21 +620,21 @@
                 } else {
                     Swal.fire({
                         icon: 'error',
-                        title: 'فشل الإرسال',
-                        text: data.message || 'خطأ غير معروف',
-                        confirmButtonText: 'حسناً',
+                        title: CONV_I18N.sendFailedTitle,
+                        text: data.message || CONV_I18N.unknownError,
+                        confirmButtonText: CONV_I18N.ok,
                         confirmButtonColor: '#128C7E'
                     });
                     document.getElementById(tempId)?.remove();
                 }
             } catch (error) {
                 console.error(error);
-                let textMsg = error.message === 'Failed to fetch' ? 'انقطع الاتصال بالإنترنت أو الخادم غير متاح.' : error.message;
+                let textMsg = error.message === 'Failed to fetch' ? CONV_I18N.connectionLost : error.message;
                 Swal.fire({
                     icon: 'error',
-                    title: 'تنبيه',
+                    title: CONV_I18N.alertTitle,
                     text: textMsg,
-                    confirmButtonText: 'حسناً',
+                    confirmButtonText: CONV_I18N.ok,
                     confirmButtonColor: '#128C7E'
                 });
                 document.getElementById(tempId)?.remove();
@@ -680,7 +714,7 @@
                         
                         if (isIncoming) {
                             hasIncoming = true;
-                            lastIncomingMsg = msg.message_text || 'تم استلام مرفق جديد';
+                            lastIncomingMsg = msg.message_text || CONV_I18N.newAttachmentReceived;
                         }
                         
                         let mediaPreview = '';
@@ -692,7 +726,7 @@
                                 <div class="mb-2">
                                     <a href="${msg.file_path}" target="_blank" class="flex items-center gap-2 text-indigo-600 bg-indigo-50 p-3 rounded-lg hover:bg-indigo-100 transition-colors">
                                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
-                                        <span class="text-sm font-bold font-mono dir-ltr">${msg.file_name || 'مرفق'}</span>
+                                        <span class="text-sm font-bold font-mono dir-ltr">${msg.file_name || CONV_I18N.attachment}</span>
                                     </a>
                                 </div>`;
                             }
@@ -729,7 +763,7 @@
                     });
 
                     if (hasIncoming) {
-                        playNotificationAlert('رسالة جديدة من ' + '{{ $conversation->phone_number }}', lastIncomingMsg);
+                        playNotificationAlert(CONV_I18N.newMessageFrom + ' ' + '{{ $conversation->phone_number }}', lastIncomingMsg);
                     }
                     
                     // Auto-scroll if the user was already at the bottom
@@ -749,14 +783,14 @@
 
         function confirmClose() {
             Swal.fire({
-                title: 'إغلاق المحادثة',
-                text: "هل أنت متأكد من إغلاق هذه المحادثة؟",
+                title: CONV_I18N.closeConversationTitle,
+                text: CONV_I18N.confirmClose,
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#ef4444',
                 cancelButtonColor: '#9ca3af',
-                confirmButtonText: 'نعم، إغلاق',
-                cancelButtonText: 'إلغاء',
+                confirmButtonText: CONV_I18N.yesClose,
+                cancelButtonText: CONV_I18N.cancel,
                 reverseButtons: true
             }).then((result) => {
                 if (result.isConfirmed) {
@@ -769,20 +803,20 @@
         function editMessage(msgId, btnElement) {
             const currentText = btnElement.getAttribute('data-text');
             Swal.fire({
-                title: 'تعديل الرسالة',
+                title: CONV_I18N.editMessageTitle,
                 input: 'textarea',
                 inputValue: currentText,
                 inputAttributes: {
-                    'aria-label': 'اكتب رسالتك هنا'
+                    'aria-label': CONV_I18N.writeMessageHere
                 },
                 showCancelButton: true,
-                confirmButtonText: 'حفظ التعديلات',
-                cancelButtonText: 'إلغاء',
+                confirmButtonText: CONV_I18N.saveEdits,
+                cancelButtonText: CONV_I18N.cancel,
                 confirmButtonColor: '#128C7E',
                 showLoaderOnConfirm: true,
                 preConfirm: (newText) => {
                     if (!newText.trim()) {
-                        Swal.showValidationMessage('الرسالة لا يمكن أن تكون فارغة');
+                        Swal.showValidationMessage(CONV_I18N.messageEmpty);
                         return false;
                     }
                     if (newText === currentText) {
@@ -804,7 +838,7 @@
                         return response.json()
                     })
                     .catch(error => {
-                        Swal.showValidationMessage(`فشل التحديث: ${error}`)
+                        Swal.showValidationMessage(`${CONV_I18N.updateFailedPrefix}: ${error}`)
                     })
                 },
                 allowOutsideClick: () => !Swal.isLoading()
@@ -814,12 +848,12 @@
                     const updatedText = result.value.data.message_text;
                     const textEl = document.getElementById(`msg-text-${msgId}`);
                     if (textEl) textEl.textContent = updatedText;
-                    
+
                     // Update the button data attribute
                     btnElement.setAttribute('data-text', updatedText);
 
                     Swal.fire({
-                        title: 'تم التعديل!',
+                        title: CONV_I18N.editedSuccess,
                         icon: 'success',
                         timer: 1500,
                         showConfirmButton: false
@@ -830,14 +864,14 @@
 
         function deleteMessage(msgId) {
             Swal.fire({
-                title: 'حذف الرسالة',
-                text: "هل أنت متأكد من حذف هذه الرسالة؟ لن يمكنك التراجع عن ذلك.",
+                title: CONV_I18N.deleteMessageTitle,
+                text: CONV_I18N.confirmDeleteMessage,
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#ef4444',
                 cancelButtonColor: '#9ca3af',
-                confirmButtonText: 'نعم، احذفها',
-                cancelButtonText: 'إلغاء',
+                confirmButtonText: CONV_I18N.yesDelete,
+                cancelButtonText: CONV_I18N.cancel,
                 reverseButtons: true,
                 showLoaderOnConfirm: true,
                 preConfirm: () => {
@@ -855,7 +889,7 @@
                         return response.json()
                     })
                     .catch(error => {
-                        Swal.showValidationMessage(`فشل الحذف: ${error}`)
+                        Swal.showValidationMessage(`${CONV_I18N.deleteFailedPrefix}: ${error}`)
                     })
                 },
                 allowOutsideClick: () => !Swal.isLoading()
@@ -865,7 +899,7 @@
                     // (نفس اتفاقية حذف العميل عبر واتساب) — نُحدِّث عنصر الرسالة بدل إزالته كلياً.
                     const textEl = document.getElementById(`msg-text-${msgId}`);
                     if (textEl) {
-                        textEl.textContent = '🚫 تم حذف هذه الرسالة';
+                        textEl.textContent = CONV_I18N.messageDeletedMarker;
                     }
                     const container = document.getElementById(`msg-container-${msgId}`);
                     if (container) {
@@ -875,7 +909,7 @@
                         if (mediaEl) mediaEl.closest('div')?.remove();
                     }
                     Swal.fire({
-                        title: 'تم الحذف!',
+                        title: CONV_I18N.deletedSuccess,
                         icon: 'success',
                         timer: 1500,
                         showConfirmButton: false

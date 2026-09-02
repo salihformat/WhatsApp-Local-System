@@ -32,8 +32,31 @@ Schedule::command('messages:sync-status')->everyTwoMinutes();
 // فحص صحة النظام
 Schedule::command('monitor:system --interval=0')->everyTenMinutes()->withoutOverlapping();
 
-// تشغيل queue worker كل دقيقة
-Schedule::command('queue:work --once')->everyMinute();
+// [Fix] كان هذا يعمل دائماً كل دقيقة بصرف النظر عن وجود queue:work دائم مُشغَّل بالفعل من لوحة
+// التحكم (DashboardController::startServices) — تشغيل مستهلِكَين للطابور معاً (Worker دائم + هذا
+// المجدوَل) يتسابقان على نفس صفوف جدول jobs يسبب أحياناً SQLSTATE[40001] Deadlock عند محاولة كليهما
+// حجز نفس الصف بنفس اللحظة تقريباً، وقد يُعالج كلاهما نفس الرسالة مرتين. نجعله يعمل فقط كشبكة أمان
+// احتياطية عندما لا يوجد Worker دائم يعمل فعلياً (بدل تشغيله دائماً بالتوازي معه).
+Schedule::command('queue:work --once')->everyMinute()->when(function () {
+    $pidFile = storage_path('app/queue_worker.pid');
+    if (!file_exists($pidFile)) {
+        return true;
+    }
+
+    $pid = trim(file_get_contents($pidFile));
+    if (!ctype_digit($pid)) {
+        return true;
+    }
+
+    exec('tasklist /FI "PID eq ' . $pid . '" /NH 2>NUL', $output);
+    foreach ($output as $line) {
+        if (str_contains($line, $pid)) {
+            return false; // الـ Worker الدائم يعمل بالفعل — لا حاجة لهذا الاحتياطي
+        }
+    }
+
+    return true; // ملف PID قديم/متروك، لا يوجد Worker حي فعلياً
+});
 
 // مراقبة مجلد الفواتير (PrintMonitor)
 Schedule::command('monitor:folder')->everyMinute()->withoutOverlapping();

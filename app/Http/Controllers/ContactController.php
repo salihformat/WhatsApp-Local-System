@@ -129,6 +129,8 @@ class ContactController extends Controller
     public function destroy(Contact $contact)
     {
         if ($contact->user_id !== auth()->id()) abort(403);
+        $this->authorize('delete', $contact);
+
         $contact->groups()->detach();
         $contact->delete();
         return redirect()->route('contacts.index')->with('success', __('contacts.contact_deleted'));
@@ -147,7 +149,11 @@ class ContactController extends Controller
 
         switch ($request->action) {
             case 'delete':
-                foreach ($contacts as $c) { $c->groups()->detach(); $c->delete(); }
+                foreach ($contacts as $c) { 
+                    $this->authorize('delete', $c);
+                    $c->groups()->detach(); 
+                    $c->delete(); 
+                }
                 return back()->with('success', __('contacts.contacts_deleted'));
             case 'toggle_favorite':
                 foreach ($contacts as $c) $c->toggleFavorite();

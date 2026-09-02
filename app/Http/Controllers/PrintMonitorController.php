@@ -25,11 +25,11 @@ class PrintMonitorController extends Controller
         $folderExists = File::exists($folderPath);
 
         $folders = [
-            'pending' => ['label' => 'قيد الانتظار (لم تُعالَج بعد)', 'path' => $folderPath, 'root_only' => true],
-            'review' => ['label' => 'بانتظار المراجعة', 'path' => $folderPath . '/review'],
-            'processing' => ['label' => 'قيد المعالجة الآن', 'path' => $folderPath . '/processing'],
-            'archive' => ['label' => 'أُرسلت بنجاح', 'path' => $folderPath . '/archive'],
-            'failed' => ['label' => 'فشلت', 'path' => $folderPath . '/failed'],
+            'pending' => ['label' => __('local_agent.folder_pending'), 'path' => $folderPath, 'root_only' => true],
+            'review' => ['label' => __('local_agent.folder_review'), 'path' => $folderPath . '/review'],
+            'processing' => ['label' => __('local_agent.folder_processing'), 'path' => $folderPath . '/processing'],
+            'archive' => ['label' => __('local_agent.folder_sent'), 'path' => $folderPath . '/archive'],
+            'failed' => ['label' => __('local_agent.folder_failed'), 'path' => $folderPath . '/failed'],
         ];
 
         $data = [];
@@ -108,21 +108,21 @@ class PrintMonitorController extends Controller
     private function traceSourceLabel(?string $source): string
     {
         return match ($source) {
-            'filename' => 'رقم الجوال مُستخرج من اسم الملف',
-            'label' => 'رقم الجوال مُستخرج من محتوى الملف (كلمة دلالة)',
-            'file_number' => 'تم العثور على رقم ملف داخل المستند وتم البحث عنه في جهات الاتصال',
-            'file_number_verified' => 'لم توجد تسمية دقيقة، فتم البحث عن أي رقم قرب كلمة "no"/"رقم" والتحقق منه مقابل جهات الاتصال مباشرة',
-            'ocr_missing' => 'تعذّرت القراءة البصرية (OCR) — البرنامج غير مثبَّت',
-            'ocr_error' => 'تعذّرت القراءة البصرية (OCR) لهذا الملف',
-            'empty_image_text' => 'الصورة/الصفحة الممسوحة ضوئياً لا تحتوي نصاً يمكن قراءته',
-            'unlabeled_fallback' => 'لم توجد كلمة دلالة، تم استخدام أول رقم يشبه جوالاً سعودياً في المحتوى',
-            'corrupted_fallback' => 'طبقة النص تبدو تالفة (مشكلة ترميز عربي)، تم البحث عن رقم بلا تسمية فقط',
-            'env_fallback' => 'تم استخدام رقم الجوال الاحتياطي من الإعدادات (MONITOR_FALLBACK_PHONE)',
-            'parse_error' => 'تعذّرت قراءة محتوى الملف',
-            'empty_text' => 'الملف لا يحتوي على طبقة نص قابلة للقراءة',
-            'no_match_in_content' => 'لم يُعثر على أي رقم أو تسمية صالحة داخل المحتوى',
-            'none' => 'لم تتم أي محاولة استخراج (لا اسم ملف ولا محتوى مطابق)',
-            default => 'غير معروف',
+            'filename' => __('local_agent.trace_filename'),
+            'label' => __('local_agent.trace_label'),
+            'file_number' => __('local_agent.trace_file_number'),
+            'file_number_verified' => __('local_agent.trace_file_number_verified'),
+            'ocr_missing' => __('local_agent.trace_ocr_missing'),
+            'ocr_error' => __('local_agent.trace_ocr_error'),
+            'empty_image_text' => __('local_agent.trace_empty_image_text'),
+            'unlabeled_fallback' => __('local_agent.trace_unlabeled_fallback'),
+            'corrupted_fallback' => __('local_agent.trace_corrupted_fallback'),
+            'env_fallback' => __('local_agent.trace_env_fallback'),
+            'parse_error' => __('local_agent.trace_parse_error'),
+            'empty_text' => __('local_agent.trace_empty_text'),
+            'no_match_in_content' => __('local_agent.trace_no_match_in_content'),
+            'none' => __('local_agent.trace_none'),
+            default => __('local_agent.trace_unknown'),
         };
     }
 
