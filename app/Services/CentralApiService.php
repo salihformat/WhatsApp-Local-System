@@ -489,6 +489,32 @@ class CentralApiService
     }
 
     /**
+     * [New] فحص استباقي: هل باقة الشركة تدعم ميزة "النظام المحلي" أصلاً؟ — بدل انتظار فشل أول
+     * محاولة إرسال فعلية بخطأ FEATURE_NOT_ENABLED لاكتشاف ذلك، ما كان يترك المشكلة مدفونة في
+     * ملف الـ log فقط دون أي مؤشر ظاهر في لوحة تحكم النظام المحلي نفسها.
+     */
+    public function checkFeatureStatus(): array
+    {
+        try {
+            $result = $this->makeApiRequest('GET', '/local-system/feature-status', [], null, 1, 15);
+
+            return [
+                'enabled' => $result['enabled'] ?? false,
+                'message' => $result['message'] ?? null,
+                'checked' => true,
+            ];
+        } catch (Exception $e) {
+            // فشل الفحص نفسه (شبكة/مصادقة) لا يعني بالضرورة أن الميزة غير مفعّلة — لا نُظهر تنبيهاً
+            // خاطئاً في هذه الحالة، فقط نُعلِّم أن الفحص لم يكتمل.
+            return [
+                'enabled' => true,
+                'message' => null,
+                'checked' => false,
+            ];
+        }
+    }
+
+    /**
      * الحصول على إحصائيات الشركة من النظام المركزي
      */
     public function getCompanyStatistics(): array

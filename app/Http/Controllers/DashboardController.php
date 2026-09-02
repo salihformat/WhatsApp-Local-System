@@ -202,12 +202,36 @@ class DashboardController extends Controller
         // لوناً مختلفاً (كهرماني) لهذه الحالة بدل الأحمر المخصص للحالة المؤكدة.
         $whatsappStatus['check_failed'] = in_array($whatsappStatus['status'] ?? null, ['error', 'failed'], true);
 
-        // 5.6 تنبيه "مانع" ظاهر في اللوحة — يُرفَع من SendMessageJob عند أخطاء دائمة (مصادقة/باقة) تمنع
-        // إرسال أي رسالة، بدل أن يبقى الخطأ مدفوناً في ملف الـ log فقط.
+        // 5.6 تنبيه "مانع" ظاهر في اللوحة — مصدران:
+        // أ) فحص استباقي حي لدعم الباقة لميزة "النظام المحلي" (checkFeatureStatus) — يكتشف المشكلة
+        //    فور تحميل اللوحة بدل انتظار فشل أول محاولة إرسال فعلية.
+        // ب) تنبيه مخزَّن يرفعه SendMessageJob عند أخطاء دائمة أخرى (مصادقة مثلاً) تحدث أثناء الإرسال
+        //    الفعلي ولا يغطيها الفحص الاستباقي (مثل انتهاء صلاحية توكن لحظياً).
+        // الفحص الاستباقي أولوية لأنه أحدث دائماً؛ إن كان الفحص نفسه غير مؤكد (checked=false، مثلاً
+        // بسبب انقطاع الشبكة) نرجع للتنبيه المخزَّن كخط دفاع ثانٍ بدل إخفاء المشكلة تماماً.
         $centralBlockingError = null;
+
         $rawBlockingError = \App\Models\Setting::get('CENTRAL_BLOCKING_ERROR');
-        if (!empty($rawBlockingError)) {
-            $centralBlockingError = json_decode($rawBlockingError, true);
+        $storedBlockingError = !empty($rawBlockingError) ? json_decode($rawBlockingError, true) : null;
+
+        $featureStatus = $centralApi->checkFeatureStatus();
+        if ($featureStatus['checked'] && !$featureStatus['enabled']) {
+            $centralBlockingError = [
+                'code' => 'FEATURE_NOT_ENABLED',
+                'message' => $featureStatus['message'] ?? 'باقتك الحالية لا تدعم ميزة الإرسال من النظام المحلي.',
+                'at' => now()->toDateTimeString(),
+            ];
+        } elseif ($featureStatus['checked'] && $featureStatus['enabled']) {
+            // الميزة مفعّلة فعلياً الآن (تأكيد حي) — أي تنبيه مخزَّن قديم بنفس الرمز أصبح غير صالح.
+            if (($storedBlockingError['code'] ?? null) === 'FEATURE_NOT_ENABLED') {
+                \App\Models\Setting::set('CENTRAL_BLOCKING_ERROR', null);
+                \App\Models\Setting::flushCache();
+                $storedBlockingError = null;
+            }
+            $centralBlockingError = $storedBlockingError;
+        } else {
+            // تعذّر الفحص الاستباقي نفسه (شبكة/مصادقة) — نعتمد على آخر تنبيه معروف كخط دفاع ثانٍ.
+            $centralBlockingError = $storedBlockingError;
         }
 
         // 6. Check Background Services Status (via PID files owned by this application only)
