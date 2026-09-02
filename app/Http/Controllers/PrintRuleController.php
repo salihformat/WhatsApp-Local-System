@@ -22,7 +22,8 @@ class PrintRuleController extends Controller
             'priority' => ['required', 'integer', 'min:0'],
             'match_type' => ['required', 'string', 'in:' . implode(',', PrintRule::MATCH_TYPES)],
             'match_value' => ['required', 'string', 'max:255'],
-            'printer_id' => ['required', 'exists:printers,id'],
+            'action_type' => ['required', 'string', 'in:' . implode(',', PrintRule::ACTION_TYPES)],
+            'printer_id' => ['nullable', 'exists:printers,id', 'required_if:action_type,print_and_send,print_only'],
         ]);
 
         PrintRule::create($validated);
@@ -37,7 +38,8 @@ class PrintRuleController extends Controller
             'priority' => ['required', 'integer', 'min:0'],
             'match_type' => ['required', 'string', 'in:' . implode(',', PrintRule::MATCH_TYPES)],
             'match_value' => ['required', 'string', 'max:255'],
-            'printer_id' => ['required', 'exists:printers,id'],
+            'action_type' => ['required', 'string', 'in:' . implode(',', PrintRule::ACTION_TYPES)],
+            'printer_id' => ['nullable', 'exists:printers,id', 'required_if:action_type,print_and_send,print_only'],
             'is_active' => ['nullable', 'boolean'],
         ]);
 

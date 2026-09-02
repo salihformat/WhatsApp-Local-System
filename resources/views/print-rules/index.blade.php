@@ -28,7 +28,7 @@
             <!-- إضافة قاعدة -->
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6 mb-6">
                 <h3 class="text-lg font-bold mb-6 text-indigo-700">{{ __('local_agent.add_routing_rule') }}</h3>
-                <form action="{{ route('print-rules.store') }}" method="POST" class="grid grid-cols-1 md:grid-cols-6 gap-6 items-end">
+                <form action="{{ route('print-rules.store') }}" method="POST" class="grid grid-cols-1 md:grid-cols-6 gap-6 items-end" x-data="{ actionType: 'print_and_send' }">
                     @csrf
 
                     <div class="md:col-span-2">
@@ -52,13 +52,24 @@
                     </div>
 
                     <div class="md:col-span-2">
+                        <label class="block text-sm font-bold text-gray-700 mb-2">{{ __('local_agent.action_type') }}</label>
+                        <select name="action_type" x-model="actionType" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <option value="print_and_send">{{ __('local_agent.action_print_and_send') }}</option>
+                            <option value="print_only">{{ __('local_agent.action_print_only') }}</option>
+                            <option value="send_only">{{ __('local_agent.action_send_only') }}</option>
+                            <option value="save_only">{{ __('local_agent.action_save_only') }}</option>
+                            <option value="hold_for_approval">{{ __('local_agent.action_hold_for_approval') }}</option>
+                        </select>
+                    </div>
+
+                    <div class="md:col-span-2">
                         <label class="block text-sm font-bold text-gray-700 mb-2">{{ __('local_agent.priority') }} <span class="text-xs text-gray-400 font-normal">({{ __('local_agent.priority_hint') }})</span></label>
                         <input type="number" name="priority" value="100" min="0" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                     </div>
 
-                    <div class="md:col-span-2">
+                    <div class="md:col-span-2" x-show="actionType === 'print_and_send' || actionType === 'print_only'">
                         <label class="block text-sm font-bold text-gray-700 mb-2">{{ __('local_agent.col_printer') }}</label>
-                        <select name="printer_id" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        <select name="printer_id" :required="actionType === 'print_and_send' || actionType === 'print_only'" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                             @foreach($printers as $printer)
                                 <option value="{{ $printer->id }}">{{ $printer->name }}</option>
                             @endforeach
@@ -84,6 +95,7 @@
                             <th class="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">{{ __('local_agent.priority') }}</th>
                             <th class="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">{{ __('local_agent.rule_name') }}</th>
                             <th class="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">{{ __('local_agent.condition') }}</th>
+                            <th class="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">{{ __('local_agent.action_type') }}</th>
                             <th class="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">{{ __('local_agent.col_printer') }}</th>
                             <th class="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">{{ __('local_agent.printer_active') }}</th>
                             <th class="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">{{ __('local_agent.col_actions') }}</th>
@@ -100,6 +112,18 @@
                                     @endphp
                                     {{ $labels[$rule->match_type] ?? $rule->match_type }} "<span class="font-medium text-gray-800">{{ $rule->match_value }}</span>"
                                 </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-center text-gray-600">
+                                    @php
+                                        $actionLabels = [
+                                            'print_and_send' => __('local_agent.action_print_and_send'),
+                                            'print_only' => __('local_agent.action_print_only'),
+                                            'send_only' => __('local_agent.action_send_only'),
+                                            'save_only' => __('local_agent.action_save_only'),
+                                            'hold_for_approval' => __('local_agent.action_hold_for_approval'),
+                                        ];
+                                    @endphp
+                                    {{ $actionLabels[$rule->action_type] ?? $rule->action_type }}
+                                </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-center font-medium text-gray-800">{{ $rule->printer?->name ?? '—' }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-center">
                                     <form action="{{ route('print-rules.update', $rule) }}" method="POST" class="inline-flex">
@@ -108,12 +132,13 @@
                                         <input type="hidden" name="priority" value="{{ $rule->priority }}">
                                         <input type="hidden" name="match_type" value="{{ $rule->match_type }}">
                                         <input type="hidden" name="match_value" value="{{ $rule->match_value }}">
+                                        <input type="hidden" name="action_type" value="{{ $rule->action_type }}">
                                         <input type="hidden" name="printer_id" value="{{ $rule->printer_id }}">
                                         <input type="checkbox" name="is_active" value="1" class="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer" onchange="this.form.submit()" {{ $rule->is_active ? 'checked' : '' }}>
                                     </form>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-center">
-                                    <div class="flex items-center justify-center gap-2" x-data="{ editModalOpen: false }">
+                                    <div class="flex items-center justify-center gap-2" x-data="{ editModalOpen: false, actionType: '{{ $rule->action_type }}' }">
                                         <!-- Edit Button -->
                                         <button @click="editModalOpen = true" class="text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-md transition-colors flex items-center gap-1">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -168,22 +193,33 @@
                                                                     <input type="text" name="match_value" value="{{ $rule->match_value }}" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                                                 </div>
 
+                                                                <div>
+                                                                    <label class="block text-sm font-bold text-gray-700 mb-2">{{ __('local_agent.action_type') }}</label>
+                                                                    <select name="action_type" x-model="actionType" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                                                        <option value="print_and_send">{{ __('local_agent.action_print_and_send') }}</option>
+                                                                        <option value="print_only">{{ __('local_agent.action_print_only') }}</option>
+                                                                        <option value="send_only">{{ __('local_agent.action_send_only') }}</option>
+                                                                        <option value="save_only">{{ __('local_agent.action_save_only') }}</option>
+                                                                        <option value="hold_for_approval">{{ __('local_agent.action_hold_for_approval') }}</option>
+                                                                    </select>
+                                                                </div>
+
                                                                 <div class="grid grid-cols-2 gap-4">
                                                                     <div>
                                                                         <label class="block text-sm font-bold text-gray-700 mb-2">{{ __('local_agent.priority') }}</label>
                                                                         <input type="number" name="priority" value="{{ $rule->priority }}" min="0" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                                                     </div>
 
-                                                                    <div>
+                                                                    <div x-show="actionType === 'print_and_send' || actionType === 'print_only'">
                                                                         <label class="block text-sm font-bold text-gray-700 mb-2">{{ __('local_agent.col_printer') }}</label>
-                                                                        <select name="printer_id" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                                                        <select name="printer_id" :required="actionType === 'print_and_send' || actionType === 'print_only'" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                                                             @foreach($printers as $printer)
                                                                                 <option value="{{ $printer->id }}" {{ $rule->printer_id == $printer->id ? 'selected' : '' }}>{{ $printer->name }}</option>
                                                                             @endforeach
                                                                         </select>
                                                                     </div>
                                                                 </div>
-                                                                
+
                                                                 @if($rule->is_active)
                                                                     <input type="hidden" name="is_active" value="1">
                                                                 @endif
@@ -205,7 +241,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="6" class="px-6 py-8 text-center text-gray-500">{{ __('local_agent.no_rules_yet') }}</td></tr>
+                            <tr><td colspan="7" class="px-6 py-8 text-center text-gray-500">{{ __('local_agent.no_rules_yet') }}</td></tr>
                         @endforelse
                     </tbody>
                 </table>

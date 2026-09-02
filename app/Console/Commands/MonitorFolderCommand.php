@@ -355,28 +355,88 @@ class MonitorFolderCommand extends Command
                     'last_message_at' => now(),
                 ]);
 
-                // Move file immediately to processing folder to prevent reprocessing
-                $processingFile = $processingPath . '/' . $filename;
-                if (File::exists($processingFile)) {
-                    File::delete($fullPath);
+                // [New] تحديد الإجراء المطلوب (طباعة/إرسال/حفظ فقط/تعليق للموافقة) عبر محرك قواعد
+                // التوجيه — قبل نقل الملف فعلياً، لأن وجهة النقل نفسها تختلف حسب الإجراء (review
+                // بدل processing عند hold_for_approval).
+                $ruleAction = app(PrintRuleEngine::class)->resolveAction($message);
+                $actionType = $ruleAction['action_type'];
+
+                if ($actionType === 'hold_for_approval') {
+                    $reviewPath = $folderPath . '/review';
+                    if (!File::exists($reviewPath)) {
+                        File::makeDirectory($reviewPath, 0755, true);
+                    }
+                    $reviewFile = $reviewPath . '/' . $filename;
+                    if (File::exists($reviewFile)) {
+                        File::delete($fullPath);
+                    } else {
+                        File::move($fullPath, $reviewFile);
+                    }
+
+                    $message->update([
+                        'status' => 'review_pending',
+                        'metadata' => array_merge($message->metadata ?? [], [
+                            'pending_action' => $ruleAction['rule']?->action_type ?? 'print_and_send',
+                            'pending_printer_id' => $ruleAction['rule']?->printer_id,
+                            'pending_action_rule_id' => $ruleAction['rule']?->id,
+                        ]),
+                    ]);
+
+                    $processedCount++;
+
+                    Log::info('MonitorFolder: file held for manual approval per print rule', [
+                        'filename' => $filename,
+                        'phone' => $phoneNumber,
+                        'message_id' => $message->id,
+                        'rule_id' => $ruleAction['rule']?->id,
+                    ]);
+
+                    $this->info("⏸️ تم تعليق الملف بانتظار موافقة يدوية (قاعدة #{$ruleAction['rule']?->id}): {$filename}");
                 } else {
-                    File::move($fullPath, $processingFile);
+                    // save_only/print_only لا يمران أبداً بـSendMessageJob (الذي ينقل الملف من processing
+                    // إلى archive بعد الإرسال بنجاح) — فلا فائدة من ترك الملف في processing إلى الأبد؛
+                    // ننقله مباشرة إلى archive بما أن الإجراء المطلوب (حفظ/طباعة) سيكتمل بلا خطوة لاحقة
+                    // تعتمد على وجوده هناك.
+                    $isTerminalWithoutSend = in_array($actionType, ['save_only', 'print_only'], true);
+                    $destinationFolder = $isTerminalWithoutSend ? $archivePath : $processingPath;
+                    if (!File::exists($destinationFolder)) {
+                        File::makeDirectory($destinationFolder, 0755, true);
+                    }
+                    $destinationFile = $destinationFolder . '/' . $filename;
+                    if (File::exists($destinationFile)) {
+                        File::delete($fullPath);
+                    } else {
+                        File::move($fullPath, $destinationFile);
+                    }
+
+                    $processedCount++;
+
+                    if (in_array($actionType, ['print_and_send', 'send_only'], true)) {
+                        // Dispatch the job asynchronously to prevent single-threaded server deadlock
+                        dispatch(new SendMessageJob($message->id));
+                    } else {
+                        // save_only أو print_only: لا إرسال عبر واتساب إطلاقاً. [Fix] استُخدمت 'no_whatsapp'
+                        // في مسودة أولى لكنها حالة موجودة مسبقاً لغرض مختلف تماماً (تعذّر الإرسال) — وأخطر
+                        // من ذلك، هذه الحالة بالذات مشمولة في استعلام إعادة المحاولة كل 5 دقائق بـroutes/
+                        // console.php (whereIn(['failed','no_whatsapp','pending'])), فكانت ستُعاد جدولة
+                        // الرسالة للإرسال تلقائياً خلال دقائق رغم أن القاعدة قصدت عدم إرسالها إطلاقاً.
+                        // 'skipped_send' حالة جديدة مستقلة لا يشملها ذلك الاستعلام ولا تُصنَّف كفشل.
+                        $message->update(['status' => 'skipped_send']);
+                    }
+
+                    if (in_array($actionType, ['print_and_send', 'print_only'], true) && $ruleAction['printer']) {
+                        $this->dispatchLocalPrintIfMatched($message, $ruleAction['printer']);
+                    }
+
+                    Log::info("Dispatched file from PrintMonitor to queue", [
+                        'filename' => $filename,
+                        'phone' => $phoneNumber,
+                        'message_id' => $message->id,
+                        'action_type' => $actionType,
+                    ]);
+
+                    $this->info("✅ تم تسجيل الملف ({$actionType}): {$filename}");
                 }
-
-                $processedCount++;
-
-                // Dispatch the job asynchronously to prevent single-threaded server deadlock
-                dispatch(new SendMessageJob($message->id));
-
-                $this->dispatchLocalPrintIfMatched($message);
-
-                Log::info("Dispatched file from PrintMonitor to queue", [
-                    'filename' => $filename,
-                    'phone' => $phoneNumber,
-                    'message_id' => $message->id
-                ]);
-
-                $this->info("✅ تم تسجيل الملف وإضافته لقائمة الإرسال: {$filename}");
             } catch (\Exception $e) {
                 $this->error("فشل في معالجة الملف {$filename}: " . $e->getMessage());
                 Log::error("PrintMonitor Error: " . $e->getMessage());
@@ -489,14 +549,16 @@ class MonitorFolderCommand extends Command
      * فعّالة. يحترم وضع الطابعة (تلقائي/يتطلب موافقة) عبر PrintJobDispatcher. لا يُفشل معالجة الملف
      * أو إرساله عبر واتساب في حال تعذّر جدولة الطباعة.
      */
-    protected function dispatchLocalPrintIfMatched(Message $message): void
+    protected function dispatchLocalPrintIfMatched(Message $message, ?Printer $printer = null): void
     {
         if (!config('printing.enabled')) {
             return;
         }
 
         try {
-            $printer = app(PrintRuleEngine::class)->resolvePrinter($message);
+            // إن لم يُمرَّر طابعة محسومة مسبقاً (من resolveAction الذي يحدد الإجراء الكامل)، نستخدم
+            // resolvePrinter() كسلوك احتياطي متوافق مع الاستدعاءات القديمة (مثل الطباعة اليدوية).
+            $printer ??= app(PrintRuleEngine::class)->resolvePrinter($message);
             if (!$printer) {
                 return;
             }

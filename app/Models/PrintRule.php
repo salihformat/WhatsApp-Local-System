@@ -12,6 +12,14 @@ class PrintRule extends Model
 
     public const MATCH_TYPES = ['phone_number', 'phone_prefix', 'keyword', 'file_type'];
 
+    // print_and_send: طباعة + إرسال معاً (السلوك الافتراضي القديم) | print_only: طباعة بلا إرسال
+    // | send_only: إرسال بلا طباعة | save_only: حفظ فقط بلا طباعة ولا إرسال
+    // | hold_for_approval: تعليق الإجراءين حتى موافقة يدوية
+    public const ACTION_TYPES = ['print_and_send', 'print_only', 'send_only', 'save_only', 'hold_for_approval'];
+
+    // الإجراءات التي تحتاج طابعة فعّالة لتُنفَّذ
+    public const PRINTING_ACTION_TYPES = ['print_and_send', 'print_only'];
+
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
@@ -26,6 +34,7 @@ class PrintRule extends Model
         'priority',
         'match_type',
         'match_value',
+        'action_type',
         'printer_id',
         'is_active',
     ];
@@ -38,6 +47,11 @@ class PrintRule extends Model
     public function printer()
     {
         return $this->belongsTo(Printer::class);
+    }
+
+    public function requiresPrinter(): bool
+    {
+        return in_array($this->action_type, self::PRINTING_ACTION_TYPES, true);
     }
 
     public function scopeActive($query)

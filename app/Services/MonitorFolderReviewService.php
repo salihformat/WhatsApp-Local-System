@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Jobs\SendMessageJob;
 use App\Models\ExtractionCorrection;
 use App\Models\Message;
+use App\Models\Printer;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 
@@ -74,14 +75,41 @@ class MonitorFolderReviewService
                 File::move($reviewFile, $targetPath);
             }
 
-            $message->update(['status' => 'pending']);
-            dispatch(new SendMessageJob($message->id));
+            // [New] إن كان الملف قد عُلِّق بسبب قاعدة hold_for_approval (لا بسبب رقم غير مؤكد)، نُنفِّذ
+            // بالضبط الإجراء الذي كانت القاعدة ستطبّقه أصلاً (طباعة/إرسال/كليهما) بدل افتراض الإرسال
+            // دائماً — وإلا سنتجاهل نيّة القاعدة الأصلية (مثال: قاعدة "طباعة فقط بانتظار موافقة").
+            $pendingAction = $message->metadata['pending_action'] ?? 'print_and_send';
+            $pendingPrinterId = $message->metadata['pending_printer_id'] ?? null;
+
+            $newStatus = in_array($pendingAction, ['print_and_send', 'send_only'], true) ? 'pending' : 'skipped_send';
+            $message->update(['status' => $newStatus]);
+
+            if (in_array($pendingAction, ['print_and_send', 'send_only'], true)) {
+                dispatch(new SendMessageJob($message->id));
+            }
+
+            if (in_array($pendingAction, ['print_and_send', 'print_only'], true)) {
+                $printer = $pendingPrinterId ? Printer::find($pendingPrinterId) : null;
+                if ($printer && $printer->is_active) {
+                    app(\App\Services\PrintJobDispatcher::class)->dispatch($message, $printer, 'monitor_folder');
+                }
+            }
 
             $this->recordCorrection($message, 'approved');
 
-            Log::info('MonitorFolder: manual review approved', ['message_id' => $message->id, 'phone' => $message->phone_number]);
+            Log::info('MonitorFolder: manual review approved', [
+                'message_id' => $message->id,
+                'phone' => $message->phone_number,
+                'pending_action' => $pendingAction,
+            ]);
 
-            return ['success' => true, 'message' => "تمت الموافقة، سيُرسل الملف إلى {$message->phone_number} الآن."];
+            $actionLabel = match ($pendingAction) {
+                'print_only' => 'سيُطبع الملف الآن دون إرسال.',
+                'send_only', 'print_and_send' => "سيُرسل الملف إلى {$message->phone_number} الآن.",
+                default => 'تم حفظ الملف دون إرسال أو طباعة.',
+            };
+
+            return ['success' => true, 'message' => "تمت الموافقة. {$actionLabel}"];
         } catch (\Exception $e) {
             Log::error('MonitorFolder: failed to approve reviewed file: ' . $e->getMessage());
             return ['success' => false, 'message' => 'فشلت الموافقة: ' . $e->getMessage()];

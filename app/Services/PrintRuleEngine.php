@@ -15,42 +15,66 @@ use Illuminate\Support\Facades\Log;
  */
 class PrintRuleEngine
 {
+    /**
+     * @deprecated استخدم resolveAction() — أُبقي عليها لأن MessageController::632 لا يزال يستدعيها
+     * مباشرة لحالة استخدام واحدة (طباعة يدوية من واجهة الرسالة) لا تحتاج معرفة نوع الإجراء.
+     */
     public function resolvePrinter(Message $message): ?Printer
     {
-        if (!$this->isPrintable($message)) {
-            Log::debug('PrintRuleEngine: message not printable', [
-                'message_id' => $message->id,
-                'message_type' => $message->message_type,
-                'file_path' => $message->file_path ? '(set)' : '(empty)',
-                'resolved_extension' => $this->fileExtension($message),
-                'file_type' => $message->file_type,
-                'file_name' => $message->file_name,
-            ]);
-            return null;
-        }
+        return $this->resolveAction($message)['printer'];
+    }
 
+    /**
+     * يحدد الإجراء الكامل المطلوب لرسالة/ملف وارد: هل يُطبع، يُرسل، كلاهما، يُحفظ فقط، أو يُعلَّق
+     * لموافقة يدوية — بناءً على أول قاعدة PrintRule نشطة تُطابقه (بأولوية priority)، أو السلوك
+     * الافتراضي التاريخي (طباعة + إرسال) إن لم تُطابق أي قاعدة.
+     *
+     * @return array{action_type: string, printer: ?Printer, rule: ?PrintRule}
+     */
+    public function resolveAction(Message $message): array
+    {
         $rules = PrintRule::with('printer')
             ->active()
             ->orderedByPriority()
             ->get();
 
         foreach ($rules as $rule) {
-            if (!$rule->printer || !$rule->printer->is_active) {
+            if (!$this->ruleMatches($rule, $message)) {
                 continue;
             }
 
-            if ($this->ruleMatches($rule, $message)) {
-                Log::info("PrintRuleEngine: matched rule #{$rule->id} ({$rule->match_type}={$rule->match_value})", [
-                    'message_id' => $message->id,
-                    'printer' => $rule->printer->name,
-                ]);
-                return $rule->printer;
+            $actionType = $rule->action_type ?: 'print_and_send';
+            $printer = null;
+
+            if (in_array($actionType, PrintRule::PRINTING_ACTION_TYPES, true)) {
+                if ($rule->printer && $rule->printer->is_active && $this->isPrintable($message)) {
+                    $printer = $rule->printer;
+                } elseif ($actionType === 'print_only') {
+                    // لا معنى للاستمرار كـ"طباعة فقط" بلا طابعة صالحة أو ملف غير قابل للطباعة —
+                    // نتجاهل هذه القاعدة تماماً وننتقل للتالية بدل تنفيذ إجراء فارغ (لا طباعة ولا إرسال).
+                    Log::debug("PrintRuleEngine: skipping print_only rule #{$rule->id} — no valid printer or file not printable", [
+                        'message_id' => $message->id,
+                    ]);
+                    continue;
+                } else {
+                    // print_and_send لكن تعذّر تحقيق شق الطباعة — نُبقي على شق الإرسال بدل إسقاط الرسالة كاملة.
+                    $actionType = 'send_only';
+                }
             }
+
+            Log::info("PrintRuleEngine: matched rule #{$rule->id} ({$rule->match_type}={$rule->match_value}) → {$actionType}", [
+                'message_id' => $message->id,
+                'printer' => $printer?->name,
+            ]);
+
+            return ['action_type' => $actionType, 'printer' => $printer, 'rule' => $rule];
         }
 
-        $defaultPrinter = Printer::active()->where('is_default', true)->first();
+        // لا قاعدة مطابقة — السلوك الافتراضي التاريخي: إرسال + طباعة إن وُجدت طابعة افتراضية وكان الملف قابلاً للطباعة.
+        $defaultPrinter = $this->isPrintable($message) ? Printer::active()->where('is_default', true)->first() : null;
+
         if ($defaultPrinter) {
-            Log::info("PrintRuleEngine: no rule matched, using default printer", [
+            Log::info('PrintRuleEngine: no rule matched, using default printer', [
                 'message_id' => $message->id,
                 'printer' => $defaultPrinter->name,
             ]);
@@ -61,7 +85,8 @@ class PrintRuleEngine
                 'extension' => $this->fileExtension($message),
             ]);
         }
-        return $defaultPrinter;
+
+        return ['action_type' => 'print_and_send', 'printer' => $defaultPrinter, 'rule' => null];
     }
 
     /**
