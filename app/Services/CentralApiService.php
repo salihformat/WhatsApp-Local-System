@@ -429,26 +429,65 @@ class CentralApiService
     }
 
     /**
-     * التحقق من الاتصال بالنظام المركزي
+     * التحقق من الاتصال بالنظام المركزي — ومن صحة الاعتمادات، لا مجرد وصول الخادم.
+     *
+     * [Bug fix 2026-09-07] كان هذا الفحص يستدعي '/health'، وهو مسار **بلا أي مصادقة** على
+     * المركزي (throttle فقط) — فيعيد 200 مهما كان CENTRAL_API_TOKEN خاطئاً. والنتيجة أن
+     * الصفحة تعرض "متصل" بينما كل طلب فعلي يُرفض بـ 401، وهو ما رُصد فعلياً: النظام المحلي
+     * يقول "متصل" والمركزي يسجّل INVALID_TOKEN لنفس اللحظة.
+     *
+     * وزاد الطين بلّة أن اختبار النجاح كان:
+     *     ($result['success'] ?? false) || !isset($result['error']) || ...
+     * وشرط `!isset($result['error'])` وحده يحوّل أي رد لا يحمل مفتاح 'error' حرفياً إلى نجاح —
+     * ورد الرفض من المركزي يستخدم 'message' و 'error_code' لا 'error'.
+     *
+     * الآن نستدعي '/auth/check' المحمي بـ auth.company، ونفرّق بين حالتين يحتاج المستخدم
+     * التمييز بينهما لأن علاجهما مختلف تماماً:
+     *   - الخادم غير متاح (شبكة/توقف) → تحقق من الرابط والإنترنت.
+     *   - الخادم يعمل لكنه رفض الاعتمادات → صحّح معرّف الشركة أو رمز الحماية.
      */
     public function checkConnection(): array
     {
-        try {
-            $result = $this->makeApiRequest('GET', '/health');
+        $startedAt = microtime(true);
 
-            // makeApiRequest might return success => false if the JSON doesn't strictly have "success": true
-            // but if there's no "error" and it returned without exception (meaning 2xx status), it's successful.
-            $isSuccess = ($result['success'] ?? false) || !isset($result['error']) || str_contains($result['error'], 'النظام المركزي يعمل بشكل طبيعي');
+        try {
+            $result = $this->makeApiRequest('GET', '/auth/check', [], null, 1, 15);
+
+            $status = $result['status'] ?? null;
+            $authRejected = in_array($status, [401, 403], true);
+
+            if ($authRejected) {
+                return [
+                    'success' => false,
+                    'auth_failed' => true,
+                    'response_time' => microtime(true) - $startedAt,
+                    'message' => 'الخادم المركزي يعمل، لكنه رفض بيانات الاعتماد. تحقّق من '
+                        . 'CENTRAL_API_COMPANY_ID و CENTRAL_API_TOKEN ومطابقتهما لما في صفحة الشركة بالمركزي.',
+                ];
+            }
+
+            // النجاح هنا صريح فقط: المركزي يعيد success=true من /auth/check بعد اجتياز
+            // المصادقة. لا نعتبر غياب مفتاح خطأ دليلَ نجاح كما كان سابقاً.
+            if (($result['success'] ?? false) === true) {
+                return [
+                    'success' => true,
+                    'auth_failed' => false,
+                    'response_time' => microtime(true) - $startedAt,
+                    'message' => 'الاتصال والمصادقة يعملان بشكل طبيعي',
+                ];
+            }
 
             return [
-                'success' => $isSuccess,
-                'response_time' => microtime(true) - LARAVEL_START,
-                'message' => $result['error'] ?? 'الاتصال يعمل بشكل طبيعي'
+                'success' => false,
+                'auth_failed' => false,
+                'response_time' => microtime(true) - $startedAt,
+                'message' => $result['error'] ?? 'تعذّر الوصول إلى النظام المركزي',
             ];
 
         } catch (Exception $e) {
             return [
                 'success' => false,
+                'auth_failed' => false,
                 'response_time' => null,
                 'message' => 'فشل في الاتصال: ' . $e->getMessage()
             ];
@@ -498,10 +537,26 @@ class CentralApiService
         try {
             $result = $this->makeApiRequest('GET', '/local-system/feature-status', [], null, 1, 15);
 
+            // [Bug fix 2026-09-07] makeApiRequest() لا يرمي استثناءً عند 401/403 — بل يعيد
+            // مصفوفة تحمل 'status' و 'error'. فكان رفضُ الاعتمادات يسقط في السطر التالي بلا
+            // مفتاح 'enabled'، فيصير enabled=false و checked=true، وتُعرَض للمستخدم رسالة
+            // "باقتك لا تدعم ميزة النظام المحلي" بينما السبب الحقيقي رمز حماية خاطئ. رُصد
+            // فعلياً: بانر FEATURE_NOT_ENABLED ظهر في نفس الفترة التي كان فيها التوكن خاطئاً.
+            // نميّز الحالتين صراحةً: رفض المصادقة ليس فحصاً ناجحاً.
+            if (in_array($result['status'] ?? null, [401, 403], true)) {
+                return [
+                    'enabled' => true,
+                    'message' => null,
+                    'checked' => false,
+                    'auth_failed' => true,
+                ];
+            }
+
             return [
                 'enabled' => $result['enabled'] ?? false,
                 'message' => $result['message'] ?? null,
                 'checked' => true,
+                'auth_failed' => false,
             ];
         } catch (Exception $e) {
             // فشل الفحص نفسه (شبكة/مصادقة) لا يعني بالضرورة أن الميزة غير مفعّلة — لا نُظهر تنبيهاً
@@ -510,6 +565,7 @@ class CentralApiService
                 'enabled' => true,
                 'message' => null,
                 'checked' => false,
+                'auth_failed' => false,
             ];
         }
     }

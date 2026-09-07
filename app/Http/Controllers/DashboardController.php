@@ -222,8 +222,18 @@ class DashboardController extends Controller
                 'at' => now()->toDateTimeString(),
             ];
         } elseif ($featureStatus['checked'] && $featureStatus['enabled']) {
-            // الميزة مفعّلة فعلياً الآن (تأكيد حي) — أي تنبيه مخزَّن قديم بنفس الرمز أصبح غير صالح.
-            if (($storedBlockingError['code'] ?? null) === 'FEATURE_NOT_ENABLED') {
+            // الميزة مفعّلة فعلياً الآن (تأكيد حي) — أي تنبيه مخزَّن قديم أصبح غير صالح.
+            //
+            // [Bug fix 2026-09-07] كان يُمسَح تنبيه FEATURE_NOT_ENABLED وحده. أما تنبيه AUTH
+            // فلا يمسحه شيء هنا إطلاقاً — ولا يُمسح إلا عند نجاح إرسال رسالة فعلية داخل
+            // SendMessageJob. فمن يصحّح رمز الحماية ولا توجد لديه رسائل في الطابور يبقى يرى
+            // "رمز الحماية غير صحيح" إلى الأبد رغم أن المصادقة تعمل. رُصد فعلياً: بانر بتوقيت
+            // 18:25:05 ظل ظاهراً بعد تصحيح التوكن بوقت طويل.
+            //
+            // ووصولنا إلى هذا الفرع أصلاً دليلٌ حيٌّ على نجاح المصادقة: feature-status مسار
+            // محمي، و checked=true تعني أنه ردّ بنجاح لا برفض (راجع checkFeatureStatus).
+            $staleCodes = ['FEATURE_NOT_ENABLED', 'AUTH'];
+            if (in_array($storedBlockingError['code'] ?? null, $staleCodes, true)) {
                 \App\Models\Setting::set('CENTRAL_BLOCKING_ERROR', null);
                 \App\Models\Setting::flushCache();
                 $storedBlockingError = null;
@@ -348,7 +358,7 @@ class DashboardController extends Controller
     public function processQueue()
     {
         try {
-            $exitCode = Artisan::call('queue:work', ['--once' => true]);
+            $exitCode = Artisan::call('queue:work', ['--once' => true, '--queue' => 'default,contacts-sync']);
             $output = Artisan::output();
             
             return redirect()->route('dashboard')->with('success', 'تم معالجة قائمة الانتظار بنجاح.');
@@ -370,7 +380,7 @@ class DashboardController extends Controller
             $messages = [];
 
             if (!$this->isTrackedProcessRunning('queue')) {
-                $this->launchTrackedProcess('queue', $phpPath, $basePath, 'artisan queue:work');
+                $this->launchTrackedProcess('queue', $phpPath, $basePath, 'artisan queue:work --queue=default,contacts-sync');
                 $messages[] = 'تم تشغيل عامل الطابور (Queue Worker).';
             } else {
                 $messages[] = 'عامل الطابور يعمل مسبقاً.';
@@ -426,7 +436,7 @@ class DashboardController extends Controller
             // Wait a moment for the process to terminate
             sleep(1);
 
-            $this->launchTrackedProcess('queue', 'c:\xampp\php\php.exe', base_path(), 'artisan queue:work');
+            $this->launchTrackedProcess('queue', 'c:\xampp\php\php.exe', base_path(), 'artisan queue:work --queue=default,contacts-sync');
 
             return redirect()->route('dashboard')->with('success', 'تم إعادة تشغيل الطابور بنجاح.');
         } catch (\Exception $e) {
