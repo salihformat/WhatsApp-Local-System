@@ -31,11 +31,11 @@ class SyncConfigCommand extends Command
         $this->info('Starting configuration sync from central server...');
 
         $apiUrl = config('app.central_api_url');
-        $token = config('app.central_api_token');
+        $token = \App\Services\CentralApiService::resolveApiToken();
         $companyId = config('app.company_id');
 
         if (empty($apiUrl) || empty($token) || empty($companyId)) {
-            $this->error('Missing central server configuration (API URL, token, or company ID). Please check your .env file.');
+            $this->error('Missing central server configuration (API URL, valid token, or company ID). Please check your .env file.');
             return 1;
         }
 

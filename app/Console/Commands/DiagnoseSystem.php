@@ -49,7 +49,7 @@ class DiagnoseSystem extends Command
 
         $configs = [
             'CENTRAL_API_URL' => config('app.central_api_url'),
-            'CENTRAL_API_TOKEN' => config('app.central_api_token'),
+            'CENTRAL_API_TOKEN' => \App\Services\CentralApiService::resolveApiToken(),
             'COMPANY_ID' => config('app.company_id'),
             'APP_ENV' => config('app.env'),
             'APP_DEBUG' => config('app.debug') ? 'true' : 'false',
@@ -58,7 +58,9 @@ class DiagnoseSystem extends Command
 
         foreach ($configs as $key => $value) {
             if (empty($value)) {
-                $this->error("❌ {$key}: Not set");
+                $this->error($key === 'CENTRAL_API_TOKEN'
+                    ? "❌ {$key}: Not set or invalid (empty, or contains spaces/control characters)"
+                    : "❌ {$key}: Not set");
             } else {
                 $displayValue = $key === 'CENTRAL_API_TOKEN' ? substr($value, 0, 10) . '...' : $value;
                 $this->line("✅ {$key}: {$displayValue}");
@@ -126,7 +128,7 @@ class DiagnoseSystem extends Command
         $this->info('🔐 Checking Authentication...');
 
         $centralUrl = config('app.central_api_url');
-        $token = config('app.central_api_token');
+        $token = \App\Services\CentralApiService::resolveApiToken();
         $companyId = config('app.company_id');
 
         if (empty($centralUrl) || empty($token) || empty($companyId)) {
