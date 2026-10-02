@@ -9,6 +9,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use App\Models\Message;
+use App\Services\CentralApiService;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -51,6 +52,16 @@ class SendMessageJob implements ShouldQueue
         // التحقق من حالة الرسالة
         if (!in_array($message->status, ['pending', 'failed'])) {
             Log::info("Message {$this->messageId} already processed with status: {$message->status}");
+            return;
+        }
+
+        // فحص مسبق للتوكن: رأس "Bearer " فارغ يُرفض مركزياً كصيغة خاطئة ويُنتج تنبيهات متكررة.
+        // لا فائدة من إعادة المحاولة قبل تصحيح الإعداد، فنفشل فوراً برسالة واضحة.
+        $apiToken = CentralApiService::resolveApiToken();
+        if ($apiToken === null) {
+            $error = 'CENTRAL_API_TOKEN فارغ أو غير صالح في إعدادات النظام المحلي (.env)';
+            Log::error("SendMessageJob aborted for message {$this->messageId}: {$error}");
+            $message->update(['status' => 'failed', 'error_message' => $error]);
             return;
         }
 
@@ -168,7 +179,7 @@ class SendMessageJob implements ShouldQueue
 
             $request = Http::timeout(180) // تم زيادة مهلة الاتصال للسماح برفع الملفات بأحجام أكبر دون انقطاع
                 ->withHeaders([
-                    'Authorization' => 'Bearer ' . config('app.central_api_token'),
+                    'Authorization' => 'Bearer ' . $apiToken,
                     'X-Company-ID' => config('app.company_id'),
                     'Accept' => 'application/json'
                 ]);
@@ -239,7 +250,7 @@ class SendMessageJob implements ShouldQueue
                         // الإرسال المباشر (multipart) واحتاجت هذا الاحتياطي. نُعيد بناء نفس الترويسات كاملة.
                         $request = Http::timeout(config('app.central_api_timeout', 60))
                             ->withHeaders([
-                                'Authorization' => 'Bearer ' . config('app.central_api_token'),
+                                'Authorization' => 'Bearer ' . $apiToken,
                                 'X-Company-ID' => config('app.company_id'),
                                 'Accept' => 'application/json',
                                 'Content-Type' => 'application/json',

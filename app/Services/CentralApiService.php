@@ -22,10 +22,32 @@ class CentralApiService
         $this->baseUrl = config('app.central_api_url');
 //        $this->companyId = config('app.central_api_company_id');
         $this->companyId = config('app.company_id');
-        $this->apiToken = config('app.central_api_token');
+        $this->apiToken = self::resolveApiToken();
         $this->timeout = config('app.central_api_timeout', 60);
         $this->retryAttempts = config('app.central_api_retry_attempts', 3);
         $this->retryDelay = config('app.central_api_retry_delay', 5);
+    }
+
+    /**
+     * يعيد CENTRAL_API_TOKEN منظّفاً (بلا مسافات/أسطر زائدة)، أو null إن كان فارغاً أو غير صالح
+     * كقيمة رأس HTTP (يحتوي مسافات داخلية أو محارف تحكم). بدون هذا الفحص كان الرأس يُرسَل
+     * "Bearer " فارغاً فيرصده النظام المركزي كـ "صيغة مصادقة خاطئة".
+     */
+    public static function resolveApiToken(): ?string
+    {
+        $token = config('app.central_api_token');
+
+        if (!is_string($token)) {
+            return null;
+        }
+
+        $token = trim($token, " \t\n\r\0\x0B\"'");
+
+        if ($token === '' || preg_match('/[\s\x00-\x1F\x7F]/', $token)) {
+            return null;
+        }
+
+        return $token;
     }
 
     /**
@@ -240,6 +262,18 @@ class CentralApiService
         $requestId = uniqid('req_');
         $effectiveMaxAttempts = $maxAttempts ?? $this->retryAttempts;
         $effectiveTimeout = $requestTimeout ?? $this->timeout;
+
+        // فحص مسبق: لا نرسل أي طلب برأس Authorization معطوب (توكن فارغ/غير صالح)
+        if ($this->apiToken === null) {
+            $error = 'CENTRAL_API_TOKEN فارغ أو غير صالح في إعدادات النظام المحلي (.env) — لم يُرسَل الطلب.';
+            Log::error($error, ['request_id' => $requestId, 'endpoint' => $endpoint, 'method' => $method]);
+
+            return [
+                'success' => false,
+                'error' => $error,
+                'status' => 'failed',
+            ];
+        }
 
         Log::info("Making API request with company ID: " . $currentCompanyId, [
             'request_id' => $requestId,
